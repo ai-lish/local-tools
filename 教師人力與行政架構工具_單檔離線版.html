@@ -222,6 +222,14 @@ textarea {
 .status-message--warning { color: #75530c; background: var(--gold-soft); border: 1px solid #ecd89a; }
 .status-message--error { color: #8d342a; background: var(--red-soft); border: 1px solid #efc8c3; }
 
+.data-layer-panel { margin-bottom: 18px; padding: 18px 20px; border-left: 5px solid var(--gold); }
+.data-layer-panel__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.data-layer-panel__header h2 { margin-bottom: 3px; font-size: 18px; }
+.data-layer-panel__header p { margin-bottom: 0; color: var(--muted); font-size: 12px; }
+.data-layer-actions { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+.confidence-pending { padding: 7px 10px; color: #75530c; background: var(--gold-soft); border: 1px solid #ecd89a; border-radius: 7px; font-size: 11px; font-weight: 750; }
+.data-layer-status { margin-top: 12px; }
+
 .teacher-picker { margin-top: 18px; padding: 25px 26px; display: grid; grid-template-columns: .8fr 1.2fr; gap: 34px; align-items: end; border-left: 5px solid var(--blue); }
 .picker-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; }
 .picker-controls label { color: #526374; font-size: 12px; font-weight: 700; }
@@ -385,6 +393,7 @@ footer p { margin: 0; }
   .pdf-upload-copy { flex-basis: calc(100% - 80px); }
   .pdf-drop-zone .button { margin-left: 78px; }
   .admin-upload-actions { align-items: stretch; flex-direction: column; }
+  .data-layer-panel__header { flex-direction: column; }
   .admin-report-header { padding: 22px 18px; }
   .membership-grid { padding: 18px; }
   .admin-summary { padding: 16px 18px; }
@@ -434,6 +443,24 @@ footer p { margin: 0; }
   </nav>
 
   <main class="shell">
+    <section class="panel data-layer-panel" aria-labelledby="dataLayerTitle">
+      <div class="data-layer-panel__header">
+        <div>
+          <h2 id="dataLayerTitle">可攜式資料中介層</h2>
+          <p>資料快照含人事資料；mapping profile 只含結構設定。所有內容只保留在記憶體，必須由使用者明示匯入或匯出檔案。</p>
+        </div>
+        <span class="confidence-pending">信心標記尚未啟用；目前 confidence 只填入 high 佔位，並不代表已校驗。</span>
+      </div>
+      <div class="data-layer-actions">
+        <button id="exportSnapshotBtn" class="button button--dark" type="button">匯出 data snapshot</button>
+        <label class="button button--ghost" for="importSnapshotInput">匯入 data snapshot</label>
+        <input id="importSnapshotInput" class="visually-hidden" type="file" accept=".json,application/json">
+        <button id="exportProfileBtn" class="button button--secondary" type="button">匯出 mapping profile</button>
+        <label class="button button--ghost" for="importProfileInput">匯入 mapping profile</label>
+        <input id="importProfileInput" class="visually-hidden" type="file" accept=".json,application/json">
+      </div>
+      <div id="dataLayerStatus" class="data-layer-status" aria-live="polite"></div>
+    </section>
     <div id="workloadTool" class="tool-view">
     <section class="intro panel">
       <div>
@@ -779,7 +806,12 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     notesList: $("#notesList"),
     copyBtn: $("#copyBtn"),
     printBtn: $("#printBtn"),
-    encodingSelect: $("#encodingSelect")
+    encodingSelect: $("#encodingSelect"),
+    exportSnapshotBtn: $("#exportSnapshotBtn"),
+    importSnapshotInput: $("#importSnapshotInput"),
+    exportProfileBtn: $("#exportProfileBtn"),
+    importProfileInput: $("#importProfileInput"),
+    dataLayerStatus: $("#dataLayerStatus")
   };
 
   const state = {
@@ -788,7 +820,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     notes: [],
     sourceName: "",
     workbook: null,
-    activeTeacherId: ""
+    activeTeacherId: "",
+    snapshot: null,
+    profile: null,
+    sourceWorkload: { fileName: "", sheetName: "", rows: 0, cols: 0 },
+    adminAdapter: null
   };
 
   const GENERIC_HEADERS = new Set([
@@ -1154,18 +1190,25 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     }
   }
 
-  function analyzeMatrix(matrix, sourceName) {
+  function analyzeMatrix(matrix, sourceName, sourceMeta = {}) {
     state.matrix = matrix.map(row => row.map(normalize));
     state.sourceName = sourceName;
     state.activeTeacherId = "";
+    state.snapshot = null;
     const config = getConfig();
     state.teachers = parseTeachers(state.matrix, config);
     state.notes = parseNotes(state.matrix, config.note);
+    const dimensions = matrixDimensions(state.matrix);
+    state.sourceWorkload = {
+      fileName: sourceMeta.fileName ?? sourceName,
+      sheetName: sourceMeta.sheetName ?? "",
+      rows: dimensions.rows,
+      cols: dimensions.cols
+    };
     renderTeacherOptions();
     dom.resultSection.hidden = true;
     dom.emptyGuide.hidden = state.teachers.length > 0;
     if (state.teachers.length) {
-      const dimensions = matrixDimensions(state.matrix);
       const duplicated = duplicateShortNames(state.teachers).size;
       showStatus("success", "資料解析完成", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師${duplicated ? `；其中 ${duplicated} 個簡稱重複，選擇時請按代碼核對` : ""}。`);
     } else {
@@ -1199,19 +1242,34 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     dom.teacherCountText.textContent = `已解析 ${state.teachers.length} 位教師；可輸入簡稱、代碼或學科領域篩選。`;
   }
 
+  function recordsForTeacher(teacher) {
+    if (state.snapshot) {
+      return {
+        assignments: state.snapshot.assignments.filter(item => item.teacherId === teacher.id).map(item => ({
+          ...item,
+          isHomeroom: item.homeroomRank !== null
+        })),
+        activities: state.snapshot.activities.filter(item => item.teacherId === teacher.id)
+      };
+    }
+    const config = getConfig();
+    const knownShortNames = new Set(state.teachers.map(item => item.shortName));
+    return {
+      assignments: [
+        ...scanTimetable(state.matrix, teacher, config.junior, "初中", knownShortNames),
+        ...scanTimetable(state.matrix, teacher, config.senior, "高中", knownShortNames)
+      ],
+      activities: scanActivities(state.matrix, teacher, config.activity, knownShortNames)
+    };
+  }
+
   function selectTeacher(teacherId) {
     const teacher = state.teachers.find(item => item.id === teacherId);
     if (!teacher) { dom.resultSection.hidden = true; return; }
     state.activeTeacherId = teacherId;
-    const config = getConfig();
-    const knownShortNames = new Set(state.teachers.map(item => item.shortName));
-    const assignments = [
-      ...scanTimetable(state.matrix, teacher, config.junior, "初中", knownShortNames),
-      ...scanTimetable(state.matrix, teacher, config.senior, "高中", knownShortNames)
-    ];
+    const { assignments, activities } = recordsForTeacher(teacher);
     const homeroom = assignments.filter(item => item.isHomeroom);
     const teaching = assignments.filter(item => !item.isHomeroom);
-    const activities = scanActivities(state.matrix, teacher, config.activity, knownShortNames);
     renderReport(teacher, homeroom, teaching, activities);
     dom.resultSection.hidden = false;
     dom.emptyGuide.hidden = true;
@@ -1277,7 +1335,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       if (["csv", "tsv"].includes(extension)) {
         state.workbook = null;
         const text = decodeText(buffer);
-        analyzeMatrix(parseDelimited(text, extension === "tsv" ? "\t" : detectDelimiter(text)), file.name);
+        analyzeMatrix(parseDelimited(text, extension === "tsv" ? "\t" : detectDelimiter(text)), file.name, { fileName: file.name, sheetName: "" });
         renderFileMeta(file, null);
         return;
       }
@@ -1300,6 +1358,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   }
 
   function chooseBestSheet(workbook) {
+    const hint = state.profile?.workload?.sheetNameHint;
+    if (hint && workbook.Sheets[hint]) return hint;
     const config = getConfig();
     let best = workbook.SheetNames[0];
     let bestScore = -1;
@@ -1313,7 +1373,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
 
   function loadWorkbookSheet(sheetName, fileName = state.sourceName.split("・")[0]) {
     if (!state.workbook || !state.workbook.Sheets[sheetName]) return;
-    analyzeMatrix(sheetToMatrix(state.workbook, sheetName), `${fileName}・${sheetName}`);
+    analyzeMatrix(sheetToMatrix(state.workbook, sheetName), `${fileName}・${sheetName}`, { fileName, sheetName });
   }
 
   function renderFileMeta(file, sheetNames, selectedSheet) {
@@ -1376,15 +1436,10 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   function copySummary() {
     const teacher = state.teachers.find(item => item.id === state.activeTeacherId);
     if (!teacher) return;
-    const config = getConfig();
-    const known = new Set(state.teachers.map(item => item.shortName));
-    const assignments = [
-      ...scanTimetable(state.matrix, teacher, config.junior, "初中", known),
-      ...scanTimetable(state.matrix, teacher, config.senior, "高中", known)
-    ];
+    const { assignments, activities: activityRecords } = recordsForTeacher(teacher);
     const homeroom = assignments.filter(item => item.isHomeroom).map(item => `${item.className} ${item.subject}`);
     const teaching = assignments.filter(item => !item.isHomeroom).map(item => `${item.className} ${item.subject}`);
-    const activities = scanActivities(state.matrix, teacher, config.activity, known).map(item => item.name);
+    const activities = activityRecords.map(item => item.name);
     const text = [
       `${teacher.shortName}老師（${teacher.code}）`,
       `總節數／負載：${teacher.load}`,
@@ -1413,6 +1468,402 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     if (!ok) throw new Error("copy failed");
   }
 
+  const SNAPSHOT_KEYS = ["kind", "schemaVersion", "generatedAt", "profileId", "source", "teachers", "assignments", "activities", "notes", "orgGroups", "conflicts"];
+  const PROFILE_KEYS = ["kind", "schemaVersion", "id", "label", "createdAt", "workload", "admin"];
+  const CONFIDENCE_VALUES = new Set(["high", "low", "manual"]);
+
+  function isPlainObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function requireObject(value, path) {
+    if (!isPlainObject(value)) throw new Error(`${path} 必須是 object。`);
+  }
+
+  function requireArray(value, path) {
+    if (!Array.isArray(value)) throw new Error(`${path} 必須是 array。`);
+  }
+
+  function requireString(value, path) {
+    if (typeof value !== "string") throw new Error(`${path} 必須是 string。`);
+  }
+
+  function requireIso8601(value, path) {
+    requireString(value, path);
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) || Number.isNaN(Date.parse(value))) {
+      throw new Error(`${path} 必須是 ISO8601 時間字串。`);
+    }
+  }
+
+  function requireNumber(value, path) {
+    if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${path} 必須是有限 number。`);
+  }
+
+  function requireExactKeys(value, keys, path) {
+    requireObject(value, path);
+    const actual = Object.keys(value).sort();
+    const expected = [...keys].sort();
+    if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
+      throw new Error(`${path} 欄位不符合 schema；必須是：${keys.join("、")}。`);
+    }
+  }
+
+  function requireConfidence(value, path) {
+    requireString(value, path);
+    if (!CONFIDENCE_VALUES.has(value)) throw new Error(`${path} 只可為 high、low 或 manual。`);
+  }
+
+  function validateRange(value, path) {
+    requireExactKeys(value, ["start", "end"], path);
+    requireNumber(value.start, `${path}.start`);
+    requireNumber(value.end, `${path}.end`);
+  }
+
+  function validateSnapshot(snapshot) {
+    requireObject(snapshot, "data snapshot");
+    if (snapshot.kind !== "teacher-tool-snapshot") throw new Error("不支援的 data snapshot：kind 必須為 teacher-tool-snapshot。");
+    if (snapshot.schemaVersion !== 1) throw new Error("不支援的 data snapshot：schemaVersion 必須為 1。");
+    requireExactKeys(snapshot, SNAPSHOT_KEYS, "data snapshot");
+    requireIso8601(snapshot.generatedAt, "generatedAt");
+    if (snapshot.profileId !== null) requireString(snapshot.profileId, "profileId");
+
+    requireExactKeys(snapshot.source, ["workload", "admin"], "source");
+    requireExactKeys(snapshot.source.workload, ["fileName", "sheetName", "rows", "cols"], "source.workload");
+    requireString(snapshot.source.workload.fileName, "source.workload.fileName");
+    requireString(snapshot.source.workload.sheetName, "source.workload.sheetName");
+    requireNumber(snapshot.source.workload.rows, "source.workload.rows");
+    requireNumber(snapshot.source.workload.cols, "source.workload.cols");
+    requireExactKeys(snapshot.source.admin, ["fileName", "pageCount"], "source.admin");
+    requireString(snapshot.source.admin.fileName, "source.admin.fileName");
+    requireNumber(snapshot.source.admin.pageCount, "source.admin.pageCount");
+
+    requireArray(snapshot.teachers, "teachers");
+    snapshot.teachers.forEach((teacher, index) => {
+      const path = `teachers[${index}]`;
+      requireExactKeys(teacher, ["id", "code", "shortName", "load", "role", "domain", "sourceRow", "sourceCol", "confidence", "edited"], path);
+      ["id", "code", "shortName", "load", "role", "domain"].forEach(key => requireString(teacher[key], `${path}.${key}`));
+      requireNumber(teacher.sourceRow, `${path}.sourceRow`);
+      requireNumber(teacher.sourceCol, `${path}.sourceCol`);
+      requireExactKeys(teacher.confidence, ["domain"], `${path}.confidence`);
+      requireConfidence(teacher.confidence.domain, `${path}.confidence.domain`);
+      if (typeof teacher.edited !== "boolean") throw new Error(`${path}.edited 必須是 boolean。`);
+    });
+
+    requireArray(snapshot.assignments, "assignments");
+    snapshot.assignments.forEach((assignment, index) => {
+      const path = `assignments[${index}]`;
+      requireExactKeys(assignment, ["teacherId", "level", "className", "subject", "homeroomRank", "row", "col", "confidence", "edited"], path);
+      ["teacherId", "level", "className", "subject"].forEach(key => requireString(assignment[key], `${path}.${key}`));
+      if (assignment.homeroomRank !== null) requireNumber(assignment.homeroomRank, `${path}.homeroomRank`);
+      requireNumber(assignment.row, `${path}.row`);
+      requireNumber(assignment.col, `${path}.col`);
+      requireExactKeys(assignment.confidence, ["subject", "className"], `${path}.confidence`);
+      requireConfidence(assignment.confidence.subject, `${path}.confidence.subject`);
+      requireConfidence(assignment.confidence.className, `${path}.confidence.className`);
+      if (typeof assignment.edited !== "boolean") throw new Error(`${path}.edited 必須是 boolean。`);
+    });
+
+    requireArray(snapshot.activities, "activities");
+    snapshot.activities.forEach((activity, index) => {
+      const path = `activities[${index}]`;
+      requireExactKeys(activity, ["teacherId", "name", "row", "col", "confidence", "edited"], path);
+      requireString(activity.teacherId, `${path}.teacherId`);
+      requireString(activity.name, `${path}.name`);
+      requireNumber(activity.row, `${path}.row`);
+      requireNumber(activity.col, `${path}.col`);
+      requireExactKeys(activity.confidence, ["name"], `${path}.confidence`);
+      requireConfidence(activity.confidence.name, `${path}.confidence.name`);
+      if (typeof activity.edited !== "boolean") throw new Error(`${path}.edited 必須是 boolean。`);
+    });
+
+    requireArray(snapshot.notes, "notes");
+    snapshot.notes.forEach((note, index) => {
+      const path = `notes[${index}]`;
+      requireExactKeys(note, ["row", "text"], path);
+      requireNumber(note.row, `${path}.row`);
+      requireString(note.text, `${path}.text`);
+    });
+
+    requireArray(snapshot.orgGroups, "orgGroups");
+    snapshot.orgGroups.forEach((group, index) => {
+      const path = `orgGroups[${index}]`;
+      requireExactKeys(group, ["key", "name", "parent", "pages", "members", "confidence", "mergedFromLines", "edited"], path);
+      ["key", "name", "parent"].forEach(key => requireString(group[key], `${path}.${key}`));
+      requireArray(group.pages, `${path}.pages`);
+      group.pages.forEach((page, pageIndex) => requireNumber(page, `${path}.pages[${pageIndex}]`));
+      requireArray(group.members, `${path}.members`);
+      group.members.forEach((member, memberIndex) => {
+        const memberPath = `${path}.members[${memberIndex}]`;
+        requireExactKeys(member, ["name", "rank", "isLeader", "confidence", "edited"], memberPath);
+        requireString(member.name, `${memberPath}.name`);
+        requireNumber(member.rank, `${memberPath}.rank`);
+        if (typeof member.isLeader !== "boolean") throw new Error(`${memberPath}.isLeader 必須是 boolean。`);
+        requireExactKeys(member.confidence, ["group", "name"], `${memberPath}.confidence`);
+        requireConfidence(member.confidence.group, `${memberPath}.confidence.group`);
+        requireConfidence(member.confidence.name, `${memberPath}.confidence.name`);
+        if (typeof member.edited !== "boolean") throw new Error(`${memberPath}.edited 必須是 boolean。`);
+      });
+      requireExactKeys(group.confidence, ["name", "parent"], `${path}.confidence`);
+      requireConfidence(group.confidence.name, `${path}.confidence.name`);
+      requireConfidence(group.confidence.parent, `${path}.confidence.parent`);
+      requireArray(group.mergedFromLines, `${path}.mergedFromLines`);
+      group.mergedFromLines.forEach((line, lineIndex) => requireString(line, `${path}.mergedFromLines[${lineIndex}]`));
+      if (typeof group.edited !== "boolean") throw new Error(`${path}.edited 必須是 boolean。`);
+    });
+
+    requireArray(snapshot.conflicts, "conflicts");
+    const conflictTypes = new Set(["duplicateShortName", "duplicatePersonName", "orphanAssignment", "unresolvedHeader"]);
+    snapshot.conflicts.forEach((conflict, index) => {
+      const path = `conflicts[${index}]`;
+      requireExactKeys(conflict, ["type", "detail", "refs"], path);
+      requireString(conflict.type, `${path}.type`);
+      if (!conflictTypes.has(conflict.type)) throw new Error(`${path}.type 不受 schema 支援。`);
+      requireString(conflict.detail, `${path}.detail`);
+      requireArray(conflict.refs, `${path}.refs`);
+    });
+    return snapshot;
+  }
+
+  function validateProfile(profile) {
+    requireObject(profile, "mapping profile");
+    if (profile.kind !== "teacher-tool-profile") throw new Error("不支援的 mapping profile：kind 必須為 teacher-tool-profile。");
+    if (profile.schemaVersion !== 1) throw new Error("不支援的 mapping profile：schemaVersion 必須為 1。");
+    requireExactKeys(profile, PROFILE_KEYS, "mapping profile");
+    ["id", "label"].forEach(key => requireString(profile[key], key));
+    requireIso8601(profile.createdAt, "createdAt");
+
+    const workloadKeys = ["sheetNameHint", "domainHeaderRow", "teacherRows", "teacherBlockWidth", "teacherFieldOrder", "domainSearchLeft", "levels", "homeroomColumns", "subjectSearchLeft", "activityRows", "noteRows"];
+    requireExactKeys(profile.workload, workloadKeys, "workload");
+    requireString(profile.workload.sheetNameHint, "workload.sheetNameHint");
+    ["domainHeaderRow", "teacherBlockWidth", "domainSearchLeft", "subjectSearchLeft"].forEach(key => requireNumber(profile.workload[key], `workload.${key}`));
+    if (profile.workload.domainSearchLeft > DOMAIN_SEARCH_LEFT) throw new Error(`workload.domainSearchLeft 不得大於 ${DOMAIN_SEARCH_LEFT}。`);
+    validateRange(profile.workload.teacherRows, "workload.teacherRows");
+    validateRange(profile.workload.activityRows, "workload.activityRows");
+    validateRange(profile.workload.noteRows, "workload.noteRows");
+    requireArray(profile.workload.teacherFieldOrder, "workload.teacherFieldOrder");
+    if (JSON.stringify(profile.workload.teacherFieldOrder) !== JSON.stringify(["code", "shortName", "load", "role"])) throw new Error("workload.teacherFieldOrder 不符合 schemaVersion 1。 ");
+    requireArray(profile.workload.levels, "workload.levels");
+    profile.workload.levels.forEach((level, index) => {
+      const path = `workload.levels[${index}]`;
+      requireExactKeys(level, ["label", "headerRows", "classRows", "continuationRows"], path);
+      requireString(level.label, `${path}.label`);
+      validateRange(level.headerRows, `${path}.headerRows`);
+      validateRange(level.classRows, `${path}.classRows`);
+      requireArray(level.continuationRows, `${path}.continuationRows`);
+      level.continuationRows.forEach((row, rowIndex) => requireNumber(row, `${path}.continuationRows[${rowIndex}]`));
+    });
+    requireExactKeys(profile.workload.homeroomColumns, ["primary", "deputy", "additional"], "workload.homeroomColumns");
+    ["primary", "deputy", "additional"].forEach(key => {
+      requireArray(profile.workload.homeroomColumns[key], `workload.homeroomColumns.${key}`);
+      profile.workload.homeroomColumns[key].forEach((col, index) => requireNumber(col, `workload.homeroomColumns.${key}[${index}]`));
+    });
+
+    requireExactKeys(profile.admin, ["orgLabelAllowList", "orgLabelDenyList", "lineYTolerance", "joinThreshold", "multiLineHeaderRule"], "admin");
+    ["orgLabelAllowList", "orgLabelDenyList"].forEach(key => {
+      requireArray(profile.admin[key], `admin.${key}`);
+      profile.admin[key].forEach((word, index) => requireString(word, `admin.${key}[${index}]`));
+    });
+    ["lineYTolerance", "joinThreshold"].forEach(key => {
+      if (profile.admin[key] !== null) requireNumber(profile.admin[key], `admin.${key}`);
+    });
+    if (profile.admin.multiLineHeaderRule !== null) requireObject(profile.admin.multiLineHeaderRule, "admin.multiLineHeaderRule");
+    return profile;
+  }
+
+  function homeroomRank(subject) {
+    if (/正班主任/.test(subject)) return 1;
+    if (/副班主任/.test(subject)) return 2;
+    if (/班主任/.test(subject)) return 3;
+    return null;
+  }
+
+  function buildSnapshot() {
+    if (state.snapshot) {
+      const snapshot = JSON.parse(JSON.stringify(state.snapshot));
+      snapshot.generatedAt = new Date().toISOString();
+      snapshot.profileId = state.profile?.id ?? snapshot.profileId;
+      return validateSnapshot(snapshot);
+    }
+    const assignments = [];
+    const activities = [];
+    for (const teacher of state.teachers) {
+      const records = recordsForTeacher(teacher);
+      records.assignments.forEach(item => assignments.push({
+        teacherId: teacher.id,
+        level: item.level,
+        className: item.className,
+        subject: item.subject,
+        homeroomRank: item.homeroomRank ?? homeroomRank(item.subject),
+        row: item.row,
+        col: item.col,
+        confidence: { subject: "high", className: "high" },
+        edited: false
+      }));
+      records.activities.forEach(item => activities.push({
+        teacherId: teacher.id,
+        name: item.name,
+        row: item.row,
+        col: item.col,
+        confidence: { name: "high" },
+        edited: false
+      }));
+    }
+    const admin = state.adminAdapter?.getSnapshotData?.() || { source: { fileName: "", pageCount: 0 }, orgGroups: [] };
+    const duplicates = duplicateShortNames(state.teachers);
+    const snapshot = {
+      kind: "teacher-tool-snapshot",
+      schemaVersion: 1,
+      generatedAt: new Date().toISOString(),
+      profileId: state.profile?.id ?? null,
+      source: {
+        workload: { ...state.sourceWorkload },
+        admin: admin.source
+      },
+      teachers: state.teachers.map(teacher => ({
+        id: teacher.id,
+        code: teacher.code,
+        shortName: teacher.shortName,
+        load: teacher.load,
+        role: teacher.role,
+        domain: teacher.domain,
+        sourceRow: teacher.sourceRow,
+        sourceCol: teacher.sourceCol,
+        confidence: { domain: "high" },
+        edited: false
+      })),
+      assignments,
+      activities,
+      notes: state.notes.map(note => ({ row: note.row, text: note.text })),
+      orgGroups: admin.orgGroups,
+      conflicts: [...duplicates].map(shortName => ({
+        type: "duplicateShortName",
+        detail: `簡稱「${shortName}」對應多於一個教師代碼。`,
+        refs: state.teachers.filter(teacher => teacher.shortName === shortName).map(teacher => teacher.id)
+      }))
+    };
+    return validateSnapshot(snapshot);
+  }
+
+  function profileTimestamp(date = new Date()) {
+    return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  }
+
+  function buildProfile() {
+    const config = getConfig();
+    const profile = {
+      kind: "teacher-tool-profile",
+      schemaVersion: 1,
+      id: `profile-${profileTimestamp()}`,
+      label: "教師人力與行政架構 mapping profile",
+      createdAt: new Date().toISOString(),
+      workload: {
+        sheetNameHint: state.sourceWorkload.sheetName,
+        domainHeaderRow: state.matrix.length ? detectDomainHeaderRow(state.matrix) + 1 : 0,
+        teacherRows: { ...config.teacher },
+        teacherBlockWidth: 5,
+        teacherFieldOrder: ["code", "shortName", "load", "role"],
+        domainSearchLeft: DOMAIN_SEARCH_LEFT,
+        levels: [
+          { label: "初中", headerRows: { start: 0, end: 0 }, classRows: { ...config.junior }, continuationRows: [] },
+          { label: "高中", headerRows: { start: 0, end: 0 }, classRows: { ...config.senior }, continuationRows: [] }
+        ],
+        homeroomColumns: { primary: [2], deputy: [3, 4], additional: [] },
+        subjectSearchLeft: 7,
+        activityRows: { ...config.activity },
+        noteRows: { ...config.note }
+      },
+      admin: {
+        orgLabelAllowList: [],
+        orgLabelDenyList: [],
+        lineYTolerance: null,
+        joinThreshold: null,
+        multiLineHeaderRule: null
+      }
+    };
+    return validateProfile(profile);
+  }
+
+  function setRangeControls(startSelector, endSelector, range) {
+    $(startSelector).value = range.start;
+    $(endSelector).value = range.end;
+  }
+
+  function applyProfileToControls(profile) {
+    setRangeControls("#teacherStart", "#teacherEnd", profile.workload.teacherRows);
+    const junior = profile.workload.levels.find(level => level.label === "初中") || profile.workload.levels[0];
+    const senior = profile.workload.levels.find(level => level.label === "高中") || profile.workload.levels[1];
+    if (junior) setRangeControls("#juniorStart", "#juniorEnd", junior.classRows);
+    if (senior) setRangeControls("#seniorStart", "#seniorEnd", senior.classRows);
+    setRangeControls("#activityStart", "#activityEnd", profile.workload.activityRows);
+    setRangeControls("#noteStart", "#noteEnd", profile.workload.noteRows);
+  }
+
+  function importSnapshotObject(input, fileName = "") {
+    const snapshot = validateSnapshot(input);
+    state.snapshot = snapshot;
+    state.workbook = null;
+    state.matrix = [];
+    state.teachers = snapshot.teachers.map(teacher => ({ ...teacher }));
+    state.notes = snapshot.notes.map(note => ({ ...note }));
+    state.sourceWorkload = { ...snapshot.source.workload };
+    state.sourceName = snapshot.source.workload.fileName || fileName || "data snapshot";
+    state.activeTeacherId = "";
+    renderTeacherOptions();
+    dom.resultSection.hidden = true;
+    dom.emptyGuide.hidden = state.teachers.length > 0;
+    state.adminAdapter?.loadSnapshot?.(snapshot, fileName);
+    return snapshot;
+  }
+
+  function importProfileObject(input) {
+    const profile = validateProfile(input);
+    state.profile = profile;
+    applyProfileToControls(profile);
+    return profile;
+  }
+
+  function registerAdminAdapter(adapter) {
+    state.adminAdapter = adapter;
+  }
+
+  function downloadJson(data, prefix) {
+    const now = new Date();
+    const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${prefix}_${date}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  function exportSnapshot() {
+    const snapshot = buildSnapshot();
+    downloadJson(snapshot, "teacher-tool-snapshot");
+    return snapshot;
+  }
+
+  function exportProfile() {
+    state.profile = buildProfile();
+    downloadJson(state.profile, "teacher-tool-profile");
+    return state.profile;
+  }
+
+  async function readJsonFile(file) {
+    try {
+      return JSON.parse(await file.text());
+    } catch (error) {
+      throw new Error(`JSON 格式無效：${error.message}`);
+    }
+  }
+
+  function showDataLayerStatus(type, title, message) {
+    dom.dataLayerStatus.innerHTML = `<div class="status-message status-message--${type}"><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(message)}</p></div></div>`;
+  }
+
   dom.fileInput.addEventListener("change", event => loadFile(event.target.files[0]));
   dom.dropZone.addEventListener("click", event => {
     if (event.target.tagName !== "LABEL") dom.fileInput.click();
@@ -1431,22 +1882,62 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const text = dom.pasteInput.value;
     if (!text.trim()) { showStatus("warning", "尚未貼上資料", "請先從試算表複製內容並貼到文字框。 "); return; }
     state.workbook = null;
-    analyzeMatrix(parseDelimited(text), "貼上資料");
+    analyzeMatrix(parseDelimited(text), "貼上資料", { fileName: "貼上資料", sheetName: "" });
     dom.fileMeta.hidden = true;
   });
   dom.demoBtn.addEventListener("click", () => {
     state.workbook = null;
-    analyzeMatrix(buildDemoMatrix(), "內置示範資料");
+    analyzeMatrix(buildDemoMatrix(), "內置示範資料", { fileName: "內置示範資料", sheetName: "" });
     dom.fileMeta.hidden = true;
   });
   dom.reparseBtn.addEventListener("click", () => {
     if (!state.matrix.length) { showStatus("warning", "尚未匯入資料", "請先匯入 Excel／CSV 或貼上試算表內容。 "); return; }
-    analyzeMatrix(state.matrix, state.sourceName);
+    analyzeMatrix(state.matrix, state.sourceName, { ...state.sourceWorkload });
   });
   dom.teacherSearch.addEventListener("input", event => renderTeacherOptions(event.target.value));
   dom.teacherSelect.addEventListener("change", event => selectTeacher(event.target.value));
   dom.copyBtn.addEventListener("click", copySummary);
   dom.printBtn.addEventListener("click", () => window.print());
+  dom.exportSnapshotBtn.addEventListener("click", () => {
+    try {
+      exportSnapshot();
+      showDataLayerStatus("success", "data snapshot 已匯出", "檔案含真實人事資料，請按校內私隱規則保管。信心標記尚未啟用。");
+    } catch (error) {
+      showDataLayerStatus("error", "無法匯出 data snapshot", error.message);
+    }
+  });
+  dom.exportProfileBtn.addEventListener("click", () => {
+    try {
+      exportProfile();
+      showDataLayerStatus("success", "mapping profile 已匯出", "此檔只含結構描述，不含人事資料；會套用於本次工作階段的下次解析。 ");
+    } catch (error) {
+      showDataLayerStatus("error", "無法匯出 mapping profile", error.message);
+    }
+  });
+  dom.importSnapshotInput.addEventListener("change", async event => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      importSnapshotObject(await readJsonFile(file), file.name);
+      showDataLayerStatus("success", "data snapshot 已匯入", `已直接載入 ${state.teachers.length} 位教師及 ${state.snapshot.orgGroups.length} 個行政組別，沒有重新解析原始檔。信心標記尚未啟用。`);
+    } catch (error) {
+      showDataLayerStatus("error", "拒絕匯入 data snapshot", error.message);
+    } finally {
+      event.target.value = "";
+    }
+  });
+  dom.importProfileInput.addEventListener("change", async event => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      const profile = importProfileObject(await readJsonFile(file));
+      showDataLayerStatus("success", "mapping profile 已套用", `已載入「${profile.label}」；會用於本次工作階段的下次原始檔解析。`);
+    } catch (error) {
+      showDataLayerStatus("error", "拒絕匯入 mapping profile", error.message);
+    } finally {
+      event.target.value = "";
+    }
+  });
 
   window.TeacherTool = {
     parseDelimited,
@@ -1457,7 +1948,18 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     buildDemoMatrix,
     expandMerges,
     detectDomainHeaderRow,
-    deriveDomain
+    deriveDomain,
+    analyzeMatrix,
+    buildSnapshot,
+    buildProfile,
+    exportSnapshot,
+    exportProfile,
+    validateSnapshot,
+    validateProfile,
+    importSnapshotObject,
+    importProfileObject,
+    registerAdminAdapter,
+    getDataLayerState: () => ({ snapshot: state.snapshot, profile: state.profile, sourceWorkload: state.sourceWorkload })
   };
 })();
 
@@ -1500,7 +2002,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     sourceName: "",
     groups: [],
     people: new Map(),
-    workerUrl: ""
+    workerUrl: "",
+    pageCount: 0
   };
 
   const ORG_WORDS = /(校長|副校長|助理校長|行政|教務|學務|訓輔|總務|資訊|課程|學生|升學|生涯|德育|公民|家校|跨學科|支援|發展|活動|統籌|專責|領導|部|組|處|科|室|委員會|小組|團隊|中心|社|隊|班)/u;
@@ -1777,6 +2280,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       state.groups = parseOrganizationPages(pages);
       state.people = buildPeopleMap(state.groups);
       state.sourceName = state.file.name;
+      state.pageCount = pdf.numPages;
       if (!state.people.size) throw new Error("已讀取 PDF 文字，但未能辨認組別與姓名。請確認表格首行是組別名稱、其下為人員名單。");
       updateProgress(100, "解析完成");
       renderAdminOptions();
@@ -1854,6 +2358,49 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     requestAnimationFrame(() => dom.adminResultSection.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
+  function getAdminSnapshotData() {
+    return {
+      source: { fileName: state.sourceName, pageCount: state.pageCount },
+      orgGroups: state.groups.map(group => ({
+        key: group.key || "",
+        name: group.name || "",
+        parent: group.parent || "",
+        pages: [...(group.pages || [group.page || 0])],
+        members: group.members.map((name, index) => ({
+          name,
+          rank: index + 1,
+          isLeader: index === 0,
+          confidence: { group: "high", name: "high" },
+          edited: false
+        })),
+        confidence: { name: "high", parent: "high" },
+        mergedFromLines: [],
+        edited: false
+      }))
+    };
+  }
+
+  function loadAdminSnapshot(snapshot, fileName = "") {
+    state.file = null;
+    state.sourceName = snapshot.source.admin.fileName || fileName || "data snapshot";
+    state.pageCount = snapshot.source.admin.pageCount;
+    state.groups = snapshot.orgGroups.map(group => ({
+      key: group.key,
+      name: group.name,
+      parent: group.parent,
+      page: group.pages[0] || 0,
+      pages: [...group.pages],
+      center: 0,
+      firstY: 0,
+      members: [...group.members].sort((a, b) => a.rank - b.rank).map(member => member.name)
+    }));
+    state.people = buildPeopleMap(state.groups);
+    renderAdminOptions();
+    renderGroupReview();
+    dom.adminResultSection.hidden = true;
+    dom.adminEmptyGuide.hidden = state.groups.length > 0;
+  }
+
   function renderGroupReview() {
     dom.adminReviewPanel.hidden = !state.groups.length;
     dom.adminReviewSummary.textContent = `${state.groups.length} 個組別・${state.people.size} 位教職員`;
@@ -1891,8 +2438,14 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     isOrgLabel,
     textItemsToLines,
     parseOrganizationPages,
-    buildPeopleMap
+    buildPeopleMap,
+    getAdminSnapshotData,
+    loadAdminSnapshot
   };
+  window.TeacherTool?.registerAdminAdapter({
+    getSnapshotData: getAdminSnapshotData,
+    loadSnapshot: loadAdminSnapshot
+  });
 })();
 
 </script>
