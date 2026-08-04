@@ -796,6 +796,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     "教師", "姓名", "簡稱", "代碼", "節數", "負載", "行政職務", "其他身分", "學科領域",
     "活動", "活動名稱", "聯課活動", "統籌", "備註", "說明", "總數", "合計"
   ]);
+  const DOMAIN_SEARCH_LEFT = 5;
 
   function normalize(value) {
     if (value === null || value === undefined) return "";
@@ -854,16 +855,12 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return text === "" || /\d/.test(text);
   }
 
-  function deriveDomain(matrix, rowIndex, colIndex) {
-    for (let r = rowIndex - 1; r >= Math.max(0, rowIndex - 10); r -= 1) {
-      const direct = valueAt(matrix, r, colIndex);
-      if (isDomainLabel(direct)) return direct;
-      for (let d = 1; d <= 4; d += 1) {
-        const left = valueAt(matrix, r, colIndex - d);
-        if (isDomainLabel(left)) return left;
-      }
+  function teacherRecordColumns(row) {
+    const columns = [];
+    for (let c = 0; c <= row.length - 3; c += 1) {
+      if (isLikelyCode(row[c]) && isLikelyShortName(row[c + 1]) && isLoad(row[c + 2])) columns.push(c);
     }
-    return "";
+    return columns;
   }
 
   function isDomainLabel(value) {
@@ -873,9 +870,39 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return /[\u3400-\u9fff]/u.test(text);
   }
 
+  function detectDomainHeaderRow(matrix) {
+    let best = null;
+    for (let r = 0; r < matrix.length - 1; r += 1) {
+      const labels = (matrix[r] || [])
+        .map((value, col) => ({ col, value: normalize(value) }))
+        .filter(item => isDomainLabel(item.value));
+      const teacherColumns = teacherRecordColumns(matrix[r + 1] || []);
+      const alignedCount = labels.filter(label => teacherColumns.includes(label.col)).length;
+      if (!alignedCount) continue;
+      const candidate = { rowIndex: r, alignedCount, labelCount: labels.length, teacherCount: teacherColumns.length };
+      if (!best || candidate.alignedCount > best.alignedCount
+        || (candidate.alignedCount === best.alignedCount && candidate.labelCount > best.labelCount)
+        || (candidate.alignedCount === best.alignedCount && candidate.labelCount === best.labelCount
+          && candidate.teacherCount > best.teacherCount)) best = candidate;
+    }
+    return best?.rowIndex ?? -1;
+  }
+
+  function deriveDomain(matrix, domainHeaderRow, colIndex) {
+    if (domainHeaderRow < 0) return "";
+    const direct = valueAt(matrix, domainHeaderRow, colIndex);
+    if (isDomainLabel(direct)) return direct;
+    for (let distance = 1; distance <= DOMAIN_SEARCH_LEFT; distance += 1) {
+      const left = valueAt(matrix, domainHeaderRow, colIndex - distance);
+      if (isDomainLabel(left)) return left;
+    }
+    return "";
+  }
+
   function parseTeachers(matrix, config = getConfig()) {
     const found = [];
     const seen = new Set();
+    const domainHeaderRow = detectDomainHeaderRow(matrix);
     for (let r = config.teacher.start - 1; r <= config.teacher.end - 1; r += 1) {
       const row = matrix[r] || [];
       for (let c = 0; c <= row.length - 2; c += 1) {
@@ -893,7 +920,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
           shortName,
           load: load || "—",
           role: role || "—",
-          domain: deriveDomain(matrix, r, c),
+          domain: deriveDomain(matrix, domainHeaderRow, c),
           sourceRow: r + 1,
           sourceCol: c + 1
         });
@@ -1428,7 +1455,9 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     scanActivities,
     parseNotes,
     buildDemoMatrix,
-    expandMerges
+    expandMerges,
+    detectDomainHeaderRow,
+    deriveDomain
   };
 })();
 
