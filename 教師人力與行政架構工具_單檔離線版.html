@@ -1894,7 +1894,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         });
       const shortCandidates = latin ? codeCandidates : names.filter(name => /^[\u3400-\u9fff]{2,6}$/u.test(name) && name.includes(teacher.shortName));
       [...codeCandidates, ...shortCandidates].forEach(name => candidateNames.add(name));
-      const joint = codeCandidates.length === 1 && (latin || shortCandidates.includes(codeCandidates[0])) ? [codeCandidates[0]] : [];
+      const joint = latin ? codeCandidates : codeCandidates.filter(name => shortCandidates.includes(name));
       const confidence = joint.length === 1 ? "high" : (codeCandidates.length || shortCandidates.length ? "low" : "unmatched");
       teacher.confidence.link = confidence;
       diagnostics.push({ teacherRecordId: teacher.recordId, codeCandidates: codeCandidates.length, shortCandidates: shortCandidates.length, jointCandidates: joint.length, confidence });
