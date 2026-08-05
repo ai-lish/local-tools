@@ -877,7 +877,30 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
 
   function isLikelyCode(value) {
     const text = compact(value);
-    return text.length >= 2 && text.length <= 20 && /[A-Za-z]/.test(text) && /^[A-Za-z][A-Za-z0-9._/-]*$/.test(text);
+    return text.length >= 2 && text.length <= 20 && /[A-Za-z]/.test(text) && /^[A-Za-z][A-Za-z0-9._/#-]*$/.test(text);
+  }
+
+  function codeRejectionReasons(value) {
+    const text = compact(value);
+    const reasons = [];
+    if (text.length < 2 || text.length > 20) reasons.push("長度不在 2–20");
+    if (!/[A-Za-z]/.test(text)) reasons.push("不含英文字母");
+    if (!/^[A-Za-z]/.test(text)) reasons.push("首字元不是英文字母");
+    const invalid = [...new Set([...text].filter(char => !/[A-Za-z0-9._/#-]/.test(char)))];
+    if (invalid.length) reasons.push(`含未允許字元：${invalid.join("、")}`);
+    return reasons;
+  }
+
+  function findRejectedTeacherCandidates(matrix, range = { start: 1, end: 12 }) {
+    const rejected = [];
+    for (let r = range.start - 1; r <= Math.min(range.end - 1, matrix.length - 1); r += 1) {
+      const row = matrix[r] || [];
+      for (let c = 0; c <= row.length - 3; c += 1) {
+        if (!isLikelyShortName(row[c + 1]) || !isLoad(row[c + 2]) || isLikelyCode(row[c])) continue;
+        rejected.push({ row: r + 1, col: c + 1, value: normalize(row[c]), reasons: codeRejectionReasons(row[c]) });
+      }
+    }
+    return rejected;
   }
 
   function isLikelyShortName(value) {
@@ -1198,6 +1221,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const config = getConfig();
     state.teachers = parseTeachers(state.matrix, config);
     state.notes = parseNotes(state.matrix, config.note);
+    const rejectedCandidates = findRejectedTeacherCandidates(state.matrix);
     const dimensions = matrixDimensions(state.matrix);
     state.sourceWorkload = {
       fileName: sourceMeta.fileName ?? sourceName,
@@ -1210,9 +1234,14 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     dom.emptyGuide.hidden = state.teachers.length > 0;
     if (state.teachers.length) {
       const duplicated = duplicateShortNames(state.teachers).size;
-      showStatus("success", "資料解析完成", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師${duplicated ? `；其中 ${duplicated} 個簡稱重複，選擇時請按代碼核對` : ""}。`);
+      if (rejectedCandidates.length) {
+        const locations = rejectedCandidates.map(item => `第 ${item.row} 列第 ${item.col} 欄「${item.value.replace(/\s+/g, " ") || "空白"}」`).join("；");
+        showStatus("warning", "資料已解析，但有疑似教師記錄被拒", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師；另有 ${rejectedCandidates.length} 筆符合右鄰短名／負載條件但代碼未通過：${locations}。${duplicated ? `另有 ${duplicated} 個簡稱重複，請按代碼核對。` : ""}`);
+      } else {
+        showStatus("success", "資料解析完成", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師；被規則拒絕的候選 0 筆${duplicated ? `；其中 ${duplicated} 個簡稱重複，選擇時請按代碼核對` : ""}。`);
+      }
     } else {
-      showStatus("warning", "未找到教師名單", `已讀取資料，但在第 ${config.teacher.start}–${config.teacher.end} 列找不到「代碼、簡稱、節數、職務」格式。請檢查工作表或調整進階設定。`);
+      showStatus("warning", "未找到教師名單", `已讀取資料，但在第 ${config.teacher.start}–${config.teacher.end} 列找不到「代碼、簡稱、節數、職務」格式；被規則拒絕的候選 ${rejectedCandidates.length} 筆。請檢查工作表或調整進階設定。`);
     }
   }
 
@@ -1949,6 +1978,9 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     expandMerges,
     detectDomainHeaderRow,
     deriveDomain,
+    isLikelyCode,
+    codeRejectionReasons,
+    findRejectedTeacherCandidates,
     analyzeMatrix,
     buildSnapshot,
     buildProfile,
