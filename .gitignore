@@ -1,0 +1,4 @@
+# Sensitive school personnel data must never enter Git history.
+teacher-tool-snapshot_*.json
+*.xlsx
+*.pdf
