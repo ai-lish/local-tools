@@ -277,12 +277,30 @@ textarea {
 .empty-item { width: 100%; padding: 14px; color: #8794a0; background: #f8fafb; border: 1px dashed #d3dce3; border-radius: 8px; text-align: center; font-size: 12px; }
 
 .teaching-table { overflow: hidden; border: 1px solid var(--line); border-radius: 8px; }
-.teaching-row { display: grid; grid-template-columns: 82px 1fr 62px; align-items: center; min-height: 43px; padding: 0 12px; font-size: 13px; }
+.teaching-row { display: grid; grid-template-columns: 82px 1fr 50px 62px; align-items: center; min-height: 43px; padding: 0 12px; font-size: 13px; }
 .teaching-row + .teaching-row { border-top: 1px solid #e5eaee; }
 .teaching-row:nth-child(even) { background: #f8fafb; }
 .teaching-class { font-weight: 800; color: var(--navy); }
+.teaching-periods { justify-self: end; color: #526374; font-size: 11px; font-weight: 750; }
 .teaching-level { justify-self: end; padding: 3px 6px; color: var(--muted); background: #eef2f5; border-radius: 4px; font-size: 10px; }
 .teaching-table .empty-item { margin: 10px; width: auto; }
+
+.relational-panel { margin-top: 18px; padding: 22px 24px; border-left: 5px solid var(--green); }
+.relational-panel__header { margin-bottom: 16px; }
+.relational-panel__header h2 { margin-bottom: 3px; font-size: 19px; }
+.relational-panel__header p { margin: 0; color: var(--muted); font-size: 12px; }
+.relational-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.relational-card { min-width: 0; padding: 17px; background: #fbfcfd; border: 1px solid var(--line); border-radius: 11px; }
+.relational-card h3 { margin-bottom: 11px; font-size: 15px; }
+.relational-controls { margin-bottom: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.relational-controls select { width: 100%; height: 40px; padding: 7px 10px; color: var(--ink); background: white; border: 1px solid #bdcbd6; border-radius: 7px; }
+.relational-summary { min-height: 18px; margin-bottom: 8px; color: #526374; font-size: 11px; font-weight: 700; }
+.relational-table-wrap { overflow-x: auto; }
+.relational-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.relational-table th, .relational-table td { padding: 8px 7px; border-bottom: 1px solid #e2e8ed; text-align: left; white-space: nowrap; }
+.relational-table th { color: #526374; background: #eef3f6; }
+.confidence-low, .unconfirmed-name { color: #8d5e00; background: #fff6d9; font-weight: 750; }
+.confidence-high { color: #1f634f; }
 
 .notes-list { display: grid; gap: 8px; }
 .note-row { display: grid; grid-template-columns: 44px 1fr; gap: 9px; color: #536474; font-size: 12px; }
@@ -358,7 +376,7 @@ footer { padding: 22px; color: #8794a0; text-align: center; font-size: 11px; bor
 footer p { margin: 0; }
 
 @media (max-width: 820px) {
-  .import-grid, .teacher-picker, .report-grid { grid-template-columns: 1fr; }
+  .import-grid, .teacher-picker, .report-grid, .relational-grid { grid-template-columns: 1fr; }
   .settings-grid { grid-template-columns: repeat(2, 1fr); }
   .report-card--wide { grid-row: auto; }
   .report-card--notes { grid-column: auto; }
@@ -388,7 +406,7 @@ footer p { margin: 0; }
   .info-cell + .info-cell { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
   .report-grid { padding: 18px; }
   .toolbar-actions { display: grid; grid-template-columns: 1fr 1fr; }
-  .teaching-row { grid-template-columns: 64px 1fr; }
+  .teaching-row { grid-template-columns: 64px 1fr 46px; }
   .teaching-level { display: none; }
   .pdf-drop-zone { align-items: flex-start; flex-wrap: wrap; padding: 18px; }
   .pdf-upload-copy { flex-basis: calc(100% - 80px); }
@@ -399,12 +417,13 @@ footer p { margin: 0; }
   .membership-grid { padding: 18px; }
   .admin-summary { padding: 16px 18px; }
   .group-review-row { grid-template-columns: 1fr; gap: 5px; }
+  .relational-controls { grid-template-columns: 1fr; }
 }
 
 @media print {
   @page { size: A4; margin: 12mm; }
   body { background: white; }
-  .topbar, .tool-nav, .intro, .import-grid, .settings-panel, .status-area, .teacher-picker, .result-toolbar, .empty-guide, .admin-upload-panel, .pdf-progress, .review-panel, footer { display: none !important; }
+  .topbar, .tool-nav, .intro, .import-grid, .settings-panel, .status-area, .teacher-picker, .relational-panel, .result-toolbar, .empty-guide, .admin-upload-panel, .pdf-progress, .review-panel, footer { display: none !important; }
   .shell { width: 100%; margin: 0; }
   .result-section { display: block !important; margin: 0; }
   .report { border: 0; box-shadow: none; border-radius: 0; }
@@ -549,6 +568,31 @@ footer p { margin: 0; }
         <select id="teacherSelect">
           <option value="">請選擇教師</option>
         </select>
+      </div>
+    </section>
+
+    <section id="relationalPanel" class="panel relational-panel" hidden>
+      <div class="relational-panel__header">
+        <span class="step-label">關係式查詢</span>
+        <h2>按班級或科目查看合作安排</h2>
+        <p>只反轉呈現已解析的 canonical records，不新增推測。</p>
+      </div>
+      <div class="relational-grid">
+        <section class="relational-card">
+          <h3>班級中心</h3>
+          <div class="relational-controls"><select id="classViewSelect" aria-label="選擇班級"><option value="">選擇班級</option></select></div>
+          <p id="classViewSummary" class="relational-summary"></p>
+          <div id="classViewTable" class="relational-table-wrap"></div>
+        </section>
+        <section class="relational-card">
+          <h3>科目中心</h3>
+          <div class="relational-controls">
+            <select id="subjectLevelSelect" aria-label="選擇級別"><option value="">選擇級別</option></select>
+            <select id="subjectViewSelect" aria-label="選擇科目"><option value="">選擇科目</option></select>
+          </div>
+          <p id="subjectViewSummary" class="relational-summary"></p>
+          <div id="subjectViewTable" class="relational-table-wrap"></div>
+        </section>
       </div>
     </section>
 
@@ -790,6 +834,14 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     teacherCountText: $("#teacherCountText"),
     teacherSearch: $("#teacherSearch"),
     teacherSelect: $("#teacherSelect"),
+    relationalPanel: $("#relationalPanel"),
+    classViewSelect: $("#classViewSelect"),
+    classViewSummary: $("#classViewSummary"),
+    classViewTable: $("#classViewTable"),
+    subjectLevelSelect: $("#subjectLevelSelect"),
+    subjectViewSelect: $("#subjectViewSelect"),
+    subjectViewSummary: $("#subjectViewSummary"),
+    subjectViewTable: $("#subjectViewTable"),
     resultSection: $("#resultSection"),
     emptyGuide: $("#emptyGuide"),
     teacherAvatar: $("#teacherAvatar"),
@@ -830,7 +882,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     rejectedTeacherCandidates: [],
     linkDiagnostics: null,
     sourceWorkload: { fileName: "", sheetName: "", rows: 0, cols: 0 },
-    adminAdapter: null
+    adminAdapter: null,
+    relationshipSnapshot: null
   };
 
   const GENERIC_HEADERS = new Set([
@@ -1075,6 +1128,29 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return candidates[0];
   }
 
+  function periodNumber(value) {
+    const text = compact(value);
+    return /^\d+$/.test(text) ? Number(text) : null;
+  }
+
+  function isPeriodReferenceRow(row) {
+    return row.filter(value => periodNumber(value) !== null).length >= 5 && !rowHasClass(row);
+  }
+
+  function detectPeriodRows(matrix, range) {
+    const rows = [];
+    for (let r = range.start - 1; r <= Math.min(range.end - 1, matrix.length - 1); r += 1) {
+      if (isPeriodReferenceRow(matrix[r] || [])) rows.push(r);
+    }
+    return rows;
+  }
+
+  function periodReferenceForCell(matrix, rowIndex, colIndex, range) {
+    const candidates = detectPeriodRows(matrix, range).filter(row => row < rowIndex);
+    const periodRow = candidates.length ? candidates[candidates.length - 1] : null;
+    return periodRow === null ? { row: null, expected: null } : { row: periodRow + 1, expected: periodNumber(matrix[periodRow]?.[colIndex]) };
+  }
+
   function scanTimetable(matrix, teacher, range, level, knownShortNames) {
     const assignments = [];
     for (let r = range.start - 1; r <= range.end - 1; r += 1) {
@@ -1098,7 +1174,27 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         });
       }
     }
-    return uniqueBy(assignments, item => `${item.level}|${item.className}|${item.subject}`);
+    const grouped = new Map();
+    for (const item of assignments) {
+      const key = `${item.level}|${item.className}|${item.subject}`;
+      const existing = grouped.get(key);
+      if (existing) { existing.sourceCells.push({ row: item.row, col: item.col }); continue; }
+      grouped.set(key, { ...item, sourceCells: [{ row: item.row, col: item.col }] });
+    }
+    return [...grouped.values()].map(item => {
+      const references = item.sourceCells.map(cell => periodReferenceForCell(matrix, cell.row - 1, cell.col - 1, range));
+      const expectedValues = [...new Set(references.map(reference => reference.expected).filter(Number.isInteger))];
+      const expected = expectedValues.length === 1 ? expectedValues[0] : null;
+      const mismatch = !item.isHomeroom && expected !== null && expected !== item.sourceCells.length;
+      return {
+        ...item,
+        periodCount: item.sourceCells.length,
+        periodConfidence: mismatch ? "low" : "high",
+        periodDiagnostic: mismatch ? "PERIOD_COUNT_MISMATCH" : "",
+        periodExpected: expected,
+        periodRow: references.find(reference => reference.row !== null)?.row ?? null
+      };
+    });
   }
 
   function isActivityLabel(value, knownShortNames) {
@@ -1368,7 +1464,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     );
     dom.teachingCount.textContent = sortedTeaching.length ? `${sortedTeaching.length} 項任教安排` : "沒有找到任教安排";
     dom.teachingList.innerHTML = sortedTeaching.length
-      ? sortedTeaching.map(item => `<div class="teaching-row"><span class="teaching-class">${escapeHtml(item.className)}</span><span>${escapeHtml(item.subject)}</span><span class="teaching-level">${escapeHtml(item.level)}</span></div>`).join("")
+      ? sortedTeaching.map(item => `<div class="teaching-row"><span class="teaching-class">${escapeHtml(item.className)}</span><span>${escapeHtml(item.subject)}</span><span class="teaching-periods">${escapeHtml(item.periodCount ?? 0)} 節</span><span class="teaching-level">${escapeHtml(item.level)}</span></div>`).join("")
       : emptyItem("未在初中或高中課表範圍內找到此教師簡稱");
 
     dom.activityCount.textContent = activities.length ? `${activities.length} 項職務` : "沒有找到聯課活動";
@@ -1501,7 +1597,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     if (!teacher) return;
     const { assignments, activities: activityRecords } = recordsForTeacher(teacher);
     const homeroom = assignments.filter(item => item.isHomeroom).map(item => `${item.className} ${item.subject}`);
-    const teaching = assignments.filter(item => !item.isHomeroom).map(item => `${item.className} ${item.subject}`);
+    const teaching = assignments.filter(item => !item.isHomeroom).map(item => `${item.className} ${item.subject}（${item.periodCount ?? 0} 節）`);
     const activities = activityRecords.map(item => item.name);
     const text = [
       `${teacher.shortName}老師（${teacher.code}）`,
@@ -1636,7 +1732,12 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const keys = Object.keys(record.confidenceReason);
     const invalidKeys = keys.filter(key => !confidenceKeys.includes(key));
     if (invalidKeys.length) throw new Error(`${path}.confidenceReason 欄位不對應 confidence：${invalidKeys.join("、")}。`);
-    if (keys.length) throw new Error(`${path}.confidenceReason 原因碼尚未由 F-N 凍結；本版本只接受省略或空 object。`);
+    for (const key of keys) {
+      const code = record.confidenceReason[key];
+      const allowed = /^assignments\[\d+\]$/.test(path) && key === "periodCount" && code === "PERIOD_COUNT_MISMATCH";
+      if (!allowed) throw new Error(`${path}.confidenceReason.${key} 含未凍結原因碼。`);
+      if (record.confidence[key] !== "low") throw new Error(`${path}.confidenceReason.${key} 只可用於 low 欄位。`);
+    }
   }
 
   function requireConfidence(value, path) {
@@ -1703,16 +1804,25 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     requireArray(snapshot.assignments, "assignments");
     snapshot.assignments.forEach((assignment, index) => {
       const path = `assignments[${index}]`;
-      requireSchemaKeys(assignment, ["recordId", "teacherId", "level", "className", "subject", "homeroomRank", "row", "col", "confidence", "edited"], ["confidenceReason"], path);
+      requireSchemaKeys(assignment, ["recordId", "teacherId", "level", "className", "subject", "homeroomRank", "periodCount", "sourceCells", "row", "col", "confidence", "edited"], ["confidenceReason"], path);
       validateRecordId(assignment.recordId, `${path}.recordId`);
       ["teacherId", "level", "className", "subject"].forEach(key => requireString(assignment[key], `${path}.${key}`));
       if (assignment.homeroomRank !== null) requireNumber(assignment.homeroomRank, `${path}.homeroomRank`);
       requirePositiveInteger(assignment.row, `${path}.row`);
       requirePositiveInteger(assignment.col, `${path}.col`);
-      requireExactKeys(assignment.confidence, ["subject", "className"], `${path}.confidence`);
+      if (!Number.isInteger(assignment.periodCount) || assignment.periodCount < 0) throw new Error(`${path}.periodCount 必須是非負整數。`);
+      requireArray(assignment.sourceCells, `${path}.sourceCells`);
+      assignment.sourceCells.forEach((cell, cellIndex) => {
+        requireExactKeys(cell, ["row", "col"], `${path}.sourceCells[${cellIndex}]`);
+        requirePositiveInteger(cell.row, `${path}.sourceCells[${cellIndex}].row`);
+        requirePositiveInteger(cell.col, `${path}.sourceCells[${cellIndex}].col`);
+      });
+      requireExactKeys(assignment.confidence, ["subject", "className", "periodCount"], `${path}.confidence`);
       requireConfidence(assignment.confidence.subject, `${path}.confidence.subject`);
       requireConfidence(assignment.confidence.className, `${path}.confidence.className`);
-      validateConfidenceReason(assignment, ["subject", "className"], path);
+      requireConfidence(assignment.confidence.periodCount, `${path}.confidence.periodCount`);
+      if (assignment.confidence.periodCount !== "manual" && assignment.periodCount !== assignment.sourceCells.length) throw new Error(`${path}.periodCount 必須等於 sourceCells 數量。`);
+      validateConfidenceReason(assignment, ["subject", "className", "periodCount"], path);
       if (typeof assignment.edited !== "boolean") throw new Error(`${path}.edited 必須是 boolean。`);
     });
 
@@ -2034,7 +2144,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       if (item.confidence.link === "manual") item.linkMethod = "manual";
     });
     const assignmentIndex = new Map(previous.assignments.map(item => [`${previousTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`, item]));
-    current.assignments.forEach(item => applyManual(item, assignmentIndex.get(`${currentTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`), { subject: "subject", className: "className" }));
+    current.assignments.forEach(item => applyManual(item, assignmentIndex.get(`${currentTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`), { subject: "subject", className: "className", periodCount: "periodCount" }));
     const activityIndex = new Map(previous.activities.map(item => [`${previousTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`, item]));
     current.activities.forEach(item => applyManual(item, activityIndex.get(`${currentTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`), { name: "name" }));
     const groupKey = group => `${group.key}|${group.pages.join(",")}`;
@@ -2089,12 +2199,16 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         className: item.className,
         subject: item.subject,
         homeroomRank: item.homeroomRank ?? homeroomRank(item.subject),
+        periodCount: item.periodCount ?? 0,
+        sourceCells: (item.sourceCells || []).map(cell => ({ row: cell.row, col: cell.col })),
         row: item.row,
         col: item.col,
         confidence: {
           subject: item.subjectConfidence || "high",
-          className: item.classNameConfidence || "high"
+          className: item.classNameConfidence || "high",
+          periodCount: item.periodConfidence || "high"
         },
+        ...(item.periodDiagnostic ? { confidenceReason: { periodCount: item.periodDiagnostic } } : {}),
         edited: false
       }));
       records.activities.forEach(item => activities.push({
@@ -2146,6 +2260,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     ["teachers.link", snapshot => snapshot.teachers.map(item => item.confidence.link)],
     ["assignments.subject", snapshot => snapshot.assignments.map(item => item.confidence.subject)],
     ["assignments.className", snapshot => snapshot.assignments.map(item => item.confidence.className)],
+    ["assignments.periodCount", snapshot => snapshot.assignments.map(item => item.confidence.periodCount)],
     ["activities.name", snapshot => snapshot.activities.map(item => item.confidence.name)],
     ["orgGroups.name", snapshot => snapshot.orgGroups.map(item => item.confidence.name)],
     ["orgGroups.parent", snapshot => snapshot.orgGroups.map(item => item.confidence.parent)],
@@ -2174,11 +2289,104 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return `實際信心統計：low ${low}/${total}，unmatched ${unmatched}；low 比例最高：${top || "沒有資料"}。`;
   }
 
+  function gradeLabel(assignment) {
+    const match = compact(assignment.className).match(/^([1-6])/);
+    return match ? ["", "中一", "中二", "中三", "中四", "中五", "中六"][Number(match[1])] : assignment.level;
+  }
+
+  function teacherLookup(snapshot) {
+    const lookup = new Map();
+    snapshot.teachers.forEach(teacher => { lookup.set(teacher.id, teacher); lookup.set(teacher.recordId, teacher); });
+    return lookup;
+  }
+
+  function buildClassViewRows(snapshot, className) {
+    const lookup = teacherLookup(snapshot);
+    const records = snapshot.assignments.filter(item => item.className === className);
+    const byTeacher = new Map();
+    records.forEach(item => {
+      const bucket = byTeacher.get(item.teacherId) || { homeroomRank: null, teaching: [] };
+      if (item.homeroomRank !== null) bucket.homeroomRank = bucket.homeroomRank === null ? item.homeroomRank : Math.min(bucket.homeroomRank, item.homeroomRank);
+      else bucket.teaching.push(item);
+      byTeacher.set(item.teacherId, bucket);
+    });
+    return [...byTeacher].flatMap(([teacherId, bucket]) => {
+      const teacher = lookup.get(teacherId) || null;
+      const teaching = bucket.teaching.length ? bucket.teaching : [null];
+      return teaching.map(item => ({ teacher, assignment: item, homeroomRank: bucket.homeroomRank }));
+    }).sort((a, b) => (a.assignment?.subject || "").localeCompare(b.assignment?.subject || "", "zh-HK") || (a.teacher?.shortName || "").localeCompare(b.teacher?.shortName || "", "zh-HK"));
+  }
+
+  function buildSubjectViewRows(snapshot, level, subject) {
+    const lookup = teacherLookup(snapshot);
+    return snapshot.assignments.filter(item => item.homeroomRank === null && gradeLabel(item) === level && item.subject === subject)
+      .map(assignment => ({ assignment, teacher: lookup.get(assignment.teacherId) || null }))
+      .sort((a, b) => a.assignment.className.localeCompare(b.assignment.className, "en", { numeric: true }) || (a.teacher?.shortName || "").localeCompare(b.teacher?.shortName || "", "zh-HK"));
+  }
+
+  function verifiedFullNameHtml(teacher) {
+    if (teacher?.confidence?.link === "high" && teacher.fullName) return `<span class="confidence-high">${escapeHtml(teacher.fullName)}</span>`;
+    const candidate = teacher?.fullName ? `（${teacher.fullName}）` : "";
+    return `<span class="unconfirmed-name">未確認${escapeHtml(candidate)}</span>`;
+  }
+
+  function homeroomLabel(rank) {
+    if (rank === 1) return "正班主任";
+    if (rank === 2) return "副班主任";
+    return rank >= 3 ? `其他班主任（${rank}）` : "—";
+  }
+
+  function confidenceHtml(item, teacher) {
+    const parts = item ? [`科目 ${item.confidence.subject}`, `班別 ${item.confidence.className}`, `節數 ${item.confidence.periodCount}`] : [];
+    parts.push(`連結 ${teacher?.confidence?.link || "unmatched"}`);
+    const low = parts.some(part => / low| unmatched/.test(part));
+    return `<span class="${low ? "confidence-low" : "confidence-high"}">${escapeHtml(parts.join("／"))}</span>`;
+  }
+
+  function renderClassView(snapshot) {
+    const className = dom.classViewSelect.value;
+    const rows = className ? buildClassViewRows(snapshot, className) : [];
+    const teacherCount = new Set(rows.map(row => row.teacher?.recordId || row.assignment?.teacherId)).size;
+    const periodTotal = rows.reduce((sum, row) => sum + (row.assignment?.periodCount || 0), 0);
+    dom.classViewSummary.textContent = className ? `${teacherCount} 位教師・${rows.filter(row => row.assignment).length} 項任教・教師課節合計 ${periodTotal}` : "請選擇班級。";
+    dom.classViewTable.innerHTML = rows.length ? `<table class="relational-table"><thead><tr><th>科目</th><th>教師簡稱</th><th>教師全名</th><th>班主任身分</th><th>節數</th><th>confidence</th></tr></thead><tbody>${rows.map(row => `<tr><td>${escapeHtml(row.assignment?.subject || "—")}</td><td>${escapeHtml(row.teacher?.shortName || "未連結")}</td><td>${verifiedFullNameHtml(row.teacher)}</td><td>${escapeHtml(homeroomLabel(row.homeroomRank))}</td><td>${escapeHtml(row.assignment?.periodCount ?? 0)}</td><td>${confidenceHtml(row.assignment, row.teacher)}</td></tr>`).join("")}</tbody></table>` : emptyItem(className ? "此班沒有任教記錄" : "請先選擇班級");
+  }
+
+  function renderSubjectView(snapshot, resetSubject = false) {
+    const level = dom.subjectLevelSelect.value;
+    const subjects = [...new Set(snapshot.assignments.filter(item => item.homeroomRank === null && gradeLabel(item) === level).map(item => item.subject))].sort((a, b) => a.localeCompare(b, "zh-HK"));
+    const current = resetSubject ? "" : dom.subjectViewSelect.value;
+    dom.subjectViewSelect.innerHTML = `<option value="">選擇科目</option>${subjects.map(subject => `<option value="${escapeHtml(subject)}">${escapeHtml(subject)}</option>`).join("")}`;
+    if (subjects.includes(current)) dom.subjectViewSelect.value = current;
+    const subject = dom.subjectViewSelect.value;
+    const rows = level && subject ? buildSubjectViewRows(snapshot, level, subject) : [];
+    const total = rows.reduce((sum, row) => sum + row.assignment.periodCount, 0);
+    dom.subjectViewSummary.textContent = subject ? `${rows.length} 項班別教師記錄・教師課節合計 ${total}` : "請選擇級別及科目。";
+    dom.subjectViewTable.innerHTML = rows.length ? `<table class="relational-table"><thead><tr><th>班級</th><th>教師簡稱</th><th>教師全名</th><th>節數</th><th>confidence</th></tr></thead><tbody>${rows.map(row => `<tr><td>${escapeHtml(row.assignment.className)}</td><td>${escapeHtml(row.teacher?.shortName || "未連結")}</td><td>${verifiedFullNameHtml(row.teacher)}</td><td>${escapeHtml(row.assignment.periodCount)}</td><td>${confidenceHtml(row.assignment, row.teacher)}</td></tr>`).join("")}</tbody></table>` : emptyItem(subject ? "此級別／科目沒有任教記錄" : "請先選擇級別及科目");
+  }
+
+  function renderRelationalViews(snapshot) {
+    state.relationshipSnapshot = snapshot;
+    const classes = [...new Set(snapshot.assignments.map(item => item.className).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+    const currentClass = dom.classViewSelect.value;
+    dom.classViewSelect.innerHTML = `<option value="">選擇班級</option>${classes.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}`;
+    if (classes.includes(currentClass)) dom.classViewSelect.value = currentClass;
+    const levels = [...new Set(snapshot.assignments.filter(item => item.homeroomRank === null).map(gradeLabel))].filter(Boolean).sort((a, b) => a.localeCompare(b, "zh-HK", { numeric: true }));
+    const currentLevel = dom.subjectLevelSelect.value;
+    dom.subjectLevelSelect.innerHTML = `<option value="">選擇級別</option>${levels.map(level => `<option value="${escapeHtml(level)}">${escapeHtml(level)}</option>`).join("")}`;
+    if (levels.includes(currentLevel)) dom.subjectLevelSelect.value = currentLevel;
+    dom.relationalPanel.hidden = snapshot.assignments.length === 0;
+    renderClassView(snapshot);
+    renderSubjectView(snapshot);
+  }
+
   function refreshConfidenceSummary(snapshot = null) {
     const current = snapshot || (state.teachers.length ? buildSnapshot() : null);
     dom.confidenceSummary.textContent = current
       ? confidenceSummaryText(current)
       : "尚未解析或匯入資料；完成後會在此顯示實際 low／unmatched 信心統計。";
+    if (current) renderRelationalViews(current);
+    else { dom.relationalPanel.hidden = true; state.relationshipSnapshot = null; }
     return current ? collectConfidenceStats(current) : [];
   }
 
@@ -2215,6 +2423,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         records.assignments.forEach(item => {
           add(item.subjectDiagnostic, "assignments.subject", { row: item.row, col: item.col, teacherCode: teacher.code });
           add(item.classNameDiagnostic, "assignments.className", { row: item.row, col: item.col, teacherCode: teacher.code });
+          add(item.periodDiagnostic, "assignments.periodCount", { row: item.row, col: item.col, teacherCode: teacher.code, expected: item.periodExpected, actual: item.periodCount, unit: "record" });
         });
         records.activities.forEach(item => add(item.nameDiagnostic, "activities.name", { row: item.row, col: item.col, teacherCode: teacher.code }));
       }
@@ -2392,6 +2601,9 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   });
   dom.teacherSearch.addEventListener("input", event => renderTeacherOptions(event.target.value));
   dom.teacherSelect.addEventListener("change", event => selectTeacher(event.target.value));
+  dom.classViewSelect.addEventListener("change", () => state.relationshipSnapshot && renderClassView(state.relationshipSnapshot));
+  dom.subjectLevelSelect.addEventListener("change", () => state.relationshipSnapshot && renderSubjectView(state.relationshipSnapshot, true));
+  dom.subjectViewSelect.addEventListener("change", () => state.relationshipSnapshot && renderSubjectView(state.relationshipSnapshot));
   dom.copyBtn.addEventListener("click", copySummary);
   dom.printBtn.addEventListener("click", () => window.print());
   dom.exportSnapshotBtn.addEventListener("click", () => {
@@ -2439,6 +2651,10 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     parseDelimited,
     parseTeachers,
     scanTimetable,
+    cellHasTeacher,
+    findClassInRow,
+    detectPeriodRows,
+    periodReferenceForCell,
     scanActivities,
     parseNotes,
     buildDemoMatrix,
@@ -2455,6 +2671,9 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     buildSnapshot,
     collectConfidenceStats,
     collectConfidenceDiagnostics,
+    buildClassViewRows,
+    buildSubjectViewRows,
+    gradeLabel,
     findExcludedContinuationCells,
     confidenceSummaryText,
     refreshConfidenceSummary,
