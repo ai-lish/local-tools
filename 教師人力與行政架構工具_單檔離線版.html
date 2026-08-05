@@ -1538,6 +1538,10 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${path} 必須是有限 number。`);
   }
 
+  function requireBoolean(value, path) {
+    if (typeof value !== "boolean") throw new Error(`${path} 必須是 boolean。`);
+  }
+
   function requirePositiveInteger(value, path) {
     if (!Number.isInteger(value) || value < 1) throw new Error(`${path} 必須是 1-based 正整數。`);
   }
@@ -1612,14 +1616,15 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     requireArray(snapshot.teachers, "teachers");
     snapshot.teachers.forEach((teacher, index) => {
       const path = `teachers[${index}]`;
-      requireSchemaKeys(teacher, ["recordId", "id", "code", "shortName", "load", "role", "domain", "sourceRow", "sourceCol", "confidence", "edited"], ["confidenceReason"], path);
+      requireSchemaKeys(teacher, ["recordId", "id", "code", "shortName", "load", "role", "domain", "isNewTeacher", "fullName", "sourceRow", "sourceCol", "confidence", "edited"], ["confidenceReason"], path);
       validateRecordId(teacher.recordId, `${path}.recordId`);
-      ["id", "code", "shortName", "load", "role", "domain"].forEach(key => requireString(teacher[key], `${path}.${key}`));
+      ["id", "code", "shortName", "load", "role", "domain", "fullName"].forEach(key => requireString(teacher[key], `${path}.${key}`));
+      requireBoolean(teacher.isNewTeacher, `${path}.isNewTeacher`);
       requirePositiveInteger(teacher.sourceRow, `${path}.sourceRow`);
       requirePositiveInteger(teacher.sourceCol, `${path}.sourceCol`);
-      requireExactKeys(teacher.confidence, ["domain"], `${path}.confidence`);
-      requireConfidence(teacher.confidence.domain, `${path}.confidence.domain`);
-      validateConfidenceReason(teacher, ["domain"], path);
+      requireExactKeys(teacher.confidence, ["domain", "isNewTeacher", "link"], `${path}.confidence`);
+      ["domain", "isNewTeacher", "link"].forEach(key => requireConfidence(teacher.confidence[key], `${path}.confidence.${key}`));
+      validateConfidenceReason(teacher, ["domain", "isNewTeacher", "link"], path);
       if (typeof teacher.edited !== "boolean") throw new Error(`${path}.edited 必須是 boolean。`);
     });
 
@@ -1673,15 +1678,15 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       requireArray(group.members, `${path}.members`);
       group.members.forEach((member, memberIndex) => {
         const memberPath = `${path}.members[${memberIndex}]`;
-        requireSchemaKeys(member, ["recordId", "name", "rank", "isLeader", "confidence", "edited"], ["confidenceReason"], memberPath);
+        requireSchemaKeys(member, ["recordId", "name", "rank", "isLeader", "linkedTeacherRecordId", "confidence", "edited"], ["confidenceReason"], memberPath);
         validateRecordId(member.recordId, `${memberPath}.recordId`);
         requireString(member.name, `${memberPath}.name`);
+        if (member.linkedTeacherRecordId !== null) requireString(member.linkedTeacherRecordId, `${memberPath}.linkedTeacherRecordId`);
         requireNumber(member.rank, `${memberPath}.rank`);
         if (typeof member.isLeader !== "boolean") throw new Error(`${memberPath}.isLeader 必須是 boolean。`);
-        requireExactKeys(member.confidence, ["group", "name"], `${memberPath}.confidence`);
-        requireConfidence(member.confidence.group, `${memberPath}.confidence.group`);
-        requireConfidence(member.confidence.name, `${memberPath}.confidence.name`);
-        validateConfidenceReason(member, ["group", "name"], memberPath);
+        requireExactKeys(member.confidence, ["group", "name", "link"], `${memberPath}.confidence`);
+        ["group", "name", "link"].forEach(key => requireConfidence(member.confidence[key], `${memberPath}.confidence.${key}`));
+        validateConfidenceReason(member, ["group", "name", "link"], memberPath);
         if (typeof member.edited !== "boolean") throw new Error(`${memberPath}.edited 必須是 boolean。`);
       });
       requireExactKeys(group.confidence, ["name", "parent"], `${path}.confidence`);
@@ -1694,7 +1699,13 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     });
 
     requireArray(snapshot.conflicts, "conflicts");
-    const conflictTypes = new Set(["duplicateShortName", "duplicatePersonName", "orphanAssignment", "unresolvedHeader"]);
+    const teacherRecordIds = new Set(snapshot.teachers.map(teacher => teacher.recordId));
+    snapshot.orgGroups.flatMap(group => group.members).forEach((member, index) => {
+      if (member.linkedTeacherRecordId !== null && !teacherRecordIds.has(member.linkedTeacherRecordId)) {
+        throw new Error(`orgGroups members[${index}].linkedTeacherRecordId 未指向有效 teacher recordId。`);
+      }
+    });
+    const conflictTypes = new Set(["duplicateShortName", "duplicatePersonName", "orphanAssignment", "unresolvedHeader", "unlinkedTeacher", "unlinkedMember"]);
     snapshot.conflicts.forEach((conflict, index) => {
       const path = `conflicts[${index}]`;
       requireExactKeys(conflict, ["type", "detail", "refs"], path);
@@ -1801,7 +1812,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       target.edited = target.edited || source.edited;
     };
     const teacherIndex = new Map(previous.teachers.map(item => [`${item.code}|${item.shortName}`, item]));
-    current.teachers.forEach(item => applyManual(item, teacherIndex.get(`${item.code}|${item.shortName}`), { domain: "domain" }));
+    current.teachers.forEach(item => applyManual(item, teacherIndex.get(`${item.code}|${item.shortName}`), { domain: "domain", isNewTeacher: "isNewTeacher", link: "fullName" }));
     const assignmentIndex = new Map(previous.assignments.map(item => [`${previousTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`, item]));
     current.assignments.forEach(item => applyManual(item, assignmentIndex.get(`${currentTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`), { subject: "subject", className: "className" }));
     const activityIndex = new Map(previous.activities.map(item => [`${previousTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`, item]));
@@ -1812,7 +1823,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       const oldGroup = groupIndex.get(groupKey(group));
       applyManual(group, oldGroup, { name: "name", parent: "parent" });
       const memberIndex = new Map((oldGroup?.members || []).map(member => [member.rank, member]));
-      group.members.forEach(member => applyManual(member, memberIndex.get(member.rank), { group: null, name: "name" }));
+      group.members.forEach(member => applyManual(member, memberIndex.get(member.rank), { group: null, name: "name", link: "linkedTeacherRecordId" }));
     });
     current.conflicts.filter(item => item.type === "duplicateShortName").forEach(conflict => {
       const match = conflict.detail.match(/「(.+?)」/);
@@ -1838,9 +1849,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       load: teacher.load,
       role: teacher.role,
       domain: teacher.domain,
+      isNewTeacher: teacher.code.endsWith("#"),
+      fullName: "",
       sourceRow: teacher.sourceRow,
       sourceCol: teacher.sourceCol,
-      confidence: { domain: "high" },
+      confidence: { domain: "high", isNewTeacher: "high", link: "low" },
       edited: false
     }));
     const teacherRecordIds = new Map(teacherSnapshots.map(teacher => [teacher.id, teacher.recordId]));
@@ -2537,7 +2550,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
           name,
           rank: index + 1,
           isLeader: index === 0,
-          confidence: { group: "high", name: "high" },
+          linkedTeacherRecordId: null,
+          confidence: { group: "high", name: "high", link: "low" },
           edited: false
         })),
         confidence: { name: "high", parent: "high" },
