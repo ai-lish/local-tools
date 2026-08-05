@@ -228,6 +228,7 @@ textarea {
 .data-layer-panel__header p { margin-bottom: 0; color: var(--muted); font-size: 12px; }
 .data-layer-actions { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
 .confidence-pending { padding: 7px 10px; color: #75530c; background: var(--gold-soft); border: 1px solid #ecd89a; border-radius: 7px; font-size: 11px; font-weight: 750; }
+.profile-partial-note { margin-top: 7px; color: #8d342a !important; font-weight: 750; }
 .data-layer-status { margin-top: 12px; }
 
 .teacher-picker { margin-top: 18px; padding: 25px 26px; display: grid; grid-template-columns: .8fr 1.2fr; gap: 34px; align-items: end; border-left: 5px solid var(--blue); }
@@ -448,6 +449,7 @@ footer p { margin: 0; }
         <div>
           <h2 id="dataLayerTitle">可攜式資料中介層</h2>
           <p>資料快照含人事資料；mapping profile 只含結構設定。所有內容只保留在記憶體，必須由使用者明示匯入或匯出檔案。</p>
+          <p class="profile-partial-note">本 profile 僅部分套用；完整 profile-driven 解析尚未啟用（F-P）。</p>
         </div>
         <span class="confidence-pending">信心標記尚未啟用；目前 confidence 只填入 high 佔位，並不代表已校驗。</span>
       </div>
@@ -504,7 +506,7 @@ footer p { margin: 0; }
       </summary>
       <div class="settings-grid">
         <label>教師名單列
-          <span class="range-inputs"><input id="teacherStart" type="number" min="1" value="2" aria-label="教師名單起始列">—<input id="teacherEnd" type="number" min="1" value="10" aria-label="教師名單結束列"></span>
+          <span class="range-inputs"><input id="teacherStart" type="number" min="1" value="3" aria-label="教師名單起始列">—<input id="teacherEnd" type="number" min="1" value="10" aria-label="教師名單結束列"></span>
         </label>
         <label>初中課表列
           <span class="range-inputs"><input id="juniorStart" type="number" min="1" value="16" aria-label="初中課表起始列">—<input id="juniorEnd" type="number" min="1" value="46" aria-label="初中課表結束列"></span>
@@ -822,6 +824,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     workbook: null,
     activeTeacherId: "",
     snapshot: null,
+    manualSnapshot: null,
     profile: null,
     sourceWorkload: { fileName: "", sheetName: "", rows: 0, cols: 0 },
     adminAdapter: null
@@ -1229,6 +1232,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       rows: dimensions.rows,
       cols: dimensions.cols
     };
+    if (state.manualSnapshot) {
+      state.snapshot = buildSnapshot();
+      state.teachers = state.snapshot.teachers.map(teacher => ({ ...teacher }));
+      state.notes = state.snapshot.notes.map(note => ({ ...note }));
+    }
     renderTeacherOptions();
     dom.resultSection.hidden = true;
     dom.emptyGuide.hidden = state.teachers.length > 0;
@@ -1427,15 +1435,15 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   function buildDemoMatrix() {
     const rows = Array.from({ length: 107 }, () => Array(36).fill(""));
     const put = (r, c, value) => { rows[r - 1][c - 1] = value; };
-    put(1, 1, "中國語文");
-    put(2, 1, "CCH2"); put(2, 2, "霞"); put(2, 3, "22"); put(2, 4, "中文科主任");
-    put(3, 1, "CCH5"); put(3, 2, "敏"); put(3, 3, "20"); put(3, 4, "訓導");
-    put(1, 11, "英國語文");
-    put(2, 11, "ENG1"); put(2, 12, "朗"); put(2, 13, "20"); put(2, 14, "SEN T");
-    put(1, 21, "數學");
-    put(2, 21, "MAT3"); put(2, 22, "衡"); put(2, 23, "21"); put(2, 24, "數學科主任");
-    put(1, 31, "科學");
-    put(2, 31, "SCI4"); put(2, 32, "嵐"); put(2, 33, "19"); put(2, 34, "STEM統籌");
+    put(2, 1, "中國語文");
+    put(3, 1, "CCH2"); put(3, 2, "霞"); put(3, 3, "22"); put(3, 4, "中文科主任");
+    put(4, 1, "CCH5"); put(4, 2, "敏"); put(4, 3, "20"); put(4, 4, "訓導");
+    put(2, 11, "英國語文");
+    put(3, 11, "ENG1"); put(3, 12, "朗"); put(3, 13, "20"); put(3, 14, "SEN T");
+    put(2, 21, "數學");
+    put(3, 21, "MAT3"); put(3, 22, "衡"); put(3, 23, "21"); put(3, 24, "數學科主任");
+    put(2, 31, "科學");
+    put(3, 31, "SCI4"); put(3, 32, "嵐"); put(3, 33, "19"); put(3, 34, "STEM統籌");
 
     ["班級", "正班主任", "副班主任", "中文", "英文", "數學", "科學", "歷史"].forEach((v, i) => put(15, i + 1, v));
     const junior = [
@@ -1497,9 +1505,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     if (!ok) throw new Error("copy failed");
   }
 
-  const SNAPSHOT_KEYS = ["kind", "schemaVersion", "generatedAt", "profileId", "source", "teachers", "assignments", "activities", "notes", "orgGroups", "conflicts"];
-  const PROFILE_KEYS = ["kind", "schemaVersion", "id", "label", "createdAt", "workload", "admin"];
+  const SNAPSHOT_KEYS = ["kind", "schemaVersion", "columnIndexBase", "generatedAt", "profileId", "source", "teachers", "assignments", "activities", "notes", "orgGroups", "conflicts"];
+  const PROFILE_KEYS = ["kind", "schemaVersion", "columnIndexBase", "id", "label", "createdAt", "workload", "admin"];
   const CONFIDENCE_VALUES = new Set(["high", "low", "manual"]);
+  // 全 schema 的絕對 row／col／欄號均為 1-based；teacherFieldOffsets 唯一例外，為相對 block 起點的 0-based 位移。
+  const COLUMN_INDEX_BASE = 1;
 
   function isPlainObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -1528,6 +1538,10 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${path} 必須是有限 number。`);
   }
 
+  function requirePositiveInteger(value, path) {
+    if (!Number.isInteger(value) || value < 1) throw new Error(`${path} 必須是 1-based 正整數。`);
+  }
+
   function requireExactKeys(value, keys, path) {
     requireObject(value, path);
     const actual = Object.keys(value).sort();
@@ -1537,6 +1551,26 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     }
   }
 
+  function requireSchemaKeys(value, requiredKeys, optionalKeys, path) {
+    requireObject(value, path);
+    const actual = Object.keys(value);
+    const missing = requiredKeys.filter(key => !Object.prototype.hasOwnProperty.call(value, key));
+    const allowed = new Set([...requiredKeys, ...optionalKeys]);
+    const extra = actual.filter(key => !allowed.has(key));
+    if (missing.length || extra.length) {
+      throw new Error(`${path} 欄位不符合 schema；缺少：${missing.join("、") || "無"}；多出：${extra.join("、") || "無"}。`);
+    }
+  }
+
+  function validateConfidenceReason(record, confidenceKeys, path) {
+    if (!Object.prototype.hasOwnProperty.call(record, "confidenceReason")) return;
+    requireObject(record.confidenceReason, `${path}.confidenceReason`);
+    const keys = Object.keys(record.confidenceReason);
+    const invalidKeys = keys.filter(key => !confidenceKeys.includes(key));
+    if (invalidKeys.length) throw new Error(`${path}.confidenceReason 欄位不對應 confidence：${invalidKeys.join("、")}。`);
+    if (keys.length) throw new Error(`${path}.confidenceReason 原因碼尚未由 F-N 凍結；本版本只接受省略或空 object。`);
+  }
+
   function requireConfidence(value, path) {
     requireString(value, path);
     if (!CONFIDENCE_VALUES.has(value)) throw new Error(`${path} 只可為 high、low 或 manual。`);
@@ -1544,8 +1578,9 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
 
   function validateRange(value, path) {
     requireExactKeys(value, ["start", "end"], path);
-    requireNumber(value.start, `${path}.start`);
-    requireNumber(value.end, `${path}.end`);
+    requirePositiveInteger(value.start, `${path}.start`);
+    requirePositiveInteger(value.end, `${path}.end`);
+    if (value.end < value.start) throw new Error(`${path}.end 不得小於 start。`);
   }
 
   function validateSnapshot(snapshot) {
@@ -1553,8 +1588,16 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     if (snapshot.kind !== "teacher-tool-snapshot") throw new Error("不支援的 data snapshot：kind 必須為 teacher-tool-snapshot。");
     if (snapshot.schemaVersion !== 1) throw new Error("不支援的 data snapshot：schemaVersion 必須為 1。");
     requireExactKeys(snapshot, SNAPSHOT_KEYS, "data snapshot");
+    if (snapshot.columnIndexBase !== COLUMN_INDEX_BASE) throw new Error("data snapshot.columnIndexBase 必須為 1。");
     requireIso8601(snapshot.generatedAt, "generatedAt");
     if (snapshot.profileId !== null) requireString(snapshot.profileId, "profileId");
+    const recordIds = new Set();
+    const validateRecordId = (recordId, path) => {
+      requireString(recordId, path);
+      if (!/^[a-z][a-z0-9-]*-[1-9]\d*$/.test(recordId)) throw new Error(`${path} 必須符合 <類型前綴>-<正整數序號>。`);
+      if (recordIds.has(recordId)) throw new Error(`${path} 與其他 recordId 重複。`);
+      recordIds.add(recordId);
+    };
 
     requireExactKeys(snapshot.source, ["workload", "admin"], "source");
     requireExactKeys(snapshot.source.workload, ["fileName", "sheetName", "rows", "cols"], "source.workload");
@@ -1569,39 +1612,45 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     requireArray(snapshot.teachers, "teachers");
     snapshot.teachers.forEach((teacher, index) => {
       const path = `teachers[${index}]`;
-      requireExactKeys(teacher, ["id", "code", "shortName", "load", "role", "domain", "sourceRow", "sourceCol", "confidence", "edited"], path);
+      requireSchemaKeys(teacher, ["recordId", "id", "code", "shortName", "load", "role", "domain", "sourceRow", "sourceCol", "confidence", "edited"], ["confidenceReason"], path);
+      validateRecordId(teacher.recordId, `${path}.recordId`);
       ["id", "code", "shortName", "load", "role", "domain"].forEach(key => requireString(teacher[key], `${path}.${key}`));
-      requireNumber(teacher.sourceRow, `${path}.sourceRow`);
-      requireNumber(teacher.sourceCol, `${path}.sourceCol`);
+      requirePositiveInteger(teacher.sourceRow, `${path}.sourceRow`);
+      requirePositiveInteger(teacher.sourceCol, `${path}.sourceCol`);
       requireExactKeys(teacher.confidence, ["domain"], `${path}.confidence`);
       requireConfidence(teacher.confidence.domain, `${path}.confidence.domain`);
+      validateConfidenceReason(teacher, ["domain"], path);
       if (typeof teacher.edited !== "boolean") throw new Error(`${path}.edited 必須是 boolean。`);
     });
 
     requireArray(snapshot.assignments, "assignments");
     snapshot.assignments.forEach((assignment, index) => {
       const path = `assignments[${index}]`;
-      requireExactKeys(assignment, ["teacherId", "level", "className", "subject", "homeroomRank", "row", "col", "confidence", "edited"], path);
+      requireSchemaKeys(assignment, ["recordId", "teacherId", "level", "className", "subject", "homeroomRank", "row", "col", "confidence", "edited"], ["confidenceReason"], path);
+      validateRecordId(assignment.recordId, `${path}.recordId`);
       ["teacherId", "level", "className", "subject"].forEach(key => requireString(assignment[key], `${path}.${key}`));
       if (assignment.homeroomRank !== null) requireNumber(assignment.homeroomRank, `${path}.homeroomRank`);
-      requireNumber(assignment.row, `${path}.row`);
-      requireNumber(assignment.col, `${path}.col`);
+      requirePositiveInteger(assignment.row, `${path}.row`);
+      requirePositiveInteger(assignment.col, `${path}.col`);
       requireExactKeys(assignment.confidence, ["subject", "className"], `${path}.confidence`);
       requireConfidence(assignment.confidence.subject, `${path}.confidence.subject`);
       requireConfidence(assignment.confidence.className, `${path}.confidence.className`);
+      validateConfidenceReason(assignment, ["subject", "className"], path);
       if (typeof assignment.edited !== "boolean") throw new Error(`${path}.edited 必須是 boolean。`);
     });
 
     requireArray(snapshot.activities, "activities");
     snapshot.activities.forEach((activity, index) => {
       const path = `activities[${index}]`;
-      requireExactKeys(activity, ["teacherId", "name", "row", "col", "confidence", "edited"], path);
+      requireSchemaKeys(activity, ["recordId", "teacherId", "name", "row", "col", "confidence", "edited"], ["confidenceReason"], path);
+      validateRecordId(activity.recordId, `${path}.recordId`);
       requireString(activity.teacherId, `${path}.teacherId`);
       requireString(activity.name, `${path}.name`);
-      requireNumber(activity.row, `${path}.row`);
-      requireNumber(activity.col, `${path}.col`);
+      requirePositiveInteger(activity.row, `${path}.row`);
+      requirePositiveInteger(activity.col, `${path}.col`);
       requireExactKeys(activity.confidence, ["name"], `${path}.confidence`);
       requireConfidence(activity.confidence.name, `${path}.confidence.name`);
+      validateConfidenceReason(activity, ["name"], path);
       if (typeof activity.edited !== "boolean") throw new Error(`${path}.edited 必須是 boolean。`);
     });
 
@@ -1609,32 +1658,36 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     snapshot.notes.forEach((note, index) => {
       const path = `notes[${index}]`;
       requireExactKeys(note, ["row", "text"], path);
-      requireNumber(note.row, `${path}.row`);
+      requirePositiveInteger(note.row, `${path}.row`);
       requireString(note.text, `${path}.text`);
     });
 
     requireArray(snapshot.orgGroups, "orgGroups");
     snapshot.orgGroups.forEach((group, index) => {
       const path = `orgGroups[${index}]`;
-      requireExactKeys(group, ["key", "name", "parent", "pages", "members", "confidence", "mergedFromLines", "edited"], path);
+      requireSchemaKeys(group, ["recordId", "key", "name", "parent", "pages", "members", "confidence", "mergedFromLines", "edited"], ["confidenceReason"], path);
+      validateRecordId(group.recordId, `${path}.recordId`);
       ["key", "name", "parent"].forEach(key => requireString(group[key], `${path}.${key}`));
       requireArray(group.pages, `${path}.pages`);
       group.pages.forEach((page, pageIndex) => requireNumber(page, `${path}.pages[${pageIndex}]`));
       requireArray(group.members, `${path}.members`);
       group.members.forEach((member, memberIndex) => {
         const memberPath = `${path}.members[${memberIndex}]`;
-        requireExactKeys(member, ["name", "rank", "isLeader", "confidence", "edited"], memberPath);
+        requireSchemaKeys(member, ["recordId", "name", "rank", "isLeader", "confidence", "edited"], ["confidenceReason"], memberPath);
+        validateRecordId(member.recordId, `${memberPath}.recordId`);
         requireString(member.name, `${memberPath}.name`);
         requireNumber(member.rank, `${memberPath}.rank`);
         if (typeof member.isLeader !== "boolean") throw new Error(`${memberPath}.isLeader 必須是 boolean。`);
         requireExactKeys(member.confidence, ["group", "name"], `${memberPath}.confidence`);
         requireConfidence(member.confidence.group, `${memberPath}.confidence.group`);
         requireConfidence(member.confidence.name, `${memberPath}.confidence.name`);
+        validateConfidenceReason(member, ["group", "name"], memberPath);
         if (typeof member.edited !== "boolean") throw new Error(`${memberPath}.edited 必須是 boolean。`);
       });
       requireExactKeys(group.confidence, ["name", "parent"], `${path}.confidence`);
       requireConfidence(group.confidence.name, `${path}.confidence.name`);
       requireConfidence(group.confidence.parent, `${path}.confidence.parent`);
+      validateConfidenceReason(group, ["name", "parent"], path);
       requireArray(group.mergedFromLines, `${path}.mergedFromLines`);
       group.mergedFromLines.forEach((line, lineIndex) => requireString(line, `${path}.mergedFromLines[${lineIndex}]`));
       if (typeof group.edited !== "boolean") throw new Error(`${path}.edited 必須是 boolean。`);
@@ -1649,6 +1702,10 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       if (!conflictTypes.has(conflict.type)) throw new Error(`${path}.type 不受 schema 支援。`);
       requireString(conflict.detail, `${path}.detail`);
       requireArray(conflict.refs, `${path}.refs`);
+      conflict.refs.forEach((ref, refIndex) => {
+        requireString(ref, `${path}.refs[${refIndex}]`);
+        if (!recordIds.has(ref)) throw new Error(`${path}.refs[${refIndex}] 未指向有效 recordId。`);
+      });
     });
     return snapshot;
   }
@@ -1658,10 +1715,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     if (profile.kind !== "teacher-tool-profile") throw new Error("不支援的 mapping profile：kind 必須為 teacher-tool-profile。");
     if (profile.schemaVersion !== 1) throw new Error("不支援的 mapping profile：schemaVersion 必須為 1。");
     requireExactKeys(profile, PROFILE_KEYS, "mapping profile");
+    if (profile.columnIndexBase !== COLUMN_INDEX_BASE) throw new Error("mapping profile.columnIndexBase 必須為 1。");
     ["id", "label"].forEach(key => requireString(profile[key], key));
     requireIso8601(profile.createdAt, "createdAt");
 
-    const workloadKeys = ["sheetNameHint", "domainHeaderRow", "teacherRows", "teacherBlockWidth", "teacherFieldOrder", "domainSearchLeft", "levels", "homeroomColumns", "subjectSearchLeft", "activityRows", "noteRows"];
+    const workloadKeys = ["sheetNameHint", "domainHeaderRow", "teacherRows", "teacherBlockWidth", "teacherFieldOrder", "teacherFieldOffsets", "domainSearchLeft", "levels", "homeroomColumns", "subjectSearchLeft", "activityRows", "noteRows"];
     requireExactKeys(profile.workload, workloadKeys, "workload");
     requireString(profile.workload.sheetNameHint, "workload.sheetNameHint");
     ["domainHeaderRow", "teacherBlockWidth", "domainSearchLeft", "subjectSearchLeft"].forEach(key => requireNumber(profile.workload[key], `workload.${key}`));
@@ -1671,20 +1729,25 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     validateRange(profile.workload.noteRows, "workload.noteRows");
     requireArray(profile.workload.teacherFieldOrder, "workload.teacherFieldOrder");
     if (JSON.stringify(profile.workload.teacherFieldOrder) !== JSON.stringify(["code", "shortName", "load", "role"])) throw new Error("workload.teacherFieldOrder 不符合 schemaVersion 1。 ");
+    requireExactKeys(profile.workload.teacherFieldOffsets, ["code", "shortName", "load", "role"], "workload.teacherFieldOffsets");
+    const offsets = profile.workload.teacherFieldOffsets;
+    if (offsets.code !== 0 || offsets.shortName !== 1 || offsets.load !== 2 || offsets.role !== 3) {
+      throw new Error("workload.teacherFieldOffsets 必須為相對 block 起點的 0-based 位移 0、1、2、3。");
+    }
     requireArray(profile.workload.levels, "workload.levels");
     profile.workload.levels.forEach((level, index) => {
       const path = `workload.levels[${index}]`;
       requireExactKeys(level, ["label", "headerRows", "classRows", "continuationRows"], path);
       requireString(level.label, `${path}.label`);
-      validateRange(level.headerRows, `${path}.headerRows`);
+      if (level.headerRows !== null) validateRange(level.headerRows, `${path}.headerRows`);
       validateRange(level.classRows, `${path}.classRows`);
       requireArray(level.continuationRows, `${path}.continuationRows`);
-      level.continuationRows.forEach((row, rowIndex) => requireNumber(row, `${path}.continuationRows[${rowIndex}]`));
+      level.continuationRows.forEach((row, rowIndex) => requirePositiveInteger(row, `${path}.continuationRows[${rowIndex}]`));
     });
     requireExactKeys(profile.workload.homeroomColumns, ["primary", "deputy", "additional"], "workload.homeroomColumns");
     ["primary", "deputy", "additional"].forEach(key => {
       requireArray(profile.workload.homeroomColumns[key], `workload.homeroomColumns.${key}`);
-      profile.workload.homeroomColumns[key].forEach((col, index) => requireNumber(col, `workload.homeroomColumns.${key}[${index}]`));
+      profile.workload.homeroomColumns[key].forEach((col, index) => requirePositiveInteger(col, `workload.homeroomColumns.${key}[${index}]`));
     });
 
     requireExactKeys(profile.admin, ["orgLabelAllowList", "orgLabelDenyList", "lineYTolerance", "joinThreshold", "multiLineHeaderRule"], "admin");
@@ -1706,6 +1769,58 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return null;
   }
 
+  function recordIdCounters(snapshot) {
+    const counters = { teacher: 0, assignment: 0, activity: 0, "org-group": 0, "org-member": 0 };
+    if (!snapshot) return counters;
+    const ids = [
+      ...snapshot.teachers.map(item => item.recordId),
+      ...snapshot.assignments.map(item => item.recordId),
+      ...snapshot.activities.map(item => item.recordId),
+      ...snapshot.orgGroups.flatMap(group => [group.recordId, ...group.members.map(member => member.recordId)])
+    ];
+    for (const recordId of ids) {
+      const match = String(recordId || "").match(/^(teacher|assignment|activity|org-group|org-member)-(\d+)$/);
+      if (match) counters[match[1]] = Math.max(counters[match[1]], Number(match[2]));
+    }
+    return counters;
+  }
+
+  function reattachManualFields(current, previous) {
+    if (!previous) return current;
+    const previousTeacherKeys = new Map(previous.teachers.map(item => [item.id, `${item.code}|${item.shortName}`]));
+    const currentTeacherKeys = new Map(current.teachers.map(item => [item.id, `${item.code}|${item.shortName}`]));
+    const applyManual = (target, source, fieldMap) => {
+      if (!source) return;
+      target.recordId = source.recordId;
+      for (const [confidenceField, valueField] of Object.entries(fieldMap)) {
+        if (source.confidence[confidenceField] !== "manual") continue;
+        if (valueField) target[valueField] = source[valueField];
+        target.confidence[confidenceField] = "manual";
+      }
+      if (Object.prototype.hasOwnProperty.call(source, "confidenceReason")) target.confidenceReason = { ...source.confidenceReason };
+      target.edited = target.edited || source.edited;
+    };
+    const teacherIndex = new Map(previous.teachers.map(item => [`${item.code}|${item.shortName}`, item]));
+    current.teachers.forEach(item => applyManual(item, teacherIndex.get(`${item.code}|${item.shortName}`), { domain: "domain" }));
+    const assignmentIndex = new Map(previous.assignments.map(item => [`${previousTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`, item]));
+    current.assignments.forEach(item => applyManual(item, assignmentIndex.get(`${currentTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`), { subject: "subject", className: "className" }));
+    const activityIndex = new Map(previous.activities.map(item => [`${previousTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`, item]));
+    current.activities.forEach(item => applyManual(item, activityIndex.get(`${currentTeacherKeys.get(item.teacherId)}|${item.row}|${item.col}`), { name: "name" }));
+    const groupKey = group => `${group.key}|${group.pages.join(",")}`;
+    const groupIndex = new Map(previous.orgGroups.map(group => [groupKey(group), group]));
+    current.orgGroups.forEach(group => {
+      const oldGroup = groupIndex.get(groupKey(group));
+      applyManual(group, oldGroup, { name: "name", parent: "parent" });
+      const memberIndex = new Map((oldGroup?.members || []).map(member => [member.rank, member]));
+      group.members.forEach(member => applyManual(member, memberIndex.get(member.rank), { group: null, name: "name" }));
+    });
+    current.conflicts.filter(item => item.type === "duplicateShortName").forEach(conflict => {
+      const match = conflict.detail.match(/「(.+?)」/);
+      if (match) conflict.refs = current.teachers.filter(teacher => teacher.shortName === match[1]).map(teacher => teacher.recordId);
+    });
+    return current;
+  }
+
   function buildSnapshot() {
     if (state.snapshot) {
       const snapshot = JSON.parse(JSON.stringify(state.snapshot));
@@ -1713,11 +1828,28 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       snapshot.profileId = state.profile?.id ?? snapshot.profileId;
       return validateSnapshot(snapshot);
     }
+    const counters = recordIdCounters(state.manualSnapshot);
+    const nextRecordId = type => `${type}-${++counters[type]}`;
+    const teacherSnapshots = state.teachers.map(teacher => ({
+      recordId: nextRecordId("teacher"),
+      id: teacher.id,
+      code: teacher.code,
+      shortName: teacher.shortName,
+      load: teacher.load,
+      role: teacher.role,
+      domain: teacher.domain,
+      sourceRow: teacher.sourceRow,
+      sourceCol: teacher.sourceCol,
+      confidence: { domain: "high" },
+      edited: false
+    }));
+    const teacherRecordIds = new Map(teacherSnapshots.map(teacher => [teacher.id, teacher.recordId]));
     const assignments = [];
     const activities = [];
     for (const teacher of state.teachers) {
       const records = recordsForTeacher(teacher);
       records.assignments.forEach(item => assignments.push({
+        recordId: nextRecordId("assignment"),
         teacherId: teacher.id,
         level: item.level,
         className: item.className,
@@ -1729,6 +1861,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         edited: false
       }));
       records.activities.forEach(item => activities.push({
+        recordId: nextRecordId("activity"),
         teacherId: teacher.id,
         name: item.name,
         row: item.row,
@@ -1738,39 +1871,34 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       }));
     }
     const admin = state.adminAdapter?.getSnapshotData?.() || { source: { fileName: "", pageCount: 0 }, orgGroups: [] };
+    const orgGroups = admin.orgGroups.map(group => ({
+      ...group,
+      recordId: nextRecordId("org-group"),
+      members: group.members.map(member => ({ ...member, recordId: nextRecordId("org-member") }))
+    }));
     const duplicates = duplicateShortNames(state.teachers);
     const snapshot = {
       kind: "teacher-tool-snapshot",
       schemaVersion: 1,
+      columnIndexBase: COLUMN_INDEX_BASE,
       generatedAt: new Date().toISOString(),
       profileId: state.profile?.id ?? null,
       source: {
         workload: { ...state.sourceWorkload },
         admin: admin.source
       },
-      teachers: state.teachers.map(teacher => ({
-        id: teacher.id,
-        code: teacher.code,
-        shortName: teacher.shortName,
-        load: teacher.load,
-        role: teacher.role,
-        domain: teacher.domain,
-        sourceRow: teacher.sourceRow,
-        sourceCol: teacher.sourceCol,
-        confidence: { domain: "high" },
-        edited: false
-      })),
+      teachers: teacherSnapshots,
       assignments,
       activities,
       notes: state.notes.map(note => ({ row: note.row, text: note.text })),
-      orgGroups: admin.orgGroups,
+      orgGroups,
       conflicts: [...duplicates].map(shortName => ({
         type: "duplicateShortName",
         detail: `簡稱「${shortName}」對應多於一個教師代碼。`,
-        refs: state.teachers.filter(teacher => teacher.shortName === shortName).map(teacher => teacher.id)
+        refs: state.teachers.filter(teacher => teacher.shortName === shortName).map(teacher => teacherRecordIds.get(teacher.id))
       }))
     };
-    return validateSnapshot(snapshot);
+    return validateSnapshot(reattachManualFields(snapshot, state.manualSnapshot));
   }
 
   function profileTimestamp(date = new Date()) {
@@ -1782,6 +1910,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const profile = {
       kind: "teacher-tool-profile",
       schemaVersion: 1,
+      columnIndexBase: COLUMN_INDEX_BASE,
       id: `profile-${profileTimestamp()}`,
       label: "教師人力與行政架構 mapping profile",
       createdAt: new Date().toISOString(),
@@ -1791,10 +1920,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         teacherRows: { ...config.teacher },
         teacherBlockWidth: 5,
         teacherFieldOrder: ["code", "shortName", "load", "role"],
+        teacherFieldOffsets: { code: 0, shortName: 1, load: 2, role: 3 },
         domainSearchLeft: DOMAIN_SEARCH_LEFT,
         levels: [
-          { label: "初中", headerRows: { start: 0, end: 0 }, classRows: { ...config.junior }, continuationRows: [] },
-          { label: "高中", headerRows: { start: 0, end: 0 }, classRows: { ...config.senior }, continuationRows: [] }
+          { label: "初中", headerRows: null, classRows: { ...config.junior }, continuationRows: [] },
+          { label: "高中", headerRows: null, classRows: { ...config.senior }, continuationRows: [] }
         ],
         homeroomColumns: { primary: [2], deputy: [3, 4], additional: [] },
         subjectSearchLeft: 7,
@@ -1830,6 +1960,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   function importSnapshotObject(input, fileName = "") {
     const snapshot = validateSnapshot(input);
     state.snapshot = snapshot;
+    state.manualSnapshot = snapshot;
     state.workbook = null;
     state.matrix = [];
     state.teachers = snapshot.teachers.map(teacher => ({ ...teacher }));
@@ -1870,9 +2001,10 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   }
 
   function exportSnapshot() {
-    const snapshot = buildSnapshot();
-    downloadJson(snapshot, "teacher-tool-snapshot");
-    return snapshot;
+    state.snapshot = buildSnapshot();
+    state.manualSnapshot = state.snapshot;
+    downloadJson(state.snapshot, "teacher-tool-snapshot");
+    return state.snapshot;
   }
 
   function exportProfile() {
@@ -1938,7 +2070,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   dom.exportProfileBtn.addEventListener("click", () => {
     try {
       exportProfile();
-      showDataLayerStatus("success", "mapping profile 已匯出", "此檔只含結構描述，不含人事資料；會套用於本次工作階段的下次解析。 ");
+      showDataLayerStatus("success", "mapping profile 已匯出", "此檔只含結構描述，不含人事資料。本 profile 僅部分套用；完整 profile-driven 解析尚未啟用（F-P）。");
     } catch (error) {
       showDataLayerStatus("error", "無法匯出 mapping profile", error.message);
     }
@@ -1960,7 +2092,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     if (!file) return;
     try {
       const profile = importProfileObject(await readJsonFile(file));
-      showDataLayerStatus("success", "mapping profile 已套用", `已載入「${profile.label}」；會用於本次工作階段的下次原始檔解析。`);
+      showDataLayerStatus("success", "mapping profile 已部分套用", `已載入「${profile.label}」並套用工作表提示／列範圍；完整 profile-driven 解析尚未啟用（F-P）。`);
     } catch (error) {
       showDataLayerStatus("error", "拒絕匯入 mapping profile", error.message);
     } finally {
@@ -2391,14 +2523,17 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   }
 
   function getAdminSnapshotData() {
+    let memberSequence = 0;
     return {
       source: { fileName: state.sourceName, pageCount: state.pageCount },
-      orgGroups: state.groups.map(group => ({
+      orgGroups: state.groups.map((group, groupIndex) => ({
+        recordId: `org-group-${groupIndex + 1}`,
         key: group.key || "",
         name: group.name || "",
         parent: group.parent || "",
         pages: [...(group.pages || [group.page || 0])],
         members: group.members.map((name, index) => ({
+          recordId: `org-member-${++memberSequence}`,
           name,
           rank: index + 1,
           isLeader: index === 0,
