@@ -1879,20 +1879,54 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const proposals = [];
     const diagnostics = [];
     const candidateNames = new Set();
-    for (const teacher of snapshot.teachers) {
-      if (teacher.confidence.link === "manual") continue;
+    const autoTeachers = snapshot.teachers.filter(teacher => teacher.confidence.link !== "manual");
+    autoTeachers.forEach(teacher => {
       teacher.fullName = "";
       teacher.confidence.link = "low";
       teacher.linkMethod = "none";
+    });
+    const newTeachers = snapshot.teachers.filter(teacher => teacher.isNewTeacher);
+    const pdfNewNames = names.filter(name => (membersByName.get(name) || []).some(member => member.isNewTeacherFromPdf));
+    const sDMatches = newTeachers.map(teacher => ({
+      teacher,
+      names: pdfNewNames.filter(name => name.includes(teacher.shortName))
+    }));
+    const sDConditions = {
+      independentSignals: newTeachers.length > 0 && pdfNewNames.length > 0
+        && newTeachers.every(teacher => teacher.confidence.isNewTeacher === "high")
+        && pdfNewNames.every(name => (membersByName.get(name) || []).some(member => member.confidence.isNewTeacherFromPdf === "high")),
+      equalCardinality: newTeachers.length === pdfNewNames.length,
+      uniqueShortNameBijection: sDMatches.every(match => match.names.length === 1),
+      zeroRemainder: new Set(sDMatches.flatMap(match => match.names)).size === pdfNewNames.length
+        && !newTeachers.some(teacher => teacher.confidence.link === "manual")
+    };
+    const sDPass = Object.values(sDConditions).every(Boolean);
+    const sDTeacherIds = new Set(newTeachers.map(teacher => teacher.recordId));
+    const sDNameSet = new Set(pdfNewNames);
+    if (sDPass) {
+      for (const match of sDMatches) {
+        candidateNames.add(match.names[0]);
+        proposals.push({ teacher: match.teacher, name: match.names[0], method: "S-D" });
+        diagnostics.push({ teacherRecordId: match.teacher.recordId, method: "S-D", codeCandidates: 0, shortCandidates: 1, jointCandidates: 1, confidence: "high" });
+      }
+    } else {
+      newTeachers.filter(teacher => teacher.confidence.link !== "manual").forEach(teacher => {
+        teacher.confidence.link = "low";
+        diagnostics.push({ teacherRecordId: teacher.recordId, method: "S-D", codeCandidates: 0, shortCandidates: 0, jointCandidates: 0, confidence: "low" });
+      });
+    }
+    for (const teacher of snapshot.teachers) {
+      if (teacher.confidence.link === "manual" || sDTeacherIds.has(teacher.recordId)) continue;
       const latin = /^[A-Za-z]{1,3}$/u.test(teacher.shortName) && /^[A-Za-z]+$/u.test(teacher.code);
       const prefix = teacherCodePrefix(teacher.code);
+      const availableNames = names.filter(name => !sDNameSet.has(name));
       const codeCandidates = latin
-        ? names.filter(name => /^[A-Za-z .'-]+$/u.test(name) && name.toLowerCase() === teacher.code.toLowerCase())
-        : names.filter(name => {
+        ? availableNames.filter(name => /^[A-Za-z .'-]+$/u.test(name) && name.toLowerCase() === teacher.code.toLowerCase())
+        : availableNames.filter(name => {
           const sequences = nameInitialSequences(name);
           return prefix.length < 3 ? sequences.some(value => value.startsWith(prefix)) : sequences.includes(prefix);
         });
-      const shortCandidates = latin ? codeCandidates : names.filter(name => /^[\u3400-\u9fff]{2,6}$/u.test(name) && name.includes(teacher.shortName));
+      const shortCandidates = latin ? codeCandidates : availableNames.filter(name => /^[\u3400-\u9fff]{2,6}$/u.test(name) && name.includes(teacher.shortName));
       [...codeCandidates, ...shortCandidates].forEach(name => candidateNames.add(name));
       const joint = latin ? codeCandidates : codeCandidates.filter(name => shortCandidates.includes(name));
       const confidence = joint.length === 1 ? "high" : (codeCandidates.length || shortCandidates.length ? "low" : "unmatched");
@@ -1928,7 +1962,13 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       members.forEach(member => { member.confidence.link = candidateNames.has(name) ? "low" : "unmatched"; });
       snapshot.conflicts.push({ type: "unlinkedMember", detail: `PDF 教職員「${name}」未連結至 xlsx 教師；此人可能不屬教學崗位。`, refs: members.map(member => member.recordId) });
     }
-    return { diagnostics, linkedTeacherCount: snapshot.teachers.filter(teacher => teacher.fullName).length, pdfNameCount: names.length, linkedPdfNameCount: linkedNames.size };
+    return {
+      diagnostics,
+      sD: { pass: sDPass, conditions: sDConditions, xlsxCount: newTeachers.length, pdfCount: pdfNewNames.length },
+      linkedTeacherCount: snapshot.teachers.filter(teacher => teacher.fullName).length,
+      pdfNameCount: names.length,
+      linkedPdfNameCount: linkedNames.size
+    };
   }
 
   function recordIdCounters(snapshot) {
@@ -2584,6 +2624,58 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return new Map([...people.entries()].sort(([a], [b]) => a.localeCompare(b, "zh-HK")));
   }
 
+  function pdfGlyphText(args) {
+    const glyphs = args?.[0];
+    if (!Array.isArray(glyphs)) return "";
+    return glyphs.map(glyph => typeof glyph === "object" && glyph ? (glyph.unicode || "") : "").join("");
+  }
+
+  function pdfColoredTextOperations(operatorList) {
+    const ops = window.pdfjsLib.OPS;
+    let fill = { op: "default", args: [0, 0, 0] };
+    const stack = [];
+    const output = [];
+    for (let index = 0; index < operatorList.fnArray.length; index += 1) {
+      const fn = operatorList.fnArray[index];
+      const args = operatorList.argsArray[index];
+      if (fn === ops.save) stack.push({ op: fill.op, args: [...fill.args] });
+      else if (fn === ops.restore) fill = stack.pop() || fill;
+      else if (fn === ops.setFillRGBColor) fill = { op: "rgb", args: Array.from(args || [], Number) };
+      else if (fn === ops.setFillGray) fill = { op: "gray", args: Array.from(args || [], Number) };
+      else if (fn === ops.setFillCMYKColor) fill = { op: "cmyk", args: Array.from(args || [], Number) };
+      else if (fn === ops.showText || fn === ops.showSpacedText) {
+        const text = pdfGlyphText(args);
+        if (text.trim()) output.push({ text, fill: { op: fill.op, args: [...fill.args] } });
+      }
+    }
+    return output;
+  }
+
+  function extractPdfColorSignal(items, operatorList) {
+    const textItems = items.filter(item => normalize(item.str));
+    const operations = pdfColoredTextOperations(operatorList);
+    const aligned = [];
+    let itemIndex = 0;
+    const key = value => String(value || "").replace(/\s+/gu, "");
+    for (const operation of operations) {
+      const target = key(operation.text);
+      let joined = "";
+      const consumed = [];
+      while (itemIndex < textItems.length && joined.length < target.length) {
+        consumed.push(textItems[itemIndex]);
+        joined += key(textItems[itemIndex].str);
+        itemIndex += 1;
+      }
+      for (const item of consumed) aligned.push({ text: item.str, fill: operation.fill, exact: joined === target });
+    }
+    const hasLegend = textItems.some(item => normalize(item.str).includes("新老師"));
+    const reliable = hasLegend && aligned.length === textItems.length && aligned.every(item => item.exact);
+    const names = reliable ? [...new Set(aligned
+      .filter(item => item.fill.op === "rgb" && item.fill.args.join(",") === "0,176,80")
+      .flatMap(item => extractPersonNames(item.text)))] : [];
+    return { hasLegend, reliable, names, alignedItems: aligned.length, textItems: textItems.length };
+  }
+
   function ensurePdfWorker() {
     if (state.workerUrl) return;
     if (!window.__PDF_WORKER_BASE64__) throw new Error("找不到本機 PDF 工作元件。");
@@ -2606,13 +2698,18 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       const loadingTask = window.pdfjsLib.getDocument({ data });
       const pdf = await loadingTask.promise;
       const pages = [];
+      const colorSignals = [];
       let textItemCount = 0;
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
         updateProgress(Math.round(8 + (pageNumber - 1) / pdf.numPages * 76), `正在提取第 ${pageNumber}／${pdf.numPages} 頁文字…`);
         const page = await pdf.getPage(pageNumber);
-        const content = await page.getTextContent({ normalizeWhitespace: true });
+        const [content, operatorList] = await Promise.all([
+          page.getTextContent({ normalizeWhitespace: true }), page.getOperatorList()
+        ]);
         textItemCount += content.items.length;
         pages.push({ pageNumber, lines: textItemsToLines(content.items, pageNumber) });
+        const colorSignal = extractPdfColorSignal(content.items, operatorList);
+        if (colorSignal.hasLegend) colorSignals.push(colorSignal);
       }
       if (!textItemCount) throw new Error("PDF 沒有可提取的文字。若這是掃描圖片，請先使用 OCR 轉成可搜尋 PDF。");
       updateProgress(90, "正在重組欄位及合併教職員資料…");
@@ -2620,6 +2717,9 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       state.people = buildPeopleMap(state.groups);
       state.sourceName = state.file.name;
       state.pageCount = pdf.numPages;
+      state.pdfColorSignalReliable = colorSignals.length > 0 && colorSignals.every(signal => signal.reliable);
+      state.pdfNewTeacherNames = state.pdfColorSignalReliable
+        ? new Set(colorSignals.flatMap(signal => signal.names)) : new Set();
       if (!state.people.size) throw new Error("已讀取 PDF 文字，但未能辨認組別與姓名。請確認表格首行是組別名稱、其下為人員名單。");
       updateProgress(100, "解析完成");
       renderAdminOptions();
@@ -2654,6 +2754,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       return;
     }
     state.file = file;
+    state.pdfNewTeacherNames = new Set();
+    state.pdfColorSignalReliable = false;
     dom.pdfFileMeta.textContent = `${file.name}・${formatBytes(file.size)}`;
     dom.parsePdfBtn.disabled = false;
     showAdminStatus("warning", "PDF 已準備好", "按「解析 PDF」開始提取行政架構。 ");
@@ -2791,6 +2893,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     textItemsToLines,
     parseOrganizationPages,
     buildPeopleMap,
+    extractPdfColorSignal,
     getAdminSnapshotData,
     loadAdminSnapshot
   };
