@@ -1543,6 +1543,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     Z: "",
   });
   /* HK_INITIAL_GROUPS_END */
+  // 香港姓名常見羅馬化並無單一標準；下列只加入有明示依據的替代首字母，不以實檔姓名反推新規則。
+  const HK_NAME_INITIAL_ALIASES = Object.freeze({
+    鄭: "Z", 葉: "I", 吳: "U", 蔡: "T",
+    郭: "G", 謝: "T", 胡: "H", 歐: "O"
+  });
 
   function isPlainObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -1834,6 +1839,10 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         if (!hkInitialIndex.has(char)) hkInitialIndex.set(char, new Set());
         hkInitialIndex.get(char).add(initial);
       }
+    }
+    for (const [char, initials] of Object.entries(HK_NAME_INITIAL_ALIASES)) {
+      if (!hkInitialIndex.has(char)) hkInitialIndex.set(char, new Set());
+      for (const initial of initials) hkInitialIndex.get(char).add(initial);
     }
     return hkInitialIndex;
   }
