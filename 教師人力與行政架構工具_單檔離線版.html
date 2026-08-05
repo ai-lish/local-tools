@@ -451,7 +451,7 @@ footer p { margin: 0; }
           <p>資料快照含人事資料；mapping profile 只含結構設定。所有內容只保留在記憶體，必須由使用者明示匯入或匯出檔案。</p>
           <p class="profile-partial-note">本 profile 僅部分套用；完整 profile-driven 解析尚未啟用（F-P）。</p>
         </div>
-        <span class="confidence-pending">完整信心標記尚未啟用（F-N）；新教師與姓名連結已按本輪規則標記，其餘解析欄位仍以 high 佔位，並不代表已校驗。</span>
+        <span id="confidenceSummary" class="confidence-pending">尚未解析或匯入資料；完成後會在此顯示實際 low／unmatched 信心統計。</span>
       </div>
       <div class="data-layer-actions">
         <button id="exportSnapshotBtn" class="button button--dark" type="button">匯出 data snapshot</button>
@@ -813,7 +813,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     importSnapshotInput: $("#importSnapshotInput"),
     exportProfileBtn: $("#exportProfileBtn"),
     importProfileInput: $("#importProfileInput"),
-    dataLayerStatus: $("#dataLayerStatus")
+    dataLayerStatus: $("#dataLayerStatus"),
+    confidenceSummary: $("#confidenceSummary")
   };
 
   const state = {
@@ -826,6 +827,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     snapshot: null,
     manualSnapshot: null,
     profile: null,
+    rejectedTeacherCandidates: [],
+    linkDiagnostics: null,
     sourceWorkload: { fileName: "", sheetName: "", rows: 0, cols: 0 },
     adminAdapter: null
   };
@@ -950,15 +953,19 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return best?.rowIndex ?? -1;
   }
 
-  function deriveDomain(matrix, domainHeaderRow, colIndex) {
-    if (domainHeaderRow < 0) return "";
+  function deriveDomainDetail(matrix, domainHeaderRow, colIndex) {
+    if (domainHeaderRow < 0) return { value: "", confidence: "low", diagnostic: "DOMAIN_HEADER_UNRESOLVED" };
     const direct = valueAt(matrix, domainHeaderRow, colIndex);
-    if (isDomainLabel(direct)) return direct;
+    if (isDomainLabel(direct)) return { value: direct, confidence: "high", diagnostic: "" };
     for (let distance = 1; distance <= DOMAIN_SEARCH_LEFT; distance += 1) {
       const left = valueAt(matrix, domainHeaderRow, colIndex - distance);
-      if (isDomainLabel(left)) return left;
+      if (isDomainLabel(left)) return { value: left, confidence: "low", diagnostic: "DOMAIN_LEFT_FALLBACK" };
     }
-    return "";
+    return { value: "", confidence: "low", diagnostic: "DOMAIN_HEADER_UNRESOLVED" };
+  }
+
+  function deriveDomain(matrix, domainHeaderRow, colIndex) {
+    return deriveDomainDetail(matrix, domainHeaderRow, colIndex).value;
   }
 
   function parseTeachers(matrix, config = getConfig()) {
@@ -976,13 +983,16 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         const identity = `${code}::${shortName}`;
         if (seen.has(identity)) continue;
         seen.add(identity);
+        const domainResult = deriveDomainDetail(matrix, domainHeaderRow, c);
         found.push({
           id: `${identity}::${r}:${c}`,
           code,
           shortName,
           load: load || "—",
           role: role || "—",
-          domain: deriveDomain(matrix, domainHeaderRow, c),
+          domain: domainResult.value,
+          domainConfidence: domainResult.confidence,
+          domainDiagnostic: domainResult.diagnostic,
           sourceRow: r + 1,
           sourceCol: c + 1
         });
@@ -1003,7 +1013,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   function findClassInRow(row, beforeCol = row.length) {
     for (let c = Math.min(beforeCol - 1, row.length - 1); c >= 0; c -= 1) {
       const value = normalize(row[c]);
-      if (looksLikeClass(value)) return { name: compact(value), col: c };
+      if (looksLikeClass(value)) return { name: compact(value), col: c, confidence: "high", diagnostic: "" };
     }
     return null;
   }
@@ -1035,14 +1045,18 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return true;
   }
 
-  function findHeaderValue(matrix, rowIndex, colIndex, knownShortNames) {
+  function findHeaderValueDetail(matrix, rowIndex, colIndex, knownShortNames) {
     const direct = valueAt(matrix, rowIndex, colIndex);
-    if (usableHeader(direct, knownShortNames)) return direct;
+    if (usableHeader(direct, knownShortNames)) return { value: direct, confidence: "high", diagnostic: "" };
     for (let offset = 1; offset <= 7; offset += 1) {
       const left = valueAt(matrix, rowIndex, colIndex - offset);
-      if (usableHeader(left, knownShortNames)) return left;
+      if (usableHeader(left, knownShortNames)) return { value: left, confidence: "low", diagnostic: "SUBJECT_LEFT_FALLBACK" };
     }
-    return "";
+    return { value: "", confidence: "low", diagnostic: "SUBJECT_DEFAULT_COLUMN" };
+  }
+
+  function findHeaderValue(matrix, rowIndex, colIndex, knownShortNames) {
+    return findHeaderValueDetail(matrix, rowIndex, colIndex, knownShortNames).value;
   }
 
   function findSubject(matrix, assignmentRow, colIndex, rangeStart, knownShortNames) {
@@ -1051,13 +1065,13 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     for (let r = assignmentRow - 1; r >= searchFloor; r -= 1) {
       const row = matrix[r] || [];
       if (rowHasClass(row)) continue;
-      const candidate = findHeaderValue(matrix, r, colIndex, knownShortNames);
-      if (!candidate) continue;
-      const clean = normalize(candidate).replace(/\n+/g, " ");
-      if (!candidates.includes(clean)) candidates.push(clean);
+      const candidate = findHeaderValueDetail(matrix, r, colIndex, knownShortNames);
+      if (!candidate.value) continue;
+      const clean = normalize(candidate.value).replace(/\n+/g, " ");
+      if (!candidates.some(item => item.value === clean)) candidates.push({ ...candidate, value: clean });
       if (candidates.length >= 2) break;
     }
-    if (!candidates.length) return `第 ${colIndex + 1} 欄科目`;
+    if (!candidates.length) return { value: `第 ${colIndex + 1} 欄科目`, confidence: "low", diagnostic: "SUBJECT_DEFAULT_COLUMN" };
     return candidates[0];
   }
 
@@ -1069,14 +1083,18 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         if (!cellHasTeacher(row[c], teacher.shortName)) continue;
         const classInfo = findClassInRow(row, c);
         if (!classInfo || classInfo.col === c) continue;
-        const subject = findSubject(matrix, r, c, range.start, knownShortNames);
+        const subjectResult = findSubject(matrix, r, c, range.start, knownShortNames);
         assignments.push({
           className: classInfo.name,
-          subject,
+          subject: subjectResult.value,
+          subjectConfidence: subjectResult.confidence,
+          subjectDiagnostic: subjectResult.diagnostic,
+          classNameConfidence: classInfo.confidence,
+          classNameDiagnostic: classInfo.diagnostic,
           level,
           row: r + 1,
           col: c + 1,
-          isHomeroom: /班主任/.test(subject)
+          isHomeroom: /班主任/.test(subjectResult.value)
         });
       }
     }
@@ -1104,7 +1122,9 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       add(rowIndex - 1, colIndex + d, d + 1, 0.8);
     }
     candidates.sort((a, b) => a.score - b.score);
-    return candidates[0]?.value || `第 ${rowIndex + 1} 列活動`;
+    return candidates.length
+      ? { value: candidates[0].value, confidence: "high", diagnostic: "" }
+      : { value: `第 ${rowIndex + 1} 列活動`, confidence: "low", diagnostic: "ACTIVITY_DEFAULT_ROW" };
   }
 
   function scanActivities(matrix, teacher, range, knownShortNames) {
@@ -1113,7 +1133,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       const row = matrix[r] || [];
       for (let c = 0; c < row.length; c += 1) {
         if (!cellHasTeacher(row[c], teacher.shortName)) continue;
-        items.push({ name: findActivityName(matrix, r, c, knownShortNames), row: r + 1, col: c + 1 });
+        const nameResult = findActivityName(matrix, r, c, knownShortNames);
+        items.push({
+          name: nameResult.value, nameConfidence: nameResult.confidence, nameDiagnostic: nameResult.diagnostic,
+          row: r + 1, col: c + 1
+        });
       }
     }
     return uniqueBy(items, item => item.name);
@@ -1225,6 +1249,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     state.teachers = parseTeachers(state.matrix, config);
     state.notes = parseNotes(state.matrix, config.note);
     const rejectedCandidates = findRejectedTeacherCandidates(state.matrix);
+    state.rejectedTeacherCandidates = rejectedCandidates;
     const dimensions = matrixDimensions(state.matrix);
     state.sourceWorkload = {
       fileName: sourceMeta.fileName ?? sourceName,
@@ -1251,6 +1276,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     } else {
       showStatus("warning", "未找到教師名單", `已讀取資料，但在第 ${config.teacher.start}–${config.teacher.end} 列找不到「代碼、簡稱、節數、職務」格式；被規則拒絕的候選 ${rejectedCandidates.length} 筆。請檢查工作表或調整進階設定。`);
     }
+    refreshConfidenceSummary();
   }
 
   function matrixDimensions(matrix) {
@@ -2048,7 +2074,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       linkMethod: "none",
       sourceRow: teacher.sourceRow,
       sourceCol: teacher.sourceCol,
-      confidence: { domain: "high", isNewTeacher: "high", link: "low" },
+      confidence: { domain: teacher.domainConfidence || "high", isNewTeacher: "high", link: "low" },
       edited: false
     }));
     const teacherRecordIds = new Map(teacherSnapshots.map(teacher => [teacher.id, teacher.recordId]));
@@ -2065,7 +2091,10 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         homeroomRank: item.homeroomRank ?? homeroomRank(item.subject),
         row: item.row,
         col: item.col,
-        confidence: { subject: "high", className: "high" },
+        confidence: {
+          subject: item.subjectConfidence || "high",
+          className: item.classNameConfidence || "high"
+        },
         edited: false
       }));
       records.activities.forEach(item => activities.push({
@@ -2074,7 +2103,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         name: item.name,
         row: item.row,
         col: item.col,
-        confidence: { name: "high" },
+        confidence: { name: item.nameConfidence || "high" },
         edited: false
       }));
     }
@@ -2107,8 +2136,102 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       }))
     };
     const withManualFields = reattachManualFields(snapshot, state.manualSnapshot);
-    linkSnapshotPeople(withManualFields);
+    state.linkDiagnostics = linkSnapshotPeople(withManualFields);
     return validateSnapshot(withManualFields);
+  }
+
+  const CONFIDENCE_FIELDS = Object.freeze([
+    ["teachers.domain", snapshot => snapshot.teachers.map(item => item.confidence.domain)],
+    ["teachers.isNewTeacher", snapshot => snapshot.teachers.map(item => item.confidence.isNewTeacher)],
+    ["teachers.link", snapshot => snapshot.teachers.map(item => item.confidence.link)],
+    ["assignments.subject", snapshot => snapshot.assignments.map(item => item.confidence.subject)],
+    ["assignments.className", snapshot => snapshot.assignments.map(item => item.confidence.className)],
+    ["activities.name", snapshot => snapshot.activities.map(item => item.confidence.name)],
+    ["orgGroups.name", snapshot => snapshot.orgGroups.map(item => item.confidence.name)],
+    ["orgGroups.parent", snapshot => snapshot.orgGroups.map(item => item.confidence.parent)],
+    ["orgMembers.group", snapshot => snapshot.orgGroups.flatMap(group => group.members.map(item => item.confidence.group))],
+    ["orgMembers.name", snapshot => snapshot.orgGroups.flatMap(group => group.members.map(item => item.confidence.name))],
+    ["orgMembers.isNewTeacherFromPdf", snapshot => snapshot.orgGroups.flatMap(group => group.members.map(item => item.confidence.isNewTeacherFromPdf))],
+    ["orgMembers.link", snapshot => snapshot.orgGroups.flatMap(group => group.members.map(item => item.confidence.link))]
+  ]);
+
+  function collectConfidenceStats(snapshot) {
+    return CONFIDENCE_FIELDS.map(([field, read]) => {
+      const counts = { high: 0, low: 0, manual: 0, unmatched: 0 };
+      for (const value of read(snapshot)) counts[value] += 1;
+      const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+      return { field, total, ...counts, lowRate: total ? counts.low / total : 0 };
+    });
+  }
+
+  function confidenceSummaryText(snapshot) {
+    const stats = collectConfidenceStats(snapshot);
+    const total = stats.reduce((sum, item) => sum + item.total, 0);
+    const low = stats.reduce((sum, item) => sum + item.low, 0);
+    const unmatched = stats.reduce((sum, item) => sum + item.unmatched, 0);
+    const top = stats.filter(item => item.total).sort((a, b) => b.lowRate - a.lowRate || b.low - a.low).slice(0, 3)
+      .map(item => `${item.field} ${item.low}/${item.total}（${(item.lowRate * 100).toFixed(1)}%）`).join("、");
+    return `實際信心統計：low ${low}/${total}，unmatched ${unmatched}；low 比例最高：${top || "沒有資料"}。`;
+  }
+
+  function refreshConfidenceSummary(snapshot = null) {
+    const current = snapshot || (state.teachers.length ? buildSnapshot() : null);
+    dom.confidenceSummary.textContent = current
+      ? confidenceSummaryText(current)
+      : "尚未解析或匯入資料；完成後會在此顯示實際 low／unmatched 信心統計。";
+    return current ? collectConfidenceStats(current) : [];
+  }
+
+  function findExcludedContinuationCells() {
+    if (!state.matrix.length) return [];
+    const config = getConfig();
+    const ranges = [config.junior, config.senior];
+    const found = new Map();
+    for (const teacher of state.teachers) {
+      for (const range of ranges) {
+        for (let r = range.start - 1; r <= range.end - 1; r += 1) {
+          const row = state.matrix[r] || [];
+          for (let c = 0; c < row.length; c += 1) {
+            if (!cellHasTeacher(row[c], teacher.shortName)) continue;
+            const classInfo = findClassInRow(row, c);
+            if (classInfo && classInfo.col !== c) continue;
+            const key = `${teacher.id}|${r}|${c}`;
+            found.set(key, { code: "CLASS_CONTINUATION_UNRESOLVED", field: "excluded.assignment", row: r + 1, col: c + 1, teacherCode: teacher.code });
+          }
+        }
+      }
+    }
+    return [...found.values()];
+  }
+
+  function collectConfidenceDiagnostics(snapshot = null) {
+    const current = snapshot || buildSnapshot();
+    const diagnostics = [];
+    const add = (code, field, extra = {}) => { if (code) diagnostics.push({ code, field, ...extra }); };
+    for (const teacher of state.teachers) add(teacher.domainDiagnostic, "teachers.domain", { row: teacher.sourceRow, col: teacher.sourceCol, teacherCode: teacher.code });
+    if (state.matrix.length && !state.snapshot) {
+      for (const teacher of state.teachers) {
+        const records = recordsForTeacher(teacher);
+        records.assignments.forEach(item => {
+          add(item.subjectDiagnostic, "assignments.subject", { row: item.row, col: item.col, teacherCode: teacher.code });
+          add(item.classNameDiagnostic, "assignments.className", { row: item.row, col: item.col, teacherCode: teacher.code });
+        });
+        records.activities.forEach(item => add(item.nameDiagnostic, "activities.name", { row: item.row, col: item.col, teacherCode: teacher.code }));
+      }
+      diagnostics.push(...findExcludedContinuationCells());
+      state.rejectedTeacherCandidates.forEach(item => add("TEACHER_CODE_REJECTED", "excluded.teacherCandidate", item));
+    }
+    current.teachers.forEach(item => {
+      if (item.confidence.link === "low") add("LINK_AMBIGUOUS", "teachers.link", { recordId: item.recordId, teacherCode: item.code });
+      if (item.confidence.link === "unmatched") add("LINK_NO_CANDIDATE", "teachers.link", { recordId: item.recordId, teacherCode: item.code });
+    });
+    current.orgGroups.forEach(group => group.members.forEach(member => {
+      if (member.confidence.isNewTeacherFromPdf === "low") add("PDF_NEW_TEACHER_SIGNAL_UNAVAILABLE", "orgMembers.isNewTeacherFromPdf", { recordId: member.recordId });
+      if (member.confidence.link === "low") add("LINK_AMBIGUOUS", "orgMembers.link", { recordId: member.recordId });
+      if (member.confidence.link === "unmatched") add("LINK_NO_CANDIDATE", "orgMembers.link", { recordId: member.recordId });
+    }));
+    diagnostics.push(...(state.adminAdapter?.getConfidenceDiagnostics?.() || []));
+    return diagnostics;
   }
 
   function profileTimestamp(date = new Date()) {
@@ -2182,6 +2305,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     dom.resultSection.hidden = true;
     dom.emptyGuide.hidden = state.teachers.length > 0;
     state.adminAdapter?.loadSnapshot?.(snapshot, fileName);
+    refreshConfidenceSummary(snapshot);
     return snapshot;
   }
 
@@ -2214,6 +2338,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     state.snapshot = buildSnapshot();
     state.manualSnapshot = state.snapshot;
     downloadJson(state.snapshot, "teacher-tool-snapshot");
+    refreshConfidenceSummary(state.snapshot);
     return state.snapshot;
   }
 
@@ -2272,7 +2397,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   dom.exportSnapshotBtn.addEventListener("click", () => {
     try {
       exportSnapshot();
-      showDataLayerStatus("success", "data snapshot 已匯出", "檔案含真實人事資料，請按校內私隱規則保管。完整信心標記尚未啟用（F-N）。");
+      showDataLayerStatus("success", "data snapshot 已匯出", `${confidenceSummaryText(state.snapshot)} 檔案含真實人事資料，請按校內私隱規則保管。`);
     } catch (error) {
       showDataLayerStatus("error", "無法匯出 data snapshot", error.message);
     }
@@ -2290,7 +2415,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     if (!file) return;
     try {
       importSnapshotObject(await readJsonFile(file), file.name);
-      showDataLayerStatus("success", "data snapshot 已匯入", `已直接載入 ${state.teachers.length} 位教師及 ${state.snapshot.orgGroups.length} 個行政組別，沒有重新解析原始檔。完整信心標記尚未啟用（F-N）。`);
+      showDataLayerStatus("success", "data snapshot 已匯入", `已直接載入 ${state.teachers.length} 位教師及 ${state.snapshot.orgGroups.length} 個行政組別，沒有重新解析原始檔。${confidenceSummaryText(state.snapshot)}`);
     } catch (error) {
       showDataLayerStatus("error", "拒絕匯入 data snapshot", error.message);
     } finally {
@@ -2328,6 +2453,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     findRejectedTeacherCandidates,
     analyzeMatrix,
     buildSnapshot,
+    collectConfidenceStats,
+    collectConfidenceDiagnostics,
+    findExcludedContinuationCells,
+    confidenceSummaryText,
+    refreshConfidenceSummary,
     buildProfile,
     exportSnapshot,
     exportProfile,
@@ -2429,21 +2559,32 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       .trim();
   }
 
-  function cleanPersonName(value) {
-    let text = normalize(value)
-      .replace(/^[•●▪■◆◇·・\-–—]+\s*/u, "")
-      .replace(ROLE_PREFIX, "")
-      .replace(/[（(][^）)]*[）)]\s*$/u, "")
-      .trim();
+  function cleanPersonNameDetail(value) {
+    const original = normalize(value);
+    let text = original;
+    const withoutBullet = text.replace(/^[•●▪■◆◇·・\-–—]+\s*/u, "");
+    const bulletRemoved = withoutBullet !== text;
+    text = withoutBullet;
+    const withoutRole = text.replace(ROLE_PREFIX, "");
+    const roleRemoved = withoutRole !== text;
+    text = withoutRole;
+    const withoutParenthetical = text.replace(/[（(][^）)]*[）)]\s*$/u, "");
+    const parentheticalRemoved = withoutParenthetical !== text;
+    text = withoutParenthetical.trim();
     text = text.replace(/\d+$/u, "").trim();
-    if (!text || isOrgLabel(text)) return "";
+    if (!text || isOrgLabel(text)) return { name: "", confidence: "high", diagnostic: "" };
     const noSpaces = text.replace(/\s+/g, "");
-    if (/^[\u3400-\u9fff]{2,6}$/u.test(noSpaces)) return noSpaces;
-    if (/^[A-Za-z][A-Za-z .'-]{2,39}$/u.test(text) && /[A-Za-z]{2}/u.test(text)) return text.replace(/\s+/g, " ");
-    return "";
+    const name = /^[\u3400-\u9fff]{2,6}$/u.test(noSpaces) ? noSpaces
+      : (/^[A-Za-z][A-Za-z .'-]{2,39}$/u.test(text) && /[A-Za-z]{2}/u.test(text) ? text.replace(/\s+/g, " ") : "");
+    const changedBeyondTrailingDigits = bulletRemoved || roleRemoved || parentheticalRemoved;
+    return { name, confidence: changedBeyondTrailingDigits ? "low" : "high", diagnostic: changedBeyondTrailingDigits ? "PERSON_NAME_CLEANED" : "" };
   }
 
-  function extractPersonNames(value) {
+  function cleanPersonName(value) {
+    return cleanPersonNameDetail(value).name;
+  }
+
+  function extractPersonNameDetails(value) {
     const text = normalize(value);
     if (!text || isOrgLabel(text)) return [];
     let chunks = text.split(/[、,，;；/／|｜\n]|\s{2,}/u).map(part => part.trim()).filter(Boolean);
@@ -2457,7 +2598,17 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       if (glued.length >= 2 && glued.join("") === chunk.replace(/\s+/g, "")) expanded.push(...glued);
       else expanded.push(chunk);
     }
-    return [...new Set(expanded.map(cleanPersonName).filter(Boolean))];
+    const details = expanded.map(cleanPersonNameDetail).filter(item => item.name);
+    const unique = new Map();
+    for (const detail of details) {
+      const existing = unique.get(detail.name);
+      if (!existing || detail.confidence === "low") unique.set(detail.name, detail);
+    }
+    return [...unique.values()];
+  }
+
+  function extractPersonNames(value) {
+    return extractPersonNameDetails(value).map(item => item.name);
   }
 
   function textItemsToLines(items, pageNumber) {
@@ -2509,16 +2660,33 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   }
 
   function chooseNearestHeader(headers, cell) {
-    return [...headers].sort((a, b) => Math.abs(a.center - cell.center) - Math.abs(b.center - cell.center))[0];
+    return chooseNearestHeaderDetail(headers, cell).header;
   }
 
-  function createGroup(groups, header, parent, page) {
+  function chooseNearestHeaderDetail(headers, cell) {
+    const ranked = [...headers]
+      .map(header => ({ header, distance: Math.abs(header.center - cell.center) }))
+      .sort((a, b) => a.distance - b.distance);
+    const first = ranked[0];
+    const second = ranked[1];
+    const relativeGap = first && second ? Math.abs(second.distance - first.distance) / Math.max(second.distance, 1) : Infinity;
+    return { header: first?.header, ambiguous: Boolean(second && relativeGap < 0.2), relativeGap };
+  }
+
+  function createGroup(groups, header, parent, page, source = "primary") {
     const name = cleanOrgLabel(header.text);
     const cleanParent = parent && parent !== name ? cleanOrgLabel(parent) : "";
     const key = `${cleanParent}|${name}`;
     let group = groups.get(key);
     if (!group) {
-      group = { key, name, parent: cleanParent, page, center: header.center, members: [], firstY: header.y || 0 };
+      group = {
+        key, name, parent: cleanParent, page, center: header.center, members: [], firstY: header.y || 0,
+        nameConfidence: source === "fallback" ? "low" : "high",
+        nameDiagnostic: source === "fallback" ? "PDF_GROUP_FALLBACK" : "",
+        parentConfidence: source === "fallback" ? "low" : "high",
+        parentDiagnostic: source === "fallback" ? "PDF_GROUP_FALLBACK" : "",
+        mergedFromLines: header.mergedFromLines || [], memberConfidence: new Map()
+      };
       groups.set(key, group);
     }
     return group;
@@ -2547,13 +2715,21 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
 
         if (!activeHeaders.length) continue;
         for (const cell of line.cells) {
-          const names = extractPersonNames(cell.text);
+          const names = extractPersonNameDetails(cell.text);
           if (!names.length) continue;
-          const header = chooseNearestHeader(activeHeaders, cell);
+          const nearest = chooseNearestHeaderDetail(activeHeaders, cell);
+          const header = nearest.header;
           if (!header) continue;
           const group = groups.get(header.groupKey);
-          for (const name of names) {
-            if (!group.members.includes(name)) group.members.push(name);
+          for (const detail of names) {
+            if (!group.members.includes(detail.name)) group.members.push(detail.name);
+            const existing = group.memberConfidence.get(detail.name) || { group: "high", name: "high" };
+            group.memberConfidence.set(detail.name, {
+              group: nearest.ambiguous ? "low" : existing.group,
+              groupDiagnostic: nearest.ambiguous ? "PDF_HEADER_AMBIGUOUS" : (existing.groupDiagnostic || ""),
+              name: detail.confidence === "low" ? "low" : existing.name,
+              nameDiagnostic: detail.diagnostic || existing.nameDiagnostic || ""
+            });
           }
         }
       }
@@ -2574,7 +2750,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         for (const cell of line.cells) {
           if (isOrgLabel(cell.text)) headers.push({ ...cell, y: line.y, page: page.pageNumber });
           else {
-            const names = extractPersonNames(cell.text);
+            const names = extractPersonNameDetails(cell.text);
             if (names.length) people.push({ ...cell, y: line.y, names });
           }
         }
@@ -2586,8 +2762,14 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
           .sort((a, b) => a.score - b.score);
         const header = candidates[0]?.header;
         if (!header) continue;
-        const group = createGroup(groups, header, "", page.pageNumber);
-        for (const name of person.names) if (!group.members.includes(name)) group.members.push(name);
+        const group = createGroup(groups, header, "", page.pageNumber, "fallback");
+        for (const detail of person.names) {
+          if (!group.members.includes(detail.name)) group.members.push(detail.name);
+          group.memberConfidence.set(detail.name, {
+            group: "low", groupDiagnostic: "PDF_GROUP_FALLBACK",
+            name: detail.confidence, nameDiagnostic: detail.diagnostic
+          });
+        }
       }
     }
     return [...groups.values()].filter(group => group.members.length);
@@ -2597,11 +2779,32 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const merged = new Map();
     for (const group of groups) {
       const key = `${group.parent}|${group.name}`;
-      if (!merged.has(key)) merged.set(key, { ...group, members: [...group.members], pages: [group.page] });
+      if (!merged.has(key)) merged.set(key, {
+        ...group,
+        members: [...group.members],
+        pages: [group.page],
+        mergedFromLines: [...(group.mergedFromLines || [])],
+        memberConfidence: new Map(group.memberConfidence || [])
+      });
       else {
         const existing = merged.get(key);
         existing.pages.push(group.page);
-        for (const member of group.members) if (!existing.members.includes(member)) existing.members.push(member);
+        if (group.nameConfidence === "low") existing.nameConfidence = "low";
+        if (group.parentConfidence === "low") existing.parentConfidence = "low";
+        existing.nameDiagnostic ||= group.nameDiagnostic || "";
+        existing.parentDiagnostic ||= group.parentDiagnostic || "";
+        existing.mergedFromLines = [...new Set([...existing.mergedFromLines, ...(group.mergedFromLines || [])])];
+        for (const member of group.members) {
+          if (!existing.members.includes(member)) existing.members.push(member);
+          const current = existing.memberConfidence.get(member) || { group: "high", name: "high" };
+          const incoming = group.memberConfidence?.get(member) || { group: "high", name: "high" };
+          existing.memberConfidence.set(member, {
+            group: current.group === "low" || incoming.group === "low" ? "low" : "high",
+            groupDiagnostic: current.groupDiagnostic || incoming.groupDiagnostic || "",
+            name: current.name === "low" || incoming.name === "low" ? "low" : "high",
+            nameDiagnostic: current.nameDiagnostic || incoming.nameDiagnostic || ""
+          });
+        }
       }
     }
     return [...merged.values()];
@@ -2726,6 +2929,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       renderGroupReview();
       dom.adminEmptyGuide.hidden = true;
       showAdminStatus("success", "行政架構解析完成", `找到 ${state.groups.length} 個部門／組別及 ${state.people.size} 位教職員。`);
+      window.TeacherTool?.refreshConfidenceSummary();
       window.alert(`PDF 解析成功！\n已找到 ${state.groups.length} 個部門／組別及 ${state.people.size} 位教職員。`);
       setTimeout(() => { dom.pdfProgress.hidden = true; }, 900);
     } catch (error) {
@@ -2809,22 +3013,28 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         name: group.name || "",
         parent: group.parent || "",
         pages: [...(group.pages || [group.page || 0])],
-        members: group.members.map((name, index) => ({
-          recordId: `org-member-${++memberSequence}`,
-          name,
-          rank: index + 1,
-          isLeader: index === 0,
-          isNewTeacherFromPdf: state.pdfNewTeacherNames.has(name),
-          linkedTeacherRecordId: null,
-          confidence: {
-            group: "high", name: "high",
-            isNewTeacherFromPdf: state.pdfColorSignalReliable ? "high" : "low",
-            link: "low"
-          },
-          edited: false
-        })),
-        confidence: { name: "high", parent: "high" },
-        mergedFromLines: [],
+        members: group.members.map((name, index) => {
+          const parsed = group.memberConfidence?.get(name) || { group: "high", name: "high" };
+          return {
+            recordId: `org-member-${++memberSequence}`,
+            name,
+            rank: index + 1,
+            isLeader: index === 0,
+            isNewTeacherFromPdf: state.pdfNewTeacherNames.has(name),
+            linkedTeacherRecordId: null,
+            confidence: {
+              group: parsed.group || "high", name: parsed.name || "high",
+              isNewTeacherFromPdf: state.pdfColorSignalReliable ? "high" : "low",
+              link: "low"
+            },
+            edited: false
+          };
+        }),
+        confidence: {
+          name: group.mergedFromLines?.length ? "low" : (group.nameConfidence || "high"),
+          parent: group.parentConfidence || "high"
+        },
+        mergedFromLines: [...(group.mergedFromLines || [])],
         edited: false
       }))
     };
@@ -2846,13 +3056,36 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       pages: [...group.pages],
       center: 0,
       firstY: 0,
-      members: [...group.members].sort((a, b) => a.rank - b.rank).map(member => member.name)
+      members: [...group.members].sort((a, b) => a.rank - b.rank).map(member => member.name),
+      nameConfidence: group.confidence.name,
+      parentConfidence: group.confidence.parent,
+      mergedFromLines: [...group.mergedFromLines],
+      memberConfidence: new Map(group.members.map(member => [member.name, {
+        group: member.confidence.group,
+        name: member.confidence.name
+      }]))
     }));
     state.people = buildPeopleMap(state.groups);
     renderAdminOptions();
     renderGroupReview();
     dom.adminResultSection.hidden = true;
     dom.adminEmptyGuide.hidden = state.groups.length > 0;
+  }
+
+  function getConfidenceDiagnostics(groups = state.groups) {
+    const diagnostics = [];
+    const add = (code, field, extra = {}) => { if (code) diagnostics.push({ code, field, ...extra }); };
+    for (const group of groups) {
+      if (group.mergedFromLines?.length) add("PDF_MULTILINE_HEADER", "orgGroups.name", { groupKey: group.key });
+      else add(group.nameDiagnostic, "orgGroups.name", { groupKey: group.key });
+      add(group.parentDiagnostic, "orgGroups.parent", { groupKey: group.key });
+      for (const member of group.members) {
+        const parsed = group.memberConfidence?.get(member) || {};
+        add(parsed.groupDiagnostic, "orgMembers.group", { groupKey: group.key });
+        add(parsed.nameDiagnostic, "orgMembers.name", { groupKey: group.key });
+      }
+    }
+    return diagnostics;
   }
 
   function renderGroupReview() {
@@ -2888,18 +3121,23 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
 
   window.AdminStructureTool = {
     cleanPersonName,
+    cleanPersonNameDetail,
     extractPersonNames,
+    extractPersonNameDetails,
     isOrgLabel,
     textItemsToLines,
+    chooseNearestHeaderDetail,
     parseOrganizationPages,
     buildPeopleMap,
     extractPdfColorSignal,
     getAdminSnapshotData,
-    loadAdminSnapshot
+    loadAdminSnapshot,
+    getConfidenceDiagnostics
   };
   window.TeacherTool?.registerAdminAdapter({
     getSnapshotData: getAdminSnapshotData,
-    loadSnapshot: loadAdminSnapshot
+    loadSnapshot: loadAdminSnapshot,
+    getConfidenceDiagnostics
   });
 })();
 
