@@ -1883,7 +1883,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
           const sequences = nameInitialSequences(name);
           return prefix.length < 3 ? sequences.some(value => value.startsWith(prefix)) : sequences.includes(prefix);
         });
-      const shortCandidates = latin ? codeCandidates : names.filter(name => /^[\u3400-\u9fff]{2,6}$/u.test(name) && name.slice(1).includes(teacher.shortName));
+      const shortCandidates = latin ? codeCandidates : names.filter(name => /^[\u3400-\u9fff]{2,6}$/u.test(name) && name.includes(teacher.shortName));
       [...codeCandidates, ...shortCandidates].forEach(name => candidateNames.add(name));
       const joint = codeCandidates.length === 1 && (latin || shortCandidates.includes(codeCandidates[0])) ? [codeCandidates[0]] : [];
       const confidence = joint.length === 1 ? "high" : (codeCandidates.length || shortCandidates.length ? "low" : "unmatched");
