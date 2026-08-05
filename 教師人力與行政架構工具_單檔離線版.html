@@ -1621,7 +1621,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   function validateSnapshot(snapshot) {
     requireObject(snapshot, "data snapshot");
     if (snapshot.kind !== "teacher-tool-snapshot") throw new Error("不支援的 data snapshot：kind 必須為 teacher-tool-snapshot。");
-    if (snapshot.schemaVersion !== 1) throw new Error("不支援的 data snapshot：schemaVersion 必須為 1。");
+    if (snapshot.schemaVersion === 1) throw new Error("此檔為已作廢的 schemaVersion 1，請重新由原始檔產生");
+    if (snapshot.schemaVersion !== 2) throw new Error("不支援的 data snapshot：schemaVersion 必須為 2。");
     requireExactKeys(snapshot, SNAPSHOT_KEYS, "data snapshot");
     if (snapshot.columnIndexBase !== COLUMN_INDEX_BASE) throw new Error("data snapshot.columnIndexBase 必須為 1。");
     requireIso8601(snapshot.generatedAt, "generatedAt");
@@ -1755,7 +1756,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   function validateProfile(profile) {
     requireObject(profile, "mapping profile");
     if (profile.kind !== "teacher-tool-profile") throw new Error("不支援的 mapping profile：kind 必須為 teacher-tool-profile。");
-    if (profile.schemaVersion !== 1) throw new Error("不支援的 mapping profile：schemaVersion 必須為 1。");
+    if (profile.schemaVersion === 1) throw new Error("此檔為已作廢的 schemaVersion 1，請重新由原始檔產生");
+    if (profile.schemaVersion !== 2) throw new Error("不支援的 mapping profile：schemaVersion 必須為 2。");
     requireExactKeys(profile, PROFILE_KEYS, "mapping profile");
     if (profile.columnIndexBase !== COLUMN_INDEX_BASE) throw new Error("mapping profile.columnIndexBase 必須為 1。");
     ["id", "label"].forEach(key => requireString(profile[key], key));
@@ -1770,7 +1772,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     validateRange(profile.workload.activityRows, "workload.activityRows");
     validateRange(profile.workload.noteRows, "workload.noteRows");
     requireArray(profile.workload.teacherFieldOrder, "workload.teacherFieldOrder");
-    if (JSON.stringify(profile.workload.teacherFieldOrder) !== JSON.stringify(["code", "shortName", "load", "role"])) throw new Error("workload.teacherFieldOrder 不符合 schemaVersion 1。 ");
+    if (JSON.stringify(profile.workload.teacherFieldOrder) !== JSON.stringify(["code", "shortName", "load", "role"])) throw new Error("workload.teacherFieldOrder 不符合 schemaVersion 2。 ");
     requireExactKeys(profile.workload.teacherFieldOffsets, ["code", "shortName", "load", "role"], "workload.teacherFieldOffsets");
     const offsets = profile.workload.teacherFieldOffsets;
     if (offsets.code !== 0 || offsets.shortName !== 1 || offsets.load !== 2 || offsets.role !== 3) {
@@ -2015,7 +2017,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const duplicates = duplicateShortNames(state.teachers);
     const snapshot = {
       kind: "teacher-tool-snapshot",
-      schemaVersion: 1,
+      schemaVersion: 2,
       columnIndexBase: COLUMN_INDEX_BASE,
       generatedAt: new Date().toISOString(),
       profileId: state.profile?.id ?? null,
@@ -2047,7 +2049,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const config = getConfig();
     const profile = {
       kind: "teacher-tool-profile",
-      schemaVersion: 1,
+      schemaVersion: 2,
       columnIndexBase: COLUMN_INDEX_BASE,
       id: `profile-${profileTimestamp()}`,
       label: "教師人力與行政架構 mapping profile",
