@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "publicRoot": "site",
+  "entries": [
+    {
+      "source": "index.html",
+      "destination": "index.html",
+      "publicMode": "static-entry"
+    },
+    {
+      "source": "teacher-workload/教師人力與行政架構工具_單檔離線版.html",
+      "destination": "teacher-workload/教師人力與行政架構工具_單檔離線版.html",
+      "publicMode": "offline-single-file"
+    }
+  ],
+  "generatedFiles": [
+    ".nojekyll"
+  ],
+  "allowedExternalHosts": []
+}
+
