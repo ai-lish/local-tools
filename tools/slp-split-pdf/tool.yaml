@@ -1,0 +1,7 @@
+# tools/slp-split-pdf/tool.yaml
+name: slp-split-pdf
+summary: Split CloudSAMS SLP PDF into per-page / per-range files
+status: stable
+runtime: python
+entry: main.py
+requires_python: ">=3.10"

@@ -1,0 +1,7 @@
+# tools/class-photo-rename/tool.yaml
+name: class-photo-rename
+summary: Rename class photos to CloudSAMS <class_code><regno> convention
+status: wip
+runtime: python
+entry: main.py
+requires_python: ">=3.10"

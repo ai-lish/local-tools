@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>相機圖片合併工具</title>
+<style>
+:root {
+  --bg: #0f1115;
+  --panel: #1a1d23;
+  --panel-2: #232830;
+  --border: #2d333c;
+  --text: #e6e8eb;
+  --text-dim: #8b95a3;
+  --accent: #4f9eff;
+  --accent-hover: #6db0ff;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #ef4444;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC",
+               "Microsoft JhengHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px 0;
+}
+header h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.container {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 0;
+  min-height: calc(100vh - 88px);
+}
+@media (max-width: 900px) {
+  .container { grid-template-columns: 1fr; }
+  .controls { border-right: none !important; border-bottom: 1px solid var(--border); }
+}
+.controls {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 20px;
+  overflow-y: auto;
+}
+.preview {
+  padding: 24px;
+  overflow: auto;
+  background: var(--bg);
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Upload zone */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--panel-2);
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--accent);
+  background: rgba(79, 158, 255, 0.08);
+}
+.upload-zone .icon { font-size: 28px; margin-bottom: 6px; }
+.upload-zone .label { font-size: 13px; color: var(--text); margin-bottom: 8px; }
+.upload-zone .upload-actions { margin: 12px 0; }
+.upload-zone .paste-hint { font-size: 11px; color: var(--text-dim); }
+.upload-zone .paste-hint kbd {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 11px;
+}
+.upload-actions .btn { font-size: 13px; padding: 6px 14px; }
+.count-badge {
+  display: inline-block;
+  margin-left: 8px;
+  background: var(--accent);
+  color: white;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.file-list {
+  margin-top: 12px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.file-list .item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+}
+.file-list .item button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--danger);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.clear-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 8px;
+  width: 100%;
+}
+.clear-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+/* Form controls */
+.mode-controls {
+  display: none;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.mode-controls.active { display: block; }
+.controls h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 20px 0 10px;
+}
+.controls h2:first-of-type { margin-top: 0; }
+
+.field {
+  display: block;
+  margin-bottom: 12px;
+}
+.field label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.field input[type="number"],
+.field select {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.field input[type="number"]:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.field input[type="color"] {
+  width: 100%;
+  height: 36px;
+  padding: 2px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  background: var(--panel-2);
+  border-radius: 4px;
+  border-left: 2px solid var(--accent);
+}
+
+/* Buttons */
+.btn {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn:hover { background: var(--border); }
+.btn-primary {
+  width: 100%;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 16px;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Preview area */
+.preview-canvas-wrap {
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#canvas {
+  max-width: 100%;
+  max-height: calc(100vh - 200px);
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.preview-empty {
+  text-align: center;
+  color: var(--text-dim);
+}
+.preview-empty .icon {
+  font-size: 56px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+.preview-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 12px;
+  text-align: center;
+}
+
+/* Error banner */
+#errorLog {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  max-width: 400px;
+  background: var(--danger);
+  color: white;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  z-index: 9999;
+  display: none;
+  font-family: monospace;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Hidden input */
+input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📷 相機圖片合併工具</h1>
+  <nav class="tabs">
+    <button class="tab active" data-mode="grid">🧩 拼貼</button>
+    <button class="tab" data-mode="stack">📚 疊圖</button>
+    <button class="tab" data-mode="compare">⚖️ 並排</button>
+  </nav>
+</header>
+
+<main class="container">
+  <aside class="controls">
+    <h2>上傳相片</h2>
+    <div class="upload-zone" id="dropzone">
+      <div class="icon">📁</div>
+      <div class="label">拖拽相片到呢度<span id="countBadge"></span></div>
+      <div class="upload-actions">
+        <button type="button" id="uploadBtn" class="btn">📂 選擇檔案</button>
+      </div>
+      <div class="paste-hint">💡 或者 <kbd>Ctrl</kbd> + <kbd>V</kbd> 直接貼上</div>
+      <div class="file-list" id="fileList"></div>
+      <button type="button" id="clearBtn" class="clear-btn" style="display:none">清除全部</button>
+    </div>
+    <input type="file" id="fileInput" multiple accept="image/*">
+
+    <h2>設定</h2>
+
+    <div id="controls-grid" class="mode-controls active">
+      <div class="field">
+        <label>欄數 (Columns)</label>
+        <select id="gridCols">
+          <option value="2">2 欄 (少相)</option>
+          <option value="3" selected>3 欄 (預設)</option>
+          <option value="4">4 欄 (多相)</option>
+          <option value="5">5 欄</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>間距 (Padding, px)</label>
+        <input type="number" id="gridPadding" value="10" min="0" max="200">
+      </div>
+      <div class="field">
+        <label>背景色</label>
+        <input type="color" id="gridBg" value="#ffffff">
+      </div>
+      <p class="hint">相片按上傳順序，由左至右、由上至下排列</p>
+    </div>
+
+    <div id="controls-stack" class="mode-controls">
+      <div class="field">
+        <label>排列方向</label>
+        <select id="stackOrientation">
+          <option value="vertical" selected>垂直 ↓ (向下疊)</option>
+          <option value="horizontal">水平 → (向右排)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>間距 (Padding, px)</label>
+        <input type="number" id="stackPadding" value="10" min="0" max="200">
+      </div>
+      <div class="field">
+        <label>背景色</label>
+        <input type="color" id="stackBg" value="#ffffff">
+      </div>
+      <p class="hint">所有相片縮放成相同寬度（垂直）或相同高度（水平），按上傳順序排列</p>
+    </div>
+
+    <div id="controls-compare" class="mode-controls">
+      <div class="field">
+        <label>間距 (Padding, px)</label>
+        <input type="number" id="comparePadding" value="10" min="0" max="200">
+      </div>
+      <div class="field">
+        <label>背景色</label>
+        <input type="color" id="compareBg" value="#ffffff">
+      </div>
+      <p class="hint">相片按上傳順序並排。建議 2–6 張內效果最佳。</p>
+    </div>
+
+    <button id="downloadBtn" class="btn-primary" disabled>⬇️ 下載 PNG</button>
+  </aside>
+
+  <section class="preview">
+    <div id="emptyState" class="preview-empty">
+      <div class="icon">🖼️</div>
+      <div>上傳相片開始合併</div>
+    </div>
+    <div id="previewWrap" class="preview-canvas-wrap" style="display:none">
+      <canvas id="canvas"></canvas>
+    </div>
+    <div id="previewMeta" class="preview-meta" style="display:none"></div>
+  </section>
+</main>
+
+<div id="errorLog"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ============ State ============
+  const state = {
+    images: [],          // Array<{ id, image: HTMLImageElement, name }>
+    mode: 'grid',        // 'grid' | 'stack' | 'compare'
+    nextId: 1,
+  };
+
+  // ============ DOM ============
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const fileList = document.getElementById('fileList');
+  const countBadge = document.getElementById('countBadge');
+  const tabs = document.querySelectorAll('.tab');
+  const modeControls = {
+    grid: document.getElementById('controls-grid'),
+    stack: document.getElementById('controls-stack'),
+    compare: document.getElementById('controls-compare'),
+  };
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const emptyState = document.getElementById('emptyState');
+  const previewWrap = document.getElementById('previewWrap');
+  const previewMeta = document.getElementById('previewMeta');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  // ============ Error display ============
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('errorLog');
+    if (el) {
+      el.style.display = 'block';
+      el.textContent = '⚠ ' + e.message +
+        (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno : '');
+    }
+    console.error('Runtime error:', e.error);
+  });
+
+  // ============ File loading ============
+  function loadFile(file) {
+    if (!file || !file.type || !file.type.startsWith('image/')) {
+      console.warn('Skipped non-image file:', file && file.name);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        state.images.push({
+          id: state.nextId++,
+          image: img,
+          name: file.name || 'pasted-image',
+        });
+        updateUI();
+        render();
+      };
+      img.onerror = () => {
+        console.error('Failed to load image:', file.name);
+      };
+      img.src = ev.target.result;
+    };
+    reader.onerror = (err) => {
+      console.error('FileReader error', err);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function loadFiles(fileListLike) {
+    const arr = Array.from(fileListLike);
+    arr.forEach(loadFile);
+  }
+
+  // ============ Event: 4 upload entry points ============
+  // (1) Button — bypasses label click, works in Telegram in-app browser
+  uploadBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    fileInput.click();
+  });
+
+  // (2) Dropzone click — only when target is NOT a button (avoid double trigger)
+  dropzone.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    if (e.target.closest('.file-list')) return;
+    if (e.target.closest('.clear-btn')) return;
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      loadFiles(e.target.files);
+      fileInput.value = ''; // allow re-selecting same files
+    }
+  });
+
+  // (3) Drag-drop
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+  dropzone.addEventListener('dragleave', (e) => {
+    if (e.target === dropzone) dropzone.classList.remove('dragover');
+  });
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      loadFiles(e.dataTransfer.files);
+    }
+  });
+
+  // (4) Paste from clipboard
+  document.addEventListener('paste', (e) => {
+    if (!e.clipboardData) return;
+    const items = e.clipboardData.items;
+    if (!items) return;
+    let count = 0;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) { loadFile(file); count++; }
+      }
+    }
+    if (count > 0) e.preventDefault();
+  });
+
+  clearBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    state.images = [];
+    updateUI();
+    render();
+  });
+
+  // ============ Mode tabs ============
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const mode = tab.dataset.mode;
+      if (mode === state.mode) return;
+      state.mode = mode;
+      tabs.forEach((t) => t.classList.toggle('active', t === tab));
+      Object.entries(modeControls).forEach(([k, el]) => {
+        el.classList.toggle('active', k === mode);
+      });
+      render();
+    });
+  });
+
+  // ============ Mode controls (any change → re-render) ============
+  ['gridCols', 'gridPadding', 'gridBg',
+   'stackOrientation', 'stackPadding', 'stackBg',
+   'comparePadding', 'compareBg'].forEach((id) => {
+    document.getElementById(id).addEventListener('change', render);
+    document.getElementById(id).addEventListener('input', render);
+  });
+
+  // ============ Update UI: file list, count badge, etc. ============
+  function updateUI() {
+    const n = state.images.length;
+    if (n > 0) {
+      countBadge.textContent = ' (' + n + ')';
+      countBadge.style.display = '';
+      clearBtn.style.display = '';
+    } else {
+      countBadge.textContent = '';
+      countBadge.style.display = 'none';
+      clearBtn.style.display = 'none';
+    }
+    // Render file list with remove buttons
+    if (n === 0) {
+      fileList.innerHTML = '';
+    } else {
+      fileList.innerHTML = state.images.map((item) =>
+        `<div class="item" data-id="${item.id}"><span>${escapeHtml(item.name)}</span><button data-remove="${item.id}">移除</button></div>`
+      ).join('');
+      fileList.querySelectorAll('button[data-remove]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = parseInt(btn.dataset.remove, 10);
+          state.images = state.images.filter((x) => x.id !== id);
+          updateUI();
+          render();
+        });
+      });
+    }
+    downloadBtn.disabled = n === 0;
+    if (n === 0) {
+      emptyState.style.display = '';
+      previewWrap.style.display = 'none';
+      previewMeta.style.display = 'none';
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ============ Renderers ============
+  function render() {
+    if (state.images.length === 0) {
+      canvas.width = 0;
+      canvas.height = 0;
+      return;
+    }
+    if (state.mode === 'grid') renderGrid();
+    else if (state.mode === 'stack') renderStack();
+    else if (state.mode === 'compare') renderCompare();
+    emptyState.style.display = 'none';
+    previewWrap.style.display = '';
+    previewMeta.style.display = '';
+  }
+
+  function renderGrid() {
+    const cols = parseInt(document.getElementById('gridCols').value, 10);
+    const padding = Math.max(0, parseInt(document.getElementById('gridPadding').value, 10) || 0);
+    const bg = document.getElementById('gridBg').value;
+
+    const imgs = state.images.map((it) => it.image);
+    const rows = Math.ceil(imgs.length / cols);
+
+    // Cell sizes: uniform - find max w/h ratio for each cell
+    // Strategy: keep each image's aspect ratio, but fit all cells to a uniform dimension
+    // Pick the cell width such that the tallest image in the cell still fits the row height.
+    // Simple approach: each cell width = same; row height = max(imgHeight * cellWidth / imgWidth) in that row.
+    // Even simpler: use UNIFORM max width across cells; each cell height = img.h * (cellW / img.w)
+
+    // Compute target cell width: use a heuristic — width based on the widest image's natural dimension
+    // For grid, we want similar visual size. Use min dimension of all images as the cell size reference.
+    // Actually simplest: pick cell width = total_target / cols where total_target = max(img.width)
+    // Then row height = max cell height across that row
+    const maxNaturalW = Math.max.apply(null, imgs.map((img) => img.width));
+    const cellW = maxNaturalW; // Each cell uses the max width as base
+    const cellHeights = imgs.map((img) => Math.round(img.height * (cellW / img.width)));
+    // For each row, height = max cell heights in that row
+    const rowHeights = [];
+    for (let r = 0; r < rows; r++) {
+      let maxH = 0;
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        if (idx < imgs.length) maxH = Math.max(maxH, cellHeights[idx]);
+      }
+      rowHeights.push(maxH);
+    }
+
+    const totalW = cols * cellW + (cols + 1) * padding;
+    const totalH = rows * rowHeights.reduce((a, b) => a + b, 0) + (rows + 1) * padding;
+
+    canvas.width = totalW;
+    canvas.height = totalH;
+
+    // Fill background
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    // Draw images
+    let y = padding;
+    for (let r = 0; r < rows; r++) {
+      let x = padding;
+      const rowH = rowHeights[r];
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        if (idx >= imgs.length) break;
+        const img = imgs[idx];
+        const drawH = Math.round(img.height * (cellW / img.width));
+        // Vertical center within row
+        const offsetY = y + Math.round((rowH - drawH) / 2);
+        ctx.drawImage(img, x, offsetY, cellW, drawH);
+        x += cellW + padding;
+      }
+      y += rowH + padding;
+    }
+
+    showMeta(imgs.length + ' 張相片', totalW + ' × ' + totalH + ' px');
+  }
+
+  function renderStack() {
+    const orientation = document.getElementById('stackOrientation').value;
+    const padding = Math.max(0, parseInt(document.getElementById('stackPadding').value, 10) || 0);
+    const bg = document.getElementById('stackBg').value;
+
+    const imgs = state.images.map((it) => it.image);
+
+    if (orientation === 'vertical') {
+      // Same width, heights proportional
+      const commonW = Math.max.apply(null, imgs.map((img) => img.width));
+      const heights = imgs.map((img) => Math.round(img.height * (commonW / img.width)));
+      const totalH = heights.reduce((a, b) => a + b, 0) + (imgs.length + 1) * padding;
+      const totalW = commonW + 2 * padding;
+
+      canvas.width = totalW;
+      canvas.height = totalH;
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, totalW, totalH);
+
+      let y = padding;
+      for (let i = 0; i < imgs.length; i++) {
+        const drawH = heights[i];
+        ctx.drawImage(imgs[i], padding, y, commonW, drawH);
+        y += drawH + padding;
+      }
+      showMeta(imgs.length + ' 張相片（垂直疊）', totalW + ' × ' + totalH + ' px');
+    } else {
+      // Same height, widths proportional
+      const commonH = Math.max.apply(null, imgs.map((img) => img.height));
+      const widths = imgs.map((img) => Math.round(img.width * (commonH / img.height)));
+      const totalW = widths.reduce((a, b) => a + b, 0) + (imgs.length + 1) * padding;
+      const totalH = commonH + 2 * padding;
+
+      canvas.width = totalW;
+      canvas.height = totalH;
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, totalW, totalH);
+
+      let x = padding;
+      for (let i = 0; i < imgs.length; i++) {
+        const drawW = widths[i];
+        ctx.drawImage(imgs[i], x, padding, drawW, commonH);
+        x += drawW + padding;
+      }
+      showMeta(imgs.length + ' 張相片（水平排）', totalW + ' × ' + totalH + ' px');
+    }
+  }
+
+  function renderCompare() {
+    const padding = Math.max(0, parseInt(document.getElementById('comparePadding').value, 10) || 0);
+    const bg = document.getElementById('compareBg').value;
+
+    const imgs = state.images.map((it) => it.image);
+    const n = imgs.length;
+
+    // Same height for all, width proportional
+    const commonH = Math.max.apply(null, imgs.map((img) => img.height));
+    const widths = imgs.map((img) => Math.round(img.width * (commonH / img.height)));
+    const totalW = widths.reduce((a, b) => a + b, 0) + (n + 1) * padding;
+    const totalH = commonH + 2 * padding;
+
+    canvas.width = totalW;
+    canvas.height = totalH;
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    let x = padding;
+    for (let i = 0; i < imgs.length; i++) {
+      ctx.drawImage(imgs[i], x, padding, widths[i], commonH);
+      x += widths[i] + padding;
+    }
+    showMeta(n + ' 張相片（並排）', totalW + ' × ' + totalH + ' px');
+  }
+
+  function showMeta(line1, line2) {
+    previewMeta.innerHTML = '<div>' + escapeHtml(line1) + '</div><div style="margin-top:2px">' + escapeHtml(line2) + '</div>';
+  }
+
+  // ============ Download ============
+  downloadBtn.addEventListener('click', () => {
+    if (canvas.width === 0 || canvas.height === 0) return;
+    canvas.toBlob((blob) => {
+      if (!blob) { console.error('toBlob returned null'); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'photo-merge-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, 'image/png');
+  });
+
+  // ============ Init ============
+  updateUI();
+})();
+</script>
+</body>
+</html>

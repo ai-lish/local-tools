@@ -11,6 +11,61 @@
       "source": "teacher-workload/教師人力與行政架構工具_單檔離線版.html",
       "destination": "teacher-workload/教師人力與行政架構工具_單檔離線版.html",
       "publicMode": "offline-single-file"
+    },
+    {
+      "source": "tools/image-upscaler/index.html",
+      "destination": "tools/image-upscaler/index.html",
+      "publicMode": "offline-single-file"
+    },
+    {
+      "source": "tools/photo-merge/index.html",
+      "destination": "tools/photo-merge/index.html",
+      "publicMode": "offline-single-file"
+    },
+    {
+      "source": "tools/slp-split-pdf/README.md",
+      "destination": "tools/slp-split-pdf/README.md",
+      "publicMode": "cli-documentation"
+    },
+    {
+      "source": "tools/slp-split-pdf/main.py",
+      "destination": "tools/slp-split-pdf/main.py",
+      "publicMode": "cli-source"
+    },
+    {
+      "source": "tools/slp-split-pdf/split.py",
+      "destination": "tools/slp-split-pdf/split.py",
+      "publicMode": "cli-source"
+    },
+    {
+      "source": "tools/slp-split-pdf/requirements.txt",
+      "destination": "tools/slp-split-pdf/requirements.txt",
+      "publicMode": "cli-source"
+    },
+    {
+      "source": "tools/slp-split-pdf/tool.yaml",
+      "destination": "tools/slp-split-pdf/tool.yaml",
+      "publicMode": "cli-source"
+    },
+    {
+      "source": "tools/class-photo-rename/README.md",
+      "destination": "tools/class-photo-rename/README.md",
+      "publicMode": "cli-documentation"
+    },
+    {
+      "source": "tools/class-photo-rename/main.py",
+      "destination": "tools/class-photo-rename/main.py",
+      "publicMode": "cli-source"
+    },
+    {
+      "source": "tools/class-photo-rename/requirements.txt",
+      "destination": "tools/class-photo-rename/requirements.txt",
+      "publicMode": "cli-source"
+    },
+    {
+      "source": "tools/class-photo-rename/tool.yaml",
+      "destination": "tools/class-photo-rename/tool.yaml",
+      "publicMode": "cli-source"
     }
   ],
   "generatedFiles": [
@@ -18,4 +73,3 @@
   ],
   "allowedExternalHosts": []
 }
-

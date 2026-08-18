@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>圖片像素提升工具 — Image Upscaler</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #1a1d23;
+    --panel-2: #232830;
+    --border: #2d333c;
+    --text: #e6e8eb;
+    --text-dim: #8b95a3;
+    --accent: #4f9eff;
+    --accent-hover: #6db0ff;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #ef4444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  .header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .header h1 {
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .header .badge {
+    font-size: 11px;
+    background: var(--panel-2);
+    color: var(--text-dim);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+
+  .container {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    padding: 20px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 900px) {
+    .container { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .panel h2 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 14px;
+  }
+
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 36px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg);
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(79, 158, 255, 0.05);
+  }
+  .upload-zone .icon {
+    font-size: 36px;
+    margin-bottom: 8px;
+    opacity: 0.7;
+  }
+  .upload-zone .label {
+    font-size: 14px;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .upload-zone .sublabel {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .upload-zone input { display: none; }
+  .upload-actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+  .upload-actions .btn {
+    width: auto;
+    padding: 8px 18px;
+    font-size: 13px;
+  }
+  .paste-hint {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .paste-hint kbd {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-family: monospace;
+    font-size: 10px;
+  }
+  .file-info {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--accent);
+    font-family: monospace;
+    word-break: break-all;
+  }
+  .file-info.error {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  .setting {
+    margin-bottom: 16px;
+  }
+  .setting label {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+  .setting .hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  .setting input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+  .setting input[type="number"] {
+    width: 100%;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+  .setting select {
+    width: 100%;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .row {
+    display: flex;
+    gap: 8px;
+  }
+  .row > * { flex: 1; }
+
+  .btn {
+    width: 100%;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn:disabled {
+    background: var(--panel-2);
+    color: var(--text-dim);
+    cursor: not-allowed;
+  }
+  .btn-secondary {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover:not(:disabled) { background: var(--border); }
+  .btn-secondary.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .preset-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .preset-row .btn {
+    flex: 0 0 auto;
+    font-size: 12px;
+    padding: 7px 11px;
+  }
+
+  .preview {
+    min-height: 500px;
+    display: flex;
+    flex-direction: column;
+  }
+  .preview-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+
+  .preview-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .tab-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .info-chip {
+    font-size: 11px;
+    background: var(--panel-2);
+    color: var(--text-dim);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+  }
+  .info-chip.success { color: var(--success); }
+
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    background:
+      linear-gradient(45deg, #1a1d23 25%, transparent 25%),
+      linear-gradient(-45deg, #1a1d23 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1a1d23 75%),
+      linear-gradient(-45deg, transparent 75%, #1a1d23 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    background-color: #14171c;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+  }
+  .canvas-wrap canvas {
+    max-width: 100%;
+    max-height: 70vh;
+    image-rendering: -webkit-optimize-contrast;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .compare-wrap {
+    position: relative;
+    width: 100%;
+    height: 70vh;
+    overflow: hidden;
+    border-radius: 8px;
+  }
+  .compare-wrap canvas {
+    position: absolute;
+    top: 0; left: 0;
+    max-width: none;
+    max-height: none;
+    image-rendering: -webkit-optimize-contrast;
+  }
+  .compare-slider {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    cursor: ew-resize;
+    z-index: 10;
+  }
+  .compare-slider::after {
+    content: '⇄';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--accent);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+
+  .progress {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent);
+    z-index: 1000;
+    transition: width 0.2s;
+  }
+  .progress.hidden { display: none; }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .stats {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    font-family: monospace;
+  }
+
+  /* ====== MAIN TABS (top-level view switcher) ====== */
+  .main-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .main-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+  }
+  .main-tab:hover { color: var(--text); }
+  .main-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* ====== PRINCIPLES VIEW ====== */
+  .principles-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 20px 80px;
+  }
+  .principles-intro { text-align: center; margin-bottom: 40px; }
+  .principles-intro h2 { font-size: 24px; margin-bottom: 8px; color: var(--text); }
+  .principles-intro p { color: var(--text-dim); font-size: 14px; max-width: 600px; margin: 0 auto; line-height: 1.7; }
+
+  .principle-module {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+    padding: 24px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .principle-module.full-width { grid-template-columns: 1fr; }
+  .principle-text { display: flex; flex-direction: column; gap: 12px; }
+  .principle-text h3 {
+    font-size: 18px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .principle-text .num {
+    background: var(--accent);
+    color: white;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600;
+    flex-shrink: 0;
+  }
+  .principle-text p { color: var(--text); font-size: 14px; line-height: 1.7; }
+  .principle-text .analogy {
+    background: var(--bg);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .principle-demo {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .principle-demo canvas {
+    background: #14171c;
+    border-radius: 4px;
+    cursor: crosshair;
+    max-width: 100%;
+  }
+  .demo-label { font-size: 12px; color: var(--text-dim); font-family: monospace; }
+  .demo-controls {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    align-items: center; justify-content: center;
+    margin-top: 8px;
+  }
+  .demo-controls button {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: monospace;
+  }
+  .demo-controls button.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .algo-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    width: 100%;
+  }
+  .algo-cell {
+    display: flex; flex-direction: column;
+    gap: 4px; align-items: center;
+  }
+  .algo-cell canvas {
+    width: 100%; height: auto;
+    background: #14171c;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    image-rendering: pixelated;
+  }
+  .algo-cell .algo-name {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-family: monospace;
+  }
+  .algo-cell.highlighted canvas {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px rgba(79, 158, 255, 0.4);
+  }
+  .algo-cell.highlighted .algo-name { color: var(--accent); font-weight: 600; }
+  .algo-cell .algo-desc { font-size: 9px; color: var(--text-dim); text-align: center; }
+  .compare-mini {
+    position: relative;
+    width: 100%; max-width: 280px;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: ew-resize;
+  }
+  .compare-mini canvas {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    image-rendering: auto;
+  }
+  .compare-mini .slider {
+    position: absolute; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--accent);
+    pointer-events: none;
+  }
+  .compare-mini .slider::after {
+    content: '⇄';
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--accent);
+    color: white;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+  .ai-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 13px;
+  }
+  .ai-table th, .ai-table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .ai-table th {
+    background: var(--panel-2);
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .ai-table tr:last-child td { border-bottom: none; }
+  .ai-table .this-tool { color: var(--accent); font-weight: 600; }
+  .principle-rgb-slider {
+    width: 100%;
+    margin-top: 12px;
+  }
+  .principle-rgb-slider .row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .principle-rgb-slider .row label {
+    width: 20px; font-size: 11px; font-family: monospace;
+    color: var(--text-dim);
+  }
+  .principle-rgb-slider input[type=range] {
+    flex: 1; accent-color: var(--accent);
+  }
+  .principle-rgb-slider .val {
+    width: 30px; font-size: 11px; font-family: monospace;
+    color: var(--text-dim); text-align: right;
+  }
+  .principle-pixel-info {
+    font-size: 11px; color: var(--accent);
+    font-family: monospace; min-height: 14px;
+  }
+  @media (max-width: 800px) {
+    .principle-module { grid-template-columns: 1fr; }
+    .algo-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="progress hidden" id="progress"></div>
+
+<div id="errorLog" style="position:fixed;bottom:12px;right:12px;max-width:400px;background:var(--danger);color:white;padding:10px 14px;border-radius:6px;font-size:12px;z-index:9999;display:none;font-family:monospace"></div>
+
+<script>
+// Catch and display any runtime errors for debugging
+window.addEventListener('error', e => {
+  const el = document.getElementById('errorLog');
+  if (el) { el.style.display = 'block'; el.textContent = '⚠ ' + e.message + (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno : ''); }
+  console.error('Runtime error:', e.error);
+});
+</script>
+
+<div class="header">
+  <h1>🖼 圖片像素提升工具</h1>
+  <span class="badge">純前端 · 離線可用</span>
+</div>
+
+<nav class="main-tabs">
+  <button class="main-tab active" data-view="tool">🔧 工具</button>
+  <button class="main-tab" data-view="principles">📖 原理</button>
+</nav>
+
+<div id="view-tool">
+<div class="container">
+  <!-- LEFT PANEL: CONTROLS -->
+  <div>
+    <div class="panel" style="margin-bottom: 16px;">
+      <h2>1️⃣ 上傳圖片</h2>
+      <div class="upload-zone" id="dropzone">
+        <div class="icon">📁</div>
+        <div class="label">拖拽圖片到呢度</div>
+        <div class="sublabel">或者用以下方式</div>
+        <div class="upload-actions">
+          <button type="button" id="uploadBtn" class="btn">📂 選擇檔案</button>
+        </div>
+        <div class="paste-hint">💡 或者 <kbd>Ctrl</kbd> + <kbd>V</kbd> 直接貼上剪貼簿嘅圖</div>
+        <div class="paste-hint" style="margin-top:6px">💡 手機：撳「選擇檔案」後可影相或從相簿挑選</div>
+      </div>
+      <div id="fileInfo" class="file-info" style="display:none"></div>
+      <input type="file" id="fileInput" accept="image/*,image/heic,image/heif" style="display:none">
+    </div>
+
+    <div class="panel" style="margin-bottom: 16px;">
+      <h2>2️⃣ 放大設定</h2>
+
+      <div class="setting">
+        <label>放大比例</label>
+        <div class="row">
+          <button class="btn btn-secondary" data-scale="2">2×</button>
+          <button class="btn btn-secondary" data-scale="3">3×</button>
+          <button class="btn btn-secondary" data-scale="4">4×</button>
+          <button class="btn btn-secondary" data-scale="custom">自訂</button>
+        </div>
+        <input type="range" id="customScale" min="1.1" max="8" step="0.1" value="2" style="margin-top:8px;display:none">
+        <div class="hint" id="scaleHint">2 倍放大</div>
+      </div>
+
+      <div class="setting">
+        <label>重採樣演算法</label>
+        <select id="algorithm">
+          <option value="lanczos3" selected>Lanczos3 — 最清晰（推薦）</option>
+          <option value="lanczos2">Lanczos2 — 平衡</option>
+          <option value="bicubic">Bicubic — 標準</option>
+          <option value="bilinear">Bilinear — 最快</option>
+          <option value="nearest">Nearest — 像素風格</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom: 16px;">
+      <h2>📐 輸出尺寸</h2>
+
+      <div class="setting">
+        <label>模式</label>
+        <select id="sizeMode">
+          <option value="factor">倍數放大（X 倍）</option>
+          <option value="minimum" selected>最小保證（強制 ≥ 設定值）</option>
+          <option value="exact">精確尺寸（最終輸出 = 設定值）</option>
+        </select>
+      </div>
+
+      <div class="setting" id="minSizeGroup">
+        <label>最小尺寸 (px)</label>
+        <div class="row">
+          <div>
+            <input type="number" id="targetW" value="1200" min="1" step="50" placeholder="寬">
+          </div>
+          <div>
+            <input type="number" id="targetH" value="1600" min="1" step="50" placeholder="高">
+          </div>
+        </div>
+        <div class="hint">細過會自動再放大；大過就用你嘅倍數</div>
+      </div>
+
+      <div class="setting" id="exactSizeGroup" style="display:none">
+        <label>精確尺寸 (px)</label>
+        <div class="row">
+          <div>
+            <input type="number" id="exactW" value="1200" min="1" step="50" placeholder="寬">
+          </div>
+          <div>
+            <input type="number" id="exactH" value="1600" min="1" step="50" placeholder="高">
+          </div>
+        </div>
+        <div class="hint">最終輸出會係呢個 size（自動調整）</div>
+      </div>
+
+      <div class="setting" style="margin-bottom:0">
+        <label>快速預設</label>
+        <div class="preset-row">
+          <button class="btn btn-secondary preset-btn active" data-w="1200" data-h="1600" data-mode="minimum" type="button">⭐ 1200×1600</button>
+          <button class="btn btn-secondary preset-btn" data-w="1920" data-h="1080" data-mode="minimum" type="button">1920×1080</button>
+          <button class="btn btn-secondary preset-btn" data-w="2480" data-h="3508" data-mode="minimum" type="button">A4 300DPI</button>
+          <button class="btn btn-secondary preset-btn" data-w="1024" data-h="768" data-mode="minimum" type="button">1024×768</button>
+          <button class="btn btn-secondary preset-btn" data-w="800" data-h="600" data-mode="minimum" type="button">800×600</button>
+        </div>
+        <div class="hint" style="margin-top:8px">撳 preset 自動填入，可以再手動改</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom: 16px;">
+      <h2>3️⃣ 增強效果</h2>
+
+      <div class="setting">
+        <label>銳化強度: <span id="sharpenVal">0</span></label>
+        <input type="range" id="sharpen" min="0" max="200" step="5" value="0">
+        <div class="hint">適合文字、線條、教材</div>
+      </div>
+
+      <div class="setting">
+        <label>降噪: <span id="denoiseVal">0</span></label>
+        <input type="range" id="denoise" min="0" max="100" step="5" value="0">
+        <div class="hint">減少 JPEG 壓縮失真</div>
+      </div>
+
+      <div class="setting">
+        <label>對比度: <span id="contrastVal">100</span>%</label>
+        <input type="range" id="contrast" min="50" max="200" step="5" value="100">
+      </div>
+
+      <div class="setting">
+        <label>亮度: <span id="brightnessVal">0</span></label>
+        <input type="range" id="brightness" min="-50" max="50" step="2" value="0">
+      </div>
+    </div>
+
+    <button class="btn" id="processBtn" disabled>⚡ 開始處理</button>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <!-- RIGHT PANEL: PREVIEW -->
+  <div class="panel preview">
+    <div class="preview-controls">
+      <button class="tab-btn active" data-view="result">處理結果</button>
+      <button class="tab-btn" data-view="compare">對比預覽</button>
+      <button class="tab-btn" data-view="original">原圖</button>
+      <div style="flex:1"></div>
+      <span class="info-chip" id="dimChip">未上傳</span>
+    </div>
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="preview-empty">⬅ 請先上傳圖片</div>
+    </div>
+    <div class="actions" id="actions" style="display:none">
+      <button class="btn" id="downloadBtn">💾 下載 PNG</button>
+      <button class="btn btn-secondary" id="downloadJpgBtn">下載 JPG</button>
+    </div>
+  </div>
+</div>
+</div><!-- /#view-tool -->
+
+<div id="view-principles" style="display:none">
+  <div class="principles-container">
+
+    <div class="principles-intro">
+      <h2>🖼 圖片點樣變大？</h2>
+      <p>由零開始了解呢個工具背後嘅原理。我哋會由「圖片 = 像素」講到 5 種放大算法，每個概念都附即時互動 demo — 你可以試下㩒㩒掣、拉下 slider，親身感受下。</p>
+    </div>
+
+    <!-- ============ MODULE 1 ============ -->
+    <div class="principle-module" id="m1">
+      <div class="principle-text">
+        <h3><span class="num">1</span>圖片 = 馬賽克牆</h3>
+        <p>你見到嘅任何數碼圖片，無論係相、icon、定 emoji，內部其實都係一個「方格陣」：一個格 × 一個格 × 一個格⋯⋯排到完。</p>
+        <p>每一個格仔叫做<strong>「像素」(pixel)</strong>。你望住一張 1000 像素闊嘅相，代表佢由 1000 個格仔橫向排成。</p>
+        <div class="analogy">📌 類比：想像你用 1000 粒相同大細嘅方塊磁磚砌一幅馬賽克牆，每粒磁磚得一種純色 — 砌出嚟就係一張圖。</div>
+        <p>👉 移個滑鼠入右邊嘅格仔試下：</p>
+      </div>
+      <div class="principle-demo">
+        <canvas id="demo-pixel-grid" width="240" height="240"></canvas>
+        <div class="principle-pixel-info" id="demo-pixel-info">滑鼠移入任何一格</div>
+      </div>
+    </div>
+
+    <!-- ============ MODULE 2 ============ -->
+    <div class="principle-module" id="m2">
+      <div class="principle-text">
+        <h3><span class="num">2</span>像素 = 三個數字</h3>
+        <p>每個像素入面，淨係得三個 0 到 255 嘅數字 — <strong style="color:#ff6b6b">紅 (R)</strong>、<strong style="color:#4ade80">綠 (G)</strong>、<strong style="color:#4f9eff">藍 (B)</strong>。電腦就係用呢三個色嘅混合，去模擬出所有顏色。</p>
+        <p>例如：<code style="background:var(--panel-2);padding:1px 5px;border-radius:3px">R=255, G=125, B=49</code> 就係橙色。</p>
+        <div class="analogy">📌 類比：紅綠藍光係三支水彩筆，每支筆可以用 0 (一滴都唔落) 到 255 (落滿) 嘅份量。三支筆一齊落水 = 一個顏色。</div>
+        <p>👉 拉下面三條 slider：</p>
+      </div>
+      <div class="principle-demo">
+        <canvas id="demo-rgb" width="120" height="120" style="border:1px solid var(--border)"></canvas>
+        <div style="font-family:monospace; font-size:12px; color:var(--text-dim)" id="demo-rgb-text">rgb(255, 125, 49)</div>
+        <div class="principle-rgb-slider">
+          <div class="row"><label style="color:#ff6b6b">R</label><input type="range" id="demo-rgb-r" min="0" max="255" value="255"><span class="val" id="demo-rgb-r-v">255</span></div>
+          <div class="row"><label style="color:#4ade80">G</label><input type="range" id="demo-rgb-g" min="0" max="255" value="125"><span class="val" id="demo-rgb-g-v">125</span></div>
+          <div class="row"><label style="color:#4f9eff">B</label><input type="range" id="demo-rgb-b" min="0" max="255" value="49"><span class="val" id="demo-rgb-b-v">49</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MODULE 3 ============ -->
+    <div class="principle-module" id="m3">
+      <div class="principle-text">
+        <h3><span class="num">3</span>放大嘅難題</h3>
+        <p>如果一張相係 100 × 100 像素，你想變成 400 × 400，電腦要點做？</p>
+        <p>佢<strong>冇辦法</strong>自己「畫」出新嘅細節 — 因為原本嘅資訊就係 100 × 100 嗰 10,000 格。</p>
+        <p>所以佢要<strong>用原本嗰 10,000 格嘅顏色，數學推算出 160,000 格嘅顏色</strong>。呢個過程叫做「重採樣」(resampling)。</p>
+        <div class="analogy">📌 類比：你有一幅 10×10 嘅小畫，要將佢印到一張 40×40 嘅大紙度。你要喺原本 100 格以外嘅 1,500 格空白位置「猜」應該填咩色 — 但你只有原本 100 格嘅資料。</div>
+      </div>
+      <div class="principle-demo">
+        <canvas id="demo-zoom-problem" width="320" height="200"></canvas>
+        <div class="demo-label">左：原圖 8×6 像素 　·　 右：放大 4× 後，多咗 192 格要靠「推算」填色</div>
+      </div>
+    </div>
+
+    <!-- ============ MODULE 4 ============ -->
+    <div class="principle-module full-width" id="m4">
+      <div class="principle-text">
+        <h3><span class="num">4</span>5 種「填色方法」並排比較</h3>
+        <p>推算顏色有好多方法，由簡單到複雜，效果同速度都唔同。下面 5 格都係用同一張 16×16 細 icon 放大 8× 嘅結果 — 唯一分別係「推算法」。</p>
+        <div class="analogy">📌 類比：5 個畫師用同一幅小畫去「照比例放大」。有人逐格抄最近嘅顏色，有人睇晒周圍先平均，有人用數學公式計權重 — 結果自然唔同。</div>
+        <p>👉 撳下面三個問題，睇下邊種方法最啱你：</p>
+        <div class="demo-controls" id="demo-algo-controls">
+          <button data-q="all" class="active">全部睇</button>
+          <button data-q="smooth">邊度最平滑？</button>
+          <button data-q="sharp">邊度最銳利？</button>
+          <button data-q="fast">邊度最快？</button>
+        </div>
+      </div>
+      <div class="principle-demo" style="gap:16px">
+        <div class="algo-grid" id="demo-algo-grid"></div>
+        <div class="demo-label" id="demo-algo-caption">5 種算法 · 同一張 16×16 icon 放大到 128×128</div>
+      </div>
+    </div>
+
+    <!-- ============ MODULE 5 ============ -->
+    <div class="principle-module" id="m5">
+      <div class="principle-text">
+        <h3><span class="num">5</span>Lanczos 嘅核心：sinc 函數</h3>
+        <p>Lanczos 係呢個工具預設嘅算法 (模塊 4 中間嗰格)。佢用一個叫 <strong>sinc</strong> 嘅數學函數，去決定「新格應該畀幾多分影響力畀周圍嘅舊格」。</p>
+        <p>sinc 嘅形狀係一個「中間高、兩邊上下振動、慢慢變零」嘅波浪。距離越近，新格受佢影響越大；距離越遠，影響越細。</p>
+        <p>而參數 <code style="background:var(--panel-2);padding:1px 5px;border-radius:3px">a</code> 就係「影響範圍」：</p>
+        <ul style="color:var(--text); font-size:13px; line-height:1.8; padding-left:20px">
+          <li><strong>a = 2</strong> = 影響半徑 2 個格，睇 4×4 = 16 格</li>
+          <li><strong>a = 3</strong> = 影響半徑 3 個格，睇 6×6 = 36 格</li>
+        </ul>
+        <div class="analogy">📌 類比：a 越大 = 越「民主」，問多啲鄰居意見先決定新色。a 細 = 較「獨斷」，淨係聽附近幾格就決定。</div>
+      </div>
+      <div class="principle-demo">
+        <canvas id="demo-sinc" width="320" height="200"></canvas>
+        <div class="demo-controls">
+          <button data-a="2">a = 2</button>
+          <button data-a="3" class="active">a = 3 (預設)</button>
+        </div>
+        <div class="demo-label">a 越大，覆蓋越廣，計算越慢，但效果越準</div>
+      </div>
+    </div>
+
+    <!-- ============ MODULE 6 ============ -->
+    <div class="principle-module full-width" id="m6">
+      <div class="principle-text">
+        <h3><span class="num">6</span>後處理 = 執生</h3>
+        <p>放大完之後，成件事未完 — 我哋仲會做 3 種「後處理」修飾，每種都係一個簡單嘅數學 filter，套用喺每個像素上面。</p>
+        <p>每個 filter 都係「3×3 鄰域 + 某個加權方式」：</p>
+        <ul style="color:var(--text); font-size:13px; line-height:1.8; padding-left:20px">
+          <li><strong>Denoise 去雜訊</strong>：3×3 全部加起平均，再用原圖同平均色按比例混合 — 抹走雜訊</li>
+          <li><strong>Contrast 對比度</strong>：每個像素 = <code style="background:var(--panel-2);padding:1px 4px;border-radius:3px">pixel × c + 128 × (1-c) + brightness × 2.55</code></li>
+          <li><strong>Sharpen 銳化</strong>：3×3 kernel <code style="background:var(--panel-2);padding:1px 4px;border-radius:3px">[0,-1,0,-1,5,-1,0,-1,0]</code> 加權 — 突出邊緣</li>
+        </ul>
+        <div class="analogy">📌 類比：沖完相之後再去 Photoshop 執：推一推「減少雜訊」滑桿、推一推「對比」滑桿、再「銳化」少少。</div>
+        <p>👉 撳下面三個效果，左右拉 slider 對比：</p>
+      </div>
+      <div class="principle-demo" style="flex-direction:row; flex-wrap:wrap; gap:24px; justify-content:space-around; min-height:auto">
+        <div style="text-align:center">
+          <div class="demo-label" style="margin-bottom:8px">Denoise 去雜訊</div>
+          <div class="compare-mini" data-mode="denoise"><canvas></canvas><canvas></canvas><div class="slider"></div></div>
+          <div class="demo-label" style="margin-top:6px">左：原　/　右：denoise=60</div>
+        </div>
+        <div style="text-align:center">
+          <div class="demo-label" style="margin-bottom:8px">Contrast 對比度</div>
+          <div class="compare-mini" data-mode="contrast"><canvas></canvas><canvas></canvas><div class="slider"></div></div>
+          <div class="demo-label" style="margin-top:6px">左：原　/　右：contrast=140</div>
+        </div>
+        <div style="text-align:center">
+          <div class="demo-label" style="margin-bottom:8px">Sharpen 銳化</div>
+          <div class="compare-mini" data-mode="sharpen"><canvas></canvas><canvas></canvas><div class="slider"></div></div>
+          <div class="demo-label" style="margin-top:6px">左：原　/　右：sharpen=80</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MODULE 7 ============ -->
+    <div class="principle-module full-width" id="m7">
+      <div class="principle-text">
+        <h3><span class="num">7</span>點解唔係 AI 放大？</h3>
+        <p>近年有種「AI 放大」(例如 Real-ESRGAN、waifu2x)，用神經網絡去「生成」原本冇嘅細節 — 效果可以非常驚艷。但本工具用純數學 (Lanczos) 嘅設計，係有意識嘅 trade-off：</p>
+        <div style="overflow-x:auto">
+          <table class="ai-table">
+            <thead>
+              <tr><th></th><th>本工具 (Lanczos)</th><th>AI 放大 (Real-ESRGAN)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>速度</strong></td><td class="this-tool">⚡ 即時 (CPU 都得)</td><td>🐢 慢 (通常要 GPU)</td></tr>
+              <tr><td><strong>私隱</strong></td><td class="this-tool">🛡 完全本地，零上傳</td><td>☁ 多數要 upload 到 server</td></tr>
+              <tr><td><strong>成本</strong></td><td class="this-tool">💰 完全免費</td><td>💸 好多要訂閱</td></tr>
+              <tr><td><strong>細節生成</strong></td><td>❌ 唔會「無中生有」</td><td class="this-tool">✅ 可以生成新紋理</td></tr>
+              <tr><td><strong>可預測</strong></td><td class="this-tool">✅ 純數學，每次一樣</td><td>⚠ 偶有「幻覺」細節</td></tr>
+              <tr><td><strong>檔案大小</strong></td><td class="this-tool">📄 單一 HTML ~50KB</td><td>📦 連 model ~100MB+</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:16px">簡單講：<strong style="color:var(--accent)">如果你要快、要私隱、要可預測，用本工具。</strong>如果你要極致畫質、肯等肯畀錢，AI 放大更適合。</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ============ STATE ============
+const state = {
+  sourceImage: null,      // HTMLImageElement
+  sourceCanvas: null,     // source canvas
+  resultCanvas: null,     // processed canvas
+  scale: 2,
+  view: 'result',
+};
+
+// ============ UPLOAD ============
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const uploadBtn = document.getElementById('uploadBtn');
+const fileInfo = document.getElementById('fileInfo');
+
+function showFileInfo(msg, isError) {
+  fileInfo.style.display = 'block';
+  fileInfo.className = 'file-info' + (isError ? ' error' : '');
+  fileInfo.textContent = msg;
+}
+function hideFileInfo() {
+  fileInfo.style.display = 'none';
+  fileInfo.className = 'file-info';
+}
+
+// Reset input value before each click — iOS fix: picking same file twice doesn't fire change
+function openFilePicker() {
+  fileInput.value = '';
+  fileInput.click();
+}
+
+uploadBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  e.preventDefault();
+  openFilePicker();
+});
+
+dropzone.addEventListener('click', (e) => {
+  if (e.target.closest('button')) return;
+  openFilePicker();
+});
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  console.log('File input change fired, files:', e.target.files.length);
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+// Paste image from clipboard (Ctrl+V anywhere on page)
+document.addEventListener('paste', e => {
+  if (!e.clipboardData) return;
+  for (const item of e.clipboardData.items) {
+    if (item.type && item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (file) { loadFile(file); e.preventDefault(); }
+      break;
+    }
+  }
+});
+
+function loadFile(file) {
+  console.log('loadFile:', file.name, file.type, file.size);
+  showFileInfo(`📄 ${file.name || '檔案'} · ${(file.size/1024).toFixed(1)} KB · ${file.type || 'unknown type'} · 載入中...`);
+
+  // iOS sometimes returns empty type for HEIC — try extension fallback
+  const looksLikeImage = file.type && file.type.startsWith('image/')
+    || /\.(jpe?g|png|gif|webp|bmp|heic|heif|svg)$/i.test(file.name || '');
+
+  if (!looksLikeImage) {
+    showFileInfo('❌ 唔係圖片檔案：' + (file.name || '未知'), true);
+    return;
+  }
+
+  // Use URL.createObjectURL — more reliable than FileReader on iOS
+  let blobUrl;
+  try {
+    blobUrl = URL.createObjectURL(file);
+  } catch (err) {
+    showFileInfo('❌ 載入失敗：' + err.message, true);
+    return;
+  }
+
+  const img = new Image();
+  img.onload = () => {
+    try {
+      state.sourceImage = img;
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0);
+      state.sourceCanvas = c;
+      document.getElementById('processBtn').disabled = false;
+      document.getElementById('dimChip').textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
+      document.getElementById('dimChip').classList.add('success');
+      showFileInfo(`✅ ${file.name || '圖片'} · ${img.naturalWidth}×${img.naturalHeight} · ${(file.size/1024).toFixed(1)} KB`);
+      showOriginal();
+    } catch (err) {
+      showFileInfo('❌ 處理失敗：' + err.message, true);
+      console.error(err);
+    } finally {
+      URL.revokeObjectURL(blobUrl);
+    }
+  };
+  img.onerror = () => {
+    showFileInfo('❌ 圖片解碼失敗：' + (file.name || '') + '（iOS HEIC 需先轉 JPG）', true);
+    URL.revokeObjectURL(blobUrl);
+  };
+  img.src = blobUrl;
+}
+
+// ============ SCALE BUTTONS ============
+document.querySelectorAll('[data-scale]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-scale]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const v = btn.dataset.scale;
+    const slider = document.getElementById('customScale');
+    if (v === 'custom') {
+      slider.style.display = 'block';
+      state.scale = parseFloat(slider.value);
+    } else {
+      slider.style.display = 'none';
+      state.scale = parseFloat(v);
+    }
+    document.getElementById('scaleHint').textContent = `${state.scale.toFixed(1)} 倍放大`;
+  });
+});
+// Default 2x active
+document.querySelector('[data-scale="2"]').classList.add('active');
+document.getElementById('customScale').addEventListener('input', e => {
+  state.scale = parseFloat(e.target.value);
+  document.getElementById('scaleHint').textContent = `${state.scale.toFixed(1)} 倍放大`;
+});
+
+// ============ SLIDERS ============
+['sharpen', 'denoise', 'contrast', 'brightness'].forEach(id => {
+  document.getElementById(id).addEventListener('input', e => {
+    const valSpan = document.getElementById(id + 'Val');
+    if (id === 'contrast') valSpan.textContent = e.target.value;
+    else if (id === 'brightness') valSpan.textContent = e.target.value;
+    else valSpan.textContent = e.target.value;
+  });
+});
+
+// ============ SIZE MODE + PRESETS ============
+document.getElementById('sizeMode').addEventListener('change', e => {
+  const mode = e.target.value;
+  document.getElementById('minSizeGroup').style.display = mode === 'minimum' ? 'block' : 'none';
+  document.getElementById('exactSizeGroup').style.display = mode === 'exact' ? 'block' : 'none';
+  // Clear preset highlight when user changes mode manually
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const w = parseInt(btn.dataset.w);
+    const h = parseInt(btn.dataset.h);
+    const mode = btn.dataset.mode;
+    document.getElementById('sizeMode').value = mode;
+    document.getElementById('sizeMode').dispatchEvent(new Event('change'));
+    if (mode === 'minimum') {
+      document.getElementById('targetW').value = w;
+      document.getElementById('targetH').value = h;
+    } else if (mode === 'exact') {
+      document.getElementById('exactW').value = w;
+      document.getElementById('exactH').value = h;
+    }
+  });
+});
+
+// ============ VIEW TABS ============
+document.querySelectorAll('[data-view]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.view = btn.dataset.view;
+    if (state.view === 'original') showOriginal();
+    else if (state.view === 'result' && state.resultCanvas) showResult();
+    else if (state.view === 'compare' && state.resultCanvas) showCompare();
+  });
+});
+
+function showOriginal() {
+  const wrap = document.getElementById('canvasWrap');
+  wrap.innerHTML = '';
+  if (!state.sourceCanvas) {
+    wrap.innerHTML = '<div class="preview-empty">⬅ 請先上傳圖片</div>';
+    return;
+  }
+  const c = state.sourceCanvas;
+  const disp = document.createElement('canvas');
+  // Fit display
+  const maxW = wrap.clientWidth - 32, maxH = wrap.clientHeight - 32;
+  const ratio = Math.min(maxW / c.width, maxH / c.height, 1);
+  disp.width = c.width * ratio; disp.height = c.height * ratio;
+  disp.getContext('2d').drawImage(c, 0, 0, disp.width, disp.height);
+  wrap.appendChild(disp);
+}
+
+// ============ PROCESS ============
+document.getElementById('processBtn').addEventListener('click', async () => {
+  if (!state.sourceImage) return;
+  const btn = document.getElementById('processBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 處理中...';
+  setProgress(10);
+
+  const algo = document.getElementById('algorithm').value;
+  const sharpen = parseInt(document.getElementById('sharpen').value);
+  const denoise = parseInt(document.getElementById('denoise').value);
+  const contrast = parseInt(document.getElementById('contrast').value);
+  const brightness = parseInt(document.getElementById('brightness').value);
+
+  // Calculate actual scale based on mode
+  const srcW = state.sourceCanvas.width, srcH = state.sourceCanvas.height;
+  const mode = document.getElementById('sizeMode').value;
+  let actualScale;
+  if (mode === 'minimum') {
+    const targetW = parseInt(document.getElementById('targetW').value) || 0;
+    const targetH = parseInt(document.getElementById('targetH').value) || 0;
+    const targetScale = Math.max(
+      targetW > 0 ? targetW / srcW : 1,
+      targetH > 0 ? targetH / srcH : 1
+    );
+    actualScale = Math.max(state.scale, targetScale);
+  } else if (mode === 'exact') {
+    const exactW = parseInt(document.getElementById('exactW').value) || 0;
+    const exactH = parseInt(document.getElementById('exactH').value) || 0;
+    actualScale = Math.max(
+      exactW > 0 ? exactW / srcW : 1,
+      exactH > 0 ? exactH / srcH : 1
+    );
+  } else {
+    actualScale = state.scale;
+  }
+
+  await sleep(20); setProgress(20);
+  // 1) Upscale
+  const upscaled = await upscale(state.sourceCanvas, actualScale, algo);
+  setProgress(60);
+  await sleep(20);
+
+  // 2) Post-process
+  const final = await postProcess(upscaled, { sharpen, denoise, contrast, brightness });
+  setProgress(95);
+  state.resultCanvas = final;
+  setProgress(100);
+  setTimeout(() => setProgress(0), 300);
+
+  btn.disabled = false;
+  btn.textContent = '⚡ 開始處理';
+  document.getElementById('actions').style.display = 'flex';
+  document.getElementById('dimChip').textContent = `${state.sourceCanvas.width}×${state.sourceCanvas.height} → ${final.width}×${final.height}`;
+  document.getElementById('stats').textContent = `輸出 ${final.width}×${final.height}px`;
+
+  // Auto switch to result view
+  document.querySelector('[data-view="result"]').click();
+});
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function setProgress(pct) {
+  const p = document.getElementById('progress');
+  if (pct <= 0) { p.classList.add('hidden'); return; }
+  p.classList.remove('hidden');
+  p.style.width = pct + '%';
+}
+
+// ============ UPSCALE ============
+async function upscale(srcCanvas, scale, algo) {
+  const dstW = Math.ceil(srcCanvas.width * scale);
+  const dstH = Math.ceil(srcCanvas.height * scale);
+  const srcCtx = srcCanvas.getContext('2d');
+  const srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+  const dstCanvas = document.createElement('canvas');
+  dstCanvas.width = dstW; dstCanvas.height = dstH;
+  const dstCtx = dstCanvas.getContext('2d');
+  const dstData = dstCtx.createImageData(dstW, dstH);
+
+  if (algo === 'lanczos3' || algo === 'lanczos2' || algo === 'bicubic' || algo === 'bilinear' || algo === 'nearest') {
+    resample(srcData, dstData, algo);
+  }
+  dstCtx.putImageData(dstData, 0, 0);
+  return dstCanvas;
+}
+
+function resample(src, dst, algo) {
+  const sw = src.width, sh = src.height, sc = sw * sh * 4;
+  const dw = dst.width, dh = dst.height;
+  const srcPx = src.data, dstPx = dst.data;
+  const scaleX = sw / dw, scaleY = sh / dh;
+  const aSize = (algo === 'lanczos3') ? 3 : (algo === 'lanczos2') ? 2 : 2;
+
+  for (let dy = 0; dy < dh; dy++) {
+    const sy = dy * scaleY;
+    const y0 = Math.max(0, Math.floor(sy - aSize));
+    const y1 = Math.min(sh - 1, Math.ceil(sy + aSize));
+    for (let dx = 0; dx < dw; dx++) {
+      const sx = dx * scaleX;
+      const x0 = Math.max(0, Math.floor(sx - aSize));
+      const x1 = Math.min(sw - 1, Math.ceil(sx + aSize));
+
+      let r = 0, g = 0, b = 0, a = 0, wsum = 0;
+      for (let yi = y0; yi <= y1; yi++) {
+        const wy = weight(sy - yi, algo);
+        for (let xi = x0; xi <= x1; xi++) {
+          const wx = weight(sx - xi, algo);
+          const w = wx * wy;
+          if (w === 0) continue;
+          const idx = (yi * sw + xi) * 4;
+          r += srcPx[idx] * w;
+          g += srcPx[idx+1] * w;
+          b += srcPx[idx+2] * w;
+          a += srcPx[idx+3] * w;
+          wsum += w;
+        }
+      }
+      const di = (dy * dw + dx) * 4;
+      if (wsum > 0) {
+        dstPx[di] = r / wsum;
+        dstPx[di+1] = g / wsum;
+        dstPx[di+2] = b / wsum;
+        dstPx[di+3] = a / wsum;
+      }
+    }
+  }
+}
+
+function weight(x, algo) {
+  x = Math.abs(x);
+  if (algo === 'nearest') return x < 0.5 ? 1 : 0;
+  if (algo === 'bilinear') return x < 1 ? 1 - x : 0;
+  if (algo === 'bicubic') {
+    if (x < 1) return (1.5 * x - 2.5) * x * x + 1;
+    if (x < 2) return ((-0.5 * x + 2.5) * x - 4) * x + 2;
+    return 0;
+  }
+  // Lanczos
+  const a = algo === 'lanczos3' ? 3 : 2;
+  if (x === 0) return 1;
+  if (x >= a) return 0;
+  return sinc(x) * sinc(x / a);
+}
+function sinc(x) {
+  if (x === 0) return 1;
+  const px = Math.PI * x;
+  return Math.sin(px) / px;
+}
+
+// ============ POST PROCESS ============
+async function postProcess(canvas, opts) {
+  const ctx = canvas.getContext('2d');
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = img.data;
+
+  // 1) Denoise (3x3 box blur weighted)
+  if (opts.denoise > 0) {
+    const strength = opts.denoise / 100;
+    const tmp = new Uint8ClampedArray(d);
+    const w = canvas.width, h = canvas.height;
+    for (let y = 1; y < h-1; y++) {
+      for (let x = 1; x < w-1; x++) {
+        const i = (y * w + x) * 4;
+        for (let c = 0; c < 3; c++) {
+          let sum = 0;
+          for (let dy = -1; dy <= 1; dy++)
+            for (let dx = -1; dx <= 1; dx++)
+              sum += tmp[((y+dy) * w + (x+dx)) * 4 + c];
+          d[i+c] = tmp[i+c] * (1-strength) + (sum/9) * strength;
+        }
+      }
+    }
+  }
+
+  // 2) Contrast + Brightness
+  if (opts.contrast !== 100 || opts.brightness !== 0) {
+    const c = opts.contrast / 100;
+    const b = opts.brightness * 2.55; // -127..127
+    const c2 = c * 255;
+    const t = 128 * (1 - c) + b;
+    for (let i = 0; i < d.length; i += 4) {
+      d[i]   = clamp(d[i]   * c + t);
+      d[i+1] = clamp(d[i+1] * c + t);
+      d[i+2] = clamp(d[i+2] * c + t);
+    }
+  }
+
+  // 3) Sharpen (unsharp mask)
+  if (opts.sharpen > 0) {
+    const amount = opts.sharpen / 100;
+    const tmp = new Uint8ClampedArray(d);
+    const w = canvas.width, h = canvas.height;
+    // 3x3 sharpen kernel
+    const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+    for (let y = 1; y < h-1; y++) {
+      for (let x = 1; x < w-1; x++) {
+        const i = (y * w + x) * 4;
+        for (let c = 0; c < 3; c++) {
+          let val = 0;
+          let k = 0;
+          for (let dy = -1; dy <= 1; dy++)
+            for (let dx = -1; dx <= 1; dx++) {
+              val += tmp[((y+dy) * w + (x+dx)) * 4 + c] * kernel[k++];
+            }
+          d[i+c] = clamp(tmp[i+c] * (1-amount) + val * amount);
+        }
+      }
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+function clamp(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+
+// ============ PREVIEW ============
+function showResult() {
+  const wrap = document.getElementById('canvasWrap');
+  wrap.innerHTML = '';
+  if (!state.resultCanvas) {
+    wrap.innerHTML = '<div class="preview-empty">未處理 · 點擊「開始處理」</div>';
+    return;
+  }
+  const c = state.resultCanvas;
+  const disp = document.createElement('canvas');
+  const maxW = wrap.clientWidth - 32, maxH = wrap.clientHeight - 32;
+  const ratio = Math.min(maxW / c.width, maxH / c.height, 1);
+  disp.width = c.width * ratio; disp.height = c.height * ratio;
+  disp.getContext('2d').drawImage(c, 0, 0, disp.width, disp.height);
+  wrap.appendChild(disp);
+}
+
+function showCompare() {
+  const wrap = document.getElementById('canvasWrap');
+  wrap.innerHTML = '';
+  if (!state.resultCanvas) return;
+
+  // Build compare wrap
+  const container = document.createElement('div');
+  container.className = 'compare-wrap';
+  container.style.position = 'relative';
+  container.style.width = '100%';
+  container.style.height = '70vh';
+
+  const orig = state.sourceCanvas;
+  const res = state.resultCanvas;
+  // Display at result resolution
+  const dispOrig = document.createElement('canvas');
+  const dispRes = document.createElement('canvas');
+  dispOrig.width = res.width; dispOrig.height = res.height;
+  dispRes.width = res.width; dispRes.height = res.height;
+  dispOrig.getContext('2d').drawImage(orig, 0, 0, res.width, res.height);
+  dispRes.getContext('2d').drawImage(res, 0, 0);
+
+  // Scale to fit
+  const maxW = wrap.clientWidth - 32, maxH = wrap.clientHeight - 32;
+  const ratio = Math.min(maxW / res.width, maxH / res.height, 1);
+  const w = res.width * ratio, h = res.height * ratio;
+  [dispOrig, dispRes].forEach(c => {
+    c.style.width = w + 'px';
+    c.style.height = h + 'px';
+  });
+  container.style.width = w + 'px';
+  container.style.height = h + 'px';
+  container.style.margin = 'auto';
+
+  const slider = document.createElement('div');
+  slider.className = 'compare-slider';
+  slider.style.left = '50%';
+  slider.style.height = h + 'px';
+
+  // Clip result
+  function updateSlider(pct) {
+    const clipX = w * pct;
+    dispRes.style.clipPath = `inset(0 0 0 ${clipX}px)`;
+    slider.style.left = clipX + 'px';
+  }
+  updateSlider(0.5);
+
+  let dragging = false;
+  const startDrag = e => { dragging = true; e.preventDefault(); };
+  const endDrag = () => { dragging = false; };
+  const onMove = e => {
+    if (!dragging) return;
+    const rect = container.getBoundingClientRect();
+    const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
+    updateSlider(Math.max(0, Math.min(1, x / w)));
+  };
+  slider.addEventListener('mousedown', startDrag);
+  slider.addEventListener('touchstart', startDrag);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('touchmove', onMove);
+  window.addEventListener('mouseup', endDrag);
+  window.addEventListener('touchend', endDrag);
+  container.addEventListener('click', e => {
+    if (e.target === slider) return;
+    const rect = container.getBoundingClientRect();
+    updateSlider(Math.max(0, Math.min(1, (e.clientX - rect.left) / w)));
+  });
+
+  container.appendChild(dispOrig);
+  container.appendChild(dispRes);
+  container.appendChild(slider);
+  wrap.appendChild(container);
+}
+
+// ============ DOWNLOAD ============
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  if (!state.resultCanvas) return;
+  state.resultCanvas.toBlob(blob => saveBlob(blob, 'upscaled.png'), 'image/png');
+});
+document.getElementById('downloadJpgBtn').addEventListener('click', () => {
+  if (!state.resultCanvas) return;
+  state.resultCanvas.toBlob(blob => saveBlob(blob, 'upscaled.jpg'), 'image/jpeg', 0.95);
+});
+function saveBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ============ MAIN TAB SWITCHER ============
+document.querySelectorAll('.main-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.view;
+    document.querySelectorAll('.main-tab').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('view-tool').style.display = target === 'tool' ? '' : 'none';
+    document.getElementById('view-principles').style.display = target === 'principles' ? '' : 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (target === 'principles' && typeof initPrinciples === 'function') initPrinciples();
+  });
+});
+
+// ============ PRINCIPLES VIEW DEMOS ============
+let principlesInited = false;
+function initPrinciples() {
+  if (principlesInited) return;
+  principlesInited = true;
+  try { initM1(); } catch (e) { console.error('M1', e); }
+  try { initM2(); } catch (e) { console.error('M2', e); }
+  try { initM3(); } catch (e) { console.error('M3', e); }
+  try { initM4(); } catch (e) { console.error('M4', e); }
+  try { initM5(); } catch (e) { console.error('M5', e); }
+  try { initM6(); } catch (e) { console.error('M6', e); }
+}
+
+// ----- Module 1: 像素 = 馬賽克牆 -----
+function initM1() {
+  const cvs = document.getElementById('demo-pixel-grid');
+  const info = document.getElementById('demo-pixel-info');
+  const ctx = cvs.getContext('2d');
+  const cols = 6, rows = 6, cell = 40;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const r = Math.round(255 * x / (cols - 1));
+      const g = Math.round(255 * y / (rows - 1));
+      const b = Math.round(255 * (1 - x / (cols - 1)) * (y / (rows - 1)));
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x * cell, y * cell, cell, cell);
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x * cell + 0.5, y * cell + 0.5, cell - 1, cell - 1);
+    }
+  }
+  cvs.addEventListener('mousemove', e => {
+    const rect = cvs.getBoundingClientRect();
+    const scaleX = cvs.width / rect.width;
+    const scaleY = cvs.height / rect.height;
+    const px = (e.clientX - rect.left) * scaleX;
+    const py = (e.clientY - rect.top) * scaleY;
+    const col = Math.floor(px / cell);
+    const row = Math.floor(py / cell);
+    if (col < 0 || col >= cols || row < 0 || row >= rows) { info.textContent = '滑鼠移入任何一格'; return; }
+    const data = ctx.getImageData(col * cell + cell / 2, row * cell + cell / 2, 1, 1).data;
+    info.textContent = `(row=${row}, col=${col})  RGB(${data[0]}, ${data[1]}, ${data[2]})`;
+  });
+  cvs.addEventListener('mouseleave', () => { info.textContent = '滑鼠移入任何一格'; });
+}
+
+// ----- Module 2: RGB slider -----
+function initM2() {
+  const cvs = document.getElementById('demo-rgb');
+  const ctx = cvs.getContext('2d');
+  const rEl = document.getElementById('demo-rgb-r');
+  const gEl = document.getElementById('demo-rgb-g');
+  const bEl = document.getElementById('demo-rgb-b');
+  const rV = document.getElementById('demo-rgb-r-v');
+  const gV = document.getElementById('demo-rgb-g-v');
+  const bV = document.getElementById('demo-rgb-b-v');
+  const text = document.getElementById('demo-rgb-text');
+  function update() {
+    const r = +rEl.value, g = +gEl.value, b = +bEl.value;
+    rV.textContent = r; gV.textContent = g; bV.textContent = b;
+    text.textContent = `rgb(${r}, ${g}, ${b})`;
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+  }
+  [rEl, gEl, bEl].forEach(el => el.addEventListener('input', update));
+  update();
+}
+
+// ----- Module 3: 放大難題示意 -----
+function initM3() {
+  const cvs = document.getElementById('demo-zoom-problem');
+  const ctx = cvs.getContext('2d');
+  const srcW = 8, srcH = 6, cell = 14;
+  const src = [
+    '  ####  ',
+    ' #    # ',
+    '# #  # #',
+    '#      #',
+    '# #  # #',
+    ' #    # ',
+  ];
+  // Left side: original (8x6)
+  ctx.fillStyle = '#1a1d23';
+  ctx.fillRect(0, 0, cvs.width, cvs.height);
+  for (let y = 0; y < srcH; y++) {
+    for (let x = 0; x < srcW; x++) {
+      ctx.fillStyle = src[y][x] === '#' ? '#4f9eff' : '#0f1115';
+      ctx.fillRect(20 + x * cell, 30 + y * cell, cell, cell);
+    }
+  }
+  // Right side: 4x enlarged faded preview
+  const scale = 4;
+  for (let y = 0; y < srcH; y++) {
+    for (let x = 0; x < srcW; x++) {
+      ctx.fillStyle = src[y][x] === '#' ? 'rgba(79,158,255,0.18)' : 'rgba(255,255,255,0.04)';
+      const bx = 170 + x * cell * scale;
+      const by = 30 + y * cell * scale;
+      ctx.fillRect(bx, by, cell * scale, cell * scale);
+    }
+  }
+  // "?" markers in random empty cells
+  ctx.fillStyle = '#fbbf24';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const qs = new Set();
+  while (qs.size < 10) {
+    const rx = 170 + Math.floor(Math.random() * srcW) * cell * scale + cell * scale / 2;
+    const ry = 30 + Math.floor(Math.random() * srcH) * cell * scale + cell * scale / 2;
+    qs.add(`${rx},${ry}`);
+    ctx.fillText('?', rx, ry);
+  }
+  // Labels
+  ctx.fillStyle = '#8b95a3';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('原圖 8×6', 20, 18);
+  ctx.fillText('放大到 32×24 — 192 格要「推算」', 170, 18);
+  ctx.fillText('↑ 4× = 16 倍像素 = 192 格要靠鄰居推算', 20, 140);
+  ctx.textAlign = 'left';
+  ctx.fillText('? = 要填嘅新格', 170, 145);
+}
+
+// ----- Module 4: 5 種算法並排 -----
+function createTestIcon(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, w, h);
+  grad.addColorStop(0, '#ff6b6b');
+  grad.addColorStop(0.5, '#fbbf24');
+  grad.addColorStop(1, '#4f9eff');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(w / 2, h / 2, w * 0.28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, 0); ctx.lineTo(w, h);
+  ctx.moveTo(w, 0); ctx.lineTo(0, h);
+  ctx.stroke();
+  return c;
+}
+
+function initM4() {
+  const src = createTestIcon(16, 16);
+  const algos = [
+    { id: 'nearest', name: 'Nearest', desc: '抄最近格' },
+    { id: 'bilinear', name: 'Bilinear', desc: '4 格平均' },
+    { id: 'bicubic', name: 'Bicubic', desc: '16 格加權' },
+    { id: 'lanczos2', name: 'Lanczos-2', desc: '4×4 範圍' },
+    { id: 'lanczos3', name: 'Lanczos-3', desc: '6×6 範圍 ⭐' },
+  ];
+  const grid = document.getElementById('demo-algo-grid');
+  grid.innerHTML = '';
+  algos.forEach(a => {
+    const cell = document.createElement('div');
+    cell.className = 'algo-cell';
+    cell.dataset.algo = a.id;
+    cell.innerHTML = `<canvas width="128" height="128"></canvas>
+      <div class="algo-name">${a.name}</div>
+      <div class="algo-desc">${a.desc}</div>`;
+    grid.appendChild(cell);
+    const cvs = cell.querySelector('canvas');
+    const ctx = cvs.getContext('2d');
+    upscale(src, 8, a.id).then(dst => {
+      const dstCtx = dst.getContext('2d');
+      ctx.putImageData(dstCtx.getImageData(0, 0, dst.width, dst.height), 0, 0);
+    });
+  });
+  const controls = document.getElementById('demo-algo-controls');
+  controls.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      controls.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const q = btn.dataset.q;
+      grid.querySelectorAll('.algo-cell').forEach(c => c.classList.remove('highlighted'));
+      if (q === 'smooth') grid.querySelector('[data-algo="bilinear"]').classList.add('highlighted');
+      else if (q === 'sharp') grid.querySelector('[data-algo="lanczos3"]').classList.add('highlighted');
+      else if (q === 'fast') grid.querySelector('[data-algo="nearest"]').classList.add('highlighted');
+    });
+  });
+}
+
+// ----- Module 5: sinc 函數 -----
+function initM5() {
+  const cvs = document.getElementById('demo-sinc');
+  const ctx = cvs.getContext('2d');
+  function drawSinc(a) {
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    // grid
+    ctx.strokeStyle = '#1f242b';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < cvs.width; i += 32) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, cvs.height); ctx.stroke(); }
+    for (let i = 0; i < cvs.height; i += 32) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(cvs.width, i); ctx.stroke(); }
+    const cy = cvs.height / 2;
+    // zero line
+    ctx.strokeStyle = '#4b5260';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(cvs.width, cy); ctx.stroke();
+    // shade "a" range
+    const start = -3, end = 3;
+    const x0 = (0 - start) / (end - start) * cvs.width;
+    const aPx = a;
+    const aLeft = (aPx - start) / (end - start) * cvs.width;
+    const aRight = (-aPx - start) / (end - start) * cvs.width;
+    ctx.fillStyle = 'rgba(251,191,36,0.1)';
+    ctx.fillRect(aRight, 0, aLeft - aRight, cvs.height);
+    // draw Lanczos kernel
+    ctx.strokeStyle = '#4f9eff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const step = 0.02;
+    for (let x = start; x <= end + 0.001; x += step) {
+      const px = (x - start) / (end - start) * cvs.width;
+      let w;
+      if (Math.abs(x) < 0.001) w = 1;
+      else {
+        const px2 = Math.PI * x;
+        const sinc1 = Math.sin(px2) / px2;
+        const sinc2 = Math.sin(px2 / a) / (px2 / a);
+        w = sinc1 * sinc2;
+      }
+      const py = cy - w * cy * 0.85;
+      if (Math.abs(x - start) < 0.001) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    // dots at integer x
+    ctx.fillStyle = '#4f9eff';
+    for (let xi = -3; xi <= 3; xi++) {
+      const px = (xi - start) / (end - start) * cvs.width;
+      let w;
+      if (xi === 0) w = 1;
+      else {
+        const px2 = Math.PI * xi;
+        const sinc1 = Math.sin(px2) / px2;
+        const sinc2 = Math.sin(px2 / a) / (px2 / a);
+        w = sinc1 * sinc2;
+      }
+      const py = cy - w * cy * 0.85;
+      ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
+    }
+    // x-axis labels
+    ctx.fillStyle = '#8b95a3';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    for (let xi = -3; xi <= 3; xi++) {
+      const px = (xi - start) / (end - start) * cvs.width;
+      ctx.fillText(xi === 0 ? '0' : (xi > 0 ? '+' + xi : '' + xi), px, cvs.height - 4);
+    }
+    ctx.textAlign = 'left';
+    ctx.fillText('x (距離)', 8, 14);
+    ctx.textAlign = 'right';
+    ctx.fillText('權重', cvs.width - 8, 14);
+  }
+  drawSinc(3);
+  document.querySelectorAll('#m5 .demo-controls button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#m5 .demo-controls button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      drawSinc(parseInt(btn.dataset.a));
+    });
+  });
+}
+
+// ----- Module 6: 3 個 compare-mini -----
+function initM6() {
+  document.querySelectorAll('.compare-mini').forEach(div => {
+    const mode = div.dataset.mode;
+    const canvasOrig = div.querySelectorAll('canvas')[0];
+    const canvasProc = div.querySelectorAll('canvas')[1];
+    const slider = div.querySelector('.slider');
+    const W = 120, H = 120;
+    canvasOrig.width = W; canvasOrig.height = H;
+    canvasProc.width = W; canvasProc.height = H;
+    const src = createTestIcon(40, 40);
+    upscale(src, 3, 'lanczos3').then(upscaled => {
+      const upCtx = upscaled.getContext('2d');
+      const upData = upCtx.getImageData(0, 0, upscaled.width, upscaled.height);
+      canvasOrig.getContext('2d').putImageData(upData, 0, 0);
+      // Process
+      const procCanvas = document.createElement('canvas');
+      procCanvas.width = upscaled.width; procCanvas.height = upscaled.height;
+      procCanvas.getContext('2d').putImageData(upData, 0, 0);
+      const opts = { sharpen: 0, denoise: 0, contrast: 100, brightness: 0 };
+      if (mode === 'denoise') opts.denoise = 60;
+      else if (mode === 'contrast') opts.contrast = 140;
+      else if (mode === 'sharpen') opts.sharpen = 80;
+      return postProcess(procCanvas, opts);
+    }).then(result => {
+      const data = result.getContext('2d').getImageData(0, 0, result.width, result.height);
+      canvasProc.getContext('2d').putImageData(data, 0, 0);
+    });
+    // Slider
+    let dragging = false;
+    function update(pct) {
+      const w = div.clientWidth;
+      slider.style.left = (w * pct) + 'px';
+      canvasProc.style.clipPath = `inset(0 0 0 ${w * pct}px)`;
+    }
+    update(0.5);
+    div.addEventListener('mousedown', e => { dragging = true; e.preventDefault(); });
+    div.addEventListener('touchstart', e => { dragging = true; e.preventDefault(); }, { passive: false });
+    window.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const rect = div.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      update(Math.max(0, Math.min(1, x / rect.width)));
+    });
+    window.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      const rect = div.getBoundingClientRect();
+      const t = e.touches[0];
+      if (!t) return;
+      const x = t.clientX - rect.left;
+      update(Math.max(0, Math.min(1, x / rect.width)));
+    });
+    window.addEventListener('mouseup', () => dragging = false);
+    window.addEventListener('touchend', () => dragging = false);
+  });
+}
+</script>
+</body>
+</html>

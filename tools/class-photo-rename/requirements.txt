@@ -1,0 +1,1 @@
+# add deps here（例如 Pillow，用嚟讀相片 EXIF / 驗證圖片格式）
