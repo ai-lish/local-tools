@@ -5521,9 +5521,76 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     }));
   }
 
+  function appendUniqueMeetingText(existing, incoming) {
+    const existingText = safeTsvCell(existing);
+    const incomingText = safeTsvCell(incoming);
+    if (!incomingText) return existingText;
+    const seen = new Set(existingText.split(/\s+/u).filter(Boolean));
+    const additions = incomingText.split(/\s+/u).filter(token => token && !seen.has(token));
+    return safeTsvCell([existingText, ...additions].filter(Boolean).join(" "));
+  }
+
+  function repairMeetingDateAlignment(rows) {
+    const repairs = [];
+    const continuationRepairs = [];
+    for (let index = 1; index < rows.length; index += 1) {
+      const previous = rows[index - 1];
+      const current = rows[index];
+      if (!/^\d{4}-\d{2}-\d{2}$/u.test(previous.date) || !/^\d{4}-\d{2}-\d{2}$/u.test(current.date) || previous.date <= current.date) continue;
+      const from = previous.date;
+      previous.date = current.date;
+      previous.weekday = current.weekday || previous.weekday;
+      previous.dateProvenance = "PDF 合併日期修正";
+      repairs.push({ sourceRow: previous.sourceRow, from, to: previous.date, recordId: previous.recordId });
+
+      if (/新老師/u.test(current.activity) && /銜接課程/u.test(previous.activity) && /^有關老師(?:\s+|$)/u.test(previous.relatedStaff)) {
+        const extras = previous.relatedStaff.replace(/^有關老師\s*/u, "").trim();
+        if (extras) {
+          previous.relatedStaff = "有關老師";
+          current.relatedStaff = appendUniqueMeetingText(extras, current.relatedStaff);
+          continuationRepairs.push({ sourceRow: current.sourceRow, recordId: current.recordId });
+        }
+      }
+    }
+
+    for (let start = 0; start < rows.length;) {
+      const date = rows[start].date;
+      let end = start;
+      while (end + 1 < rows.length && rows[end + 1].date === date) end += 1;
+      const nextDate = rows[end + 1]?.date;
+      const hasNewTeacher = rows.slice(start, end + 1).some(row => /新老師/u.test(row.activity));
+      if (/^\d{4}-\d{2}-\d{2}$/u.test(date) && /^\d{4}-\d{2}-\d{2}$/u.test(nextDate) && date < nextDate && hasNewTeacher) {
+        let lastTransitionRow = -1;
+        for (let index = start; index <= end; index += 1) {
+          if (rows[index].category === "銜接課程") lastTransitionRow = index;
+        }
+        if (lastTransitionRow >= start && lastTransitionRow < end) {
+          for (let index = lastTransitionRow + 1; index <= end; index += 1) {
+            const row = rows[index];
+            const from = row.date;
+            row.date = nextDate;
+            row.weekday = rows[end + 1].weekday || row.weekday;
+            row.dateProvenance = "PDF 合併日期修正";
+            repairs.push({ sourceRow: row.sourceRow, from, to: row.date, recordId: row.recordId });
+          }
+        }
+      }
+      start = end + 1;
+    }
+    return { repairs, continuationRepairs };
+  }
+
   function parseMeetingRows(pages, year = meetingYearFromText(pages)) {
     const rows = [];
-    const diagnostics = { lineCount: 0, unclassified: [], splitCount: 0, sourceRecordCount: 0 };
+    const diagnostics = {
+      lineCount: 0,
+      unclassified: [],
+      splitCount: 0,
+      sourceRecordCount: 0,
+      dateRepairCount: 0,
+      dateRepairs: [],
+      continuationRepairCount: 0
+    };
     let currentDate = "";
     let current = null;
     let sourceRow = 0;
@@ -5589,6 +5656,10 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       delete row._lineDate;
       delete row._dateRaw;
     });
+    const alignment = repairMeetingDateAlignment(expanded);
+    diagnostics.dateRepairCount = alignment.repairs.length;
+    diagnostics.dateRepairs = alignment.repairs;
+    diagnostics.continuationRepairCount = alignment.continuationRepairs.length;
     state.meetingDiagnostics = diagnostics;
     return expanded;
   }
@@ -5937,8 +6008,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const unclassified = state.meetingDiagnostics.unclassified.length;
     const sourceCount = state.meetingDiagnostics.sourceRecordCount || state.meetingRows.length;
     const splitCount = state.meetingDiagnostics.splitCount || 0;
+    const dateRepairCount = state.meetingDiagnostics.dateRepairCount || 0;
+    const continuationRepairCount = state.meetingDiagnostics.continuationRepairCount || 0;
     const unmatched = state.meetingMatches?.unmatchedRows?.length || 0;
-    dom.meetingExportSummary.textContent = `來源 ${sourceCount} 列→輸出 ${state.meetingRows.length} 筆會議記錄${splitCount ? `（拆分 ${splitCount} 筆）` : ""}；即時修改 ${edited} 筆；未歸類 ${unclassified} 行；未成功配對 ${unmatched} 筆；欄內 TAB／LF／CR 殘留 0 格。`;
+    const repairSummary = dateRepairCount ? `；已修正 ${dateRepairCount} 列合併日期錯位${continuationRepairCount ? `及 ${continuationRepairCount} 列換行內容歸屬` : ""}` : "";
+    dom.meetingExportSummary.textContent = `來源 ${sourceCount} 列→輸出 ${state.meetingRows.length} 筆會議記錄${splitCount ? `（拆分 ${splitCount} 筆）` : ""}${repairSummary}；即時修改 ${edited} 筆；未歸類 ${unclassified} 行；未成功配對 ${unmatched} 筆；欄內 TAB／LF／CR 殘留 0 格。`;
     dom.resetMeetingEditsBtn.disabled = edited === 0;
     dom.meetingPreviewHead.innerHTML = `<tr>${MEETING_COLUMNS.map(column => `<th scope="col">${escapeHtml(column)}</th>`).join("")}</tr>`;
     dom.meetingPreviewBody.innerHTML = state.meetingRows.map((row, rowIndex) => `<tr class="${row.edited ? "is-edited " : ""}meeting-preview-row--${row.matchStatus || "unmatched"}">${MEETING_FIELDS.map(field => meetingEditorCell(row, rowIndex, field)).join("")}</tr>`).join("");
@@ -6049,13 +6123,18 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       renderMeetingExport();
       const unclassified = state.meetingDiagnostics.unclassified;
       const splitCount = state.meetingDiagnostics.splitCount || 0;
+      const dateRepairCount = state.meetingDiagnostics.dateRepairCount || 0;
+      const continuationRepairCount = state.meetingDiagnostics.continuationRepairCount || 0;
       const unmatched = state.meetingMatches?.unmatchedRows?.length || 0;
       const warning = unclassified.length
         ? `；另有 ${unclassified.length} 行未歸類，請先核對：${unclassified.slice(0, 5).map(item => `第 ${item.sourceRow} 行「${item.text}」`).join("、")}${unclassified.length > 5 ? "⋯" : ""}`
         : "；未歸類 0 行。";
       const splitMessage = splitCount ? `；已把 ${splitCount} 個同列多地點會議拆成獨立記錄` : "；未偵測到可安全拆分的多地點會議";
+      const repairMessage = dateRepairCount
+        ? `；已修正 ${dateRepairCount} 列 PDF 合併日期錯位${continuationRepairCount ? `，並修正 ${continuationRepairCount} 列換行內容歸屬` : ""}`
+        : "；未偵測到日期合併錯位";
       const matchMessage = `；目前未成功配對 ${unmatched} 筆，請查看第三頁籤的配對提示`;
-      showMeetingStatus(unclassified.length || unmatched ? "warning" : "success", unclassified.length || unmatched ? "暑期會議轉換完成，請核對" : "暑期會議轉換完成", `已建立 ${rows.length} 筆 30_會議日程記錄${splitMessage}${matchMessage}${warning} 可即時修訂後下載 CSV／Excel，或複製 TSV。`);
+      showMeetingStatus(unclassified.length || unmatched ? "warning" : "success", unclassified.length || unmatched ? "暑期會議轉換完成，請核對" : "暑期會議轉換完成", `已建立 ${rows.length} 筆 30_會議日程記錄${splitMessage}${repairMessage}${matchMessage}${warning} 可即時修訂後下載 CSV／Excel，或複製 TSV。`);
       setTimeout(() => { dom.meetingProgress.hidden = true; }, 900);
     } catch (error) {
       console.error(error);
