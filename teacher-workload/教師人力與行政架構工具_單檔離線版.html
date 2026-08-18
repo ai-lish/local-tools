@@ -4038,6 +4038,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   const LEADER_COLOR_KEYS = new Set(["153,102,255", "141,94,243", "116,72,244"]);
   const DEPUTY_COLOR_KEY = "255,102,0";
   const NEW_TEACHER_COLOR_KEY = "0,176,80";
+  const TOOL_HASHES = Object.freeze({ workload: "#workload", admin: "#admin", meeting: "#meeting" });
 
   function normalize(value) {
     return String(value ?? "").replace(/\u3000/g, " ").replace(/\s+/g, " ").trim();
@@ -4056,17 +4057,23 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       .replace(/'/g, "&#039;");
   }
 
-  function switchTool(which) {
-    const isAdmin = which === "admin";
-    const isMeeting = which === "meeting";
-    dom.workloadTool.hidden = which !== "workload";
+  function toolFromHash() {
+    const hash = String(window.location.hash || "").toLowerCase();
+    return Object.entries(TOOL_HASHES).find(([, value]) => value === hash)?.[0] || "admin";
+  }
+
+  function switchTool(which, options = {}) {
+    const selected = TOOL_HASHES[which] ? which : "admin";
+    const isAdmin = selected === "admin";
+    const isMeeting = selected === "meeting";
+    dom.workloadTool.hidden = selected !== "workload";
     dom.adminTool.hidden = !isAdmin;
     dom.meetingTool.hidden = !isMeeting;
     dom.legacyExportPanel.hidden = isAdmin || isMeeting;
-    dom.workloadTab.classList.toggle("is-active", which === "workload");
+    dom.workloadTab.classList.toggle("is-active", selected === "workload");
     dom.adminTab.classList.toggle("is-active", isAdmin);
     dom.meetingTab.classList.toggle("is-active", isMeeting);
-    dom.workloadTab.setAttribute("aria-selected", String(which === "workload"));
+    dom.workloadTab.setAttribute("aria-selected", String(selected === "workload"));
     dom.adminTab.setAttribute("aria-selected", String(isAdmin));
     dom.meetingTab.setAttribute("aria-selected", String(isMeeting));
     const copy = {
@@ -4082,11 +4089,14 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         title: "匯入暑期會議 PDF",
         help: "把暑期當值及會議表轉為 30_會議日程；完成後可即時修訂，再下載 CSV／Excel 或複製 TSV。"
       }
-    }[which] || {};
+    }[selected] || {};
     if (copy.title) dom.startTitle.textContent = copy.title;
     if (copy.help) dom.startHelp.textContent = copy.help;
     const visibleRoutes = new Set(isMeeting ? ["meeting"] : isAdmin ? ["admin", "common"] : ["workload", "common"]);
     dom.importRoutes.forEach(route => { route.hidden = !visibleRoutes.has(route.dataset.importRoute); });
+    if (options.syncHash !== false && window.location.hash !== TOOL_HASHES[selected]) {
+      try { window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${TOOL_HASHES[selected]}`); } catch (_) { /* file:// history may be unavailable */ }
+    }
   }
 
   function fillColorKey(fill) {
@@ -6298,7 +6308,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     loadSnapshot: loadAdminSnapshot,
     getConfidenceDiagnostics
   });
-  switchTool("admin");
+  window.addEventListener("hashchange", () => switchTool(toolFromHash(), { syncHash: false }));
+  switchTool(toolFromHash(), { syncHash: false });
 })();
 
 </script>

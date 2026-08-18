@@ -16,7 +16,8 @@
     h2 { margin:0 0 8px; font-size:21px; }
     p { color:var(--muted); }
     .intro { margin:0 0 22px; }
-    .launch { display:block; padding:18px 20px; margin:18px 0; color:var(--ink); text-decoration:none; background:#fffaf0; border:1px solid #e6c979; border-left:5px solid var(--gold); border-radius:12px; }
+    .launch-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; margin:18px 0; }
+    .launch { display:block; height:100%; padding:18px 20px; color:var(--ink); text-decoration:none; background:#fffaf0; border:1px solid #e6c979; border-left:5px solid var(--gold); border-radius:12px; }
     .launch:hover, .launch:focus-visible { outline:3px solid rgba(217,155,34,.2); }
     .launch strong { display:block; margin-bottom:4px; font-size:18px; }
     .launch span { color:var(--muted); font-size:14px; }
@@ -31,12 +32,23 @@
       <h1>教師人力與行政架構工具</h1>
     </header>
     <section>
-      <h2>開始使用</h2>
-      <p class="intro">在瀏覽器內處理課務 Excel、行政架構 PDF 及暑期會議 PDF。檔案只在你的瀏覽器內處理，不會上傳。</p>
-      <a class="launch" href="teacher-workload/教師人力與行政架構工具_單檔離線版.html">
-        <strong>開啟單檔工具</strong>
-        <span>支援課務、人員、組別架構、PDF 顏色訊號、暑期會議及匯出至工作小助理。</span>
-      </a>
+      <h2>選擇工作頁面</h2>
+      <p class="intro">可直接進入指定頁面；檔案只在你的瀏覽器內處理，不會上傳。</p>
+      <div class="launch-grid">
+        <a class="launch" href="teacher-workload/教師人力與行政架構工具_單檔離線版.html#workload">
+          <strong>課務與人力安排</strong>
+          <span>匯入課務 Excel，整理教師、班別及教擔資料。</span>
+        </a>
+        <a class="launch" href="teacher-workload/教師人力與行政架構工具_單檔離線版.html#admin">
+          <strong>行政架構與專責組別</strong>
+          <span>匯入行政架構 PDF，核對組別、從屬、組長及新老師。</span>
+        </a>
+        <a class="launch" href="teacher-workload/教師人力與行政架構工具_單檔離線版.html#meeting">
+          <strong>暑期會議</strong>
+          <span>匯入暑期會議 PDF，修訂後下載 CSV／Excel 或複製 TSV。</span>
+        </a>
+      </div>
+      <p class="privacy">三個入口會開啟同一個單檔工具；進入後仍可在上方切換其他頁面。</p>
       <p class="privacy">私有解析原始碼、開發文件及來源資料不在此公開網站。</p>
     </section>
   </main>
