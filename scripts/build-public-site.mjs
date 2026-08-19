@@ -1,36 +1,46 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+#!/usr/bin/env node
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const manifestPath = path.join(root, "publish.allowlist.json");
-const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-const siteRoot = path.join(root, manifest.publicRoot);
+import { copyFile, lstat, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
-if (!Array.isArray(manifest.entries) || !manifest.entries.length) {
-  throw new Error("publish.allowlist.json must contain at least one entry");
+const root = process.cwd();
+const manifest = JSON.parse(await readFile(path.join(root, 'publish.allowlist.json'), 'utf8'));
+const siteRoot = path.resolve(root, manifest.publicRoot);
+
+function assertRelative(value, label) {
+  if (typeof value !== 'string' || value.length === 0 ||
+      path.isAbsolute(value) || value.includes('..') ||
+      value.split('/').some((part) => part === '' || part === '.')) {
+    throw new Error(label + ' is not a safe relative path: ' + value);
+  }
+}
+
+if (manifest.version !== 1 || manifest.publicRoot !== 'site' ||
+    !Array.isArray(manifest.entries) || !Array.isArray(manifest.generatedFiles)) {
+  throw new Error('invalid publish manifest');
 }
 
 await rm(siteRoot, { recursive: true, force: true });
 await mkdir(siteRoot, { recursive: true });
 
 for (const entry of manifest.entries) {
-  if (!entry.source || !entry.destination) throw new Error("Invalid allowlist entry");
-  const source = path.resolve(root, entry.source);
-  const destination = path.resolve(siteRoot, entry.destination);
-  if (!destination.startsWith(`${siteRoot}${path.sep}`) && destination !== siteRoot) {
-    throw new Error(`Destination escapes public root: ${entry.destination}`);
+  assertRelative(entry.source, 'source');
+  assertRelative(entry.destination, 'destination');
+  const sourcePath = path.resolve(root, entry.source);
+  const destinationPath = path.resolve(siteRoot, entry.destination);
+  const sourceStat = await lstat(sourcePath);
+  if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
+    throw new Error('allowlisted source is not a regular file: ' + entry.source);
   }
-  await mkdir(path.dirname(destination), { recursive: true });
-  await cp(source, destination);
+  await mkdir(path.dirname(destinationPath), { recursive: true });
+  await copyFile(sourcePath, destinationPath);
 }
 
-for (const generated of manifest.generatedFiles || []) {
-  const destination = path.resolve(siteRoot, generated);
-  if (!destination.startsWith(`${siteRoot}${path.sep}`)) throw new Error(`Generated file escapes public root: ${generated}`);
-  await mkdir(path.dirname(destination), { recursive: true });
-  if (generated === ".nojekyll") await writeFile(destination, "", "utf8");
+for (const generated of manifest.generatedFiles) {
+  assertRelative(generated, 'generated file');
 }
-
-console.log(`Built ${manifest.entries.length} allowlisted entries in ${path.relative(root, siteRoot)}/`);
-
+if (manifest.generatedFiles.length !== 1 || manifest.generatedFiles[0] !== '.nojekyll') {
+  throw new Error('generatedFiles must contain only .nojekyll');
+}
+await writeFile(path.join(siteRoot, '.nojekyll'), '');
+console.log('Built ' + (manifest.entries.length + manifest.generatedFiles.length) + ' allowlisted public files.');
