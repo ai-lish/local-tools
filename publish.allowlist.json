@@ -3,11 +3,6 @@
   "publicRoot": "site",
   "entries": [
     {
-      "source": "index.html",
-      "destination": "index.html",
-      "publicMode": "static-entry"
-    },
-    {
       "source": "teacher-workload/教師人力與行政架構工具_單檔離線版.html",
       "destination": "teacher-workload/教師人力與行政架構工具_單檔離線版.html",
       "publicMode": "offline-single-file"
@@ -16,6 +11,12 @@
       "source": "teacher-workload/活動資料分析工具.html",
       "destination": "teacher-workload/活動資料分析工具.html",
       "publicMode": "offline-single-file"
+    },
+    {
+      "source": "index.html",
+      "destination": "index.html",
+      "publicMode": "static-entry",
+      "managedBy": "math-lish/local-tools"
     },
     {
       "source": "README.md",

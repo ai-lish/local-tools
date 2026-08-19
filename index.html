@@ -14,19 +14,11 @@
     h1 { margin:0; font-size:clamp(25px,5vw,38px); }
     section { padding:28px; background:white; border:1px solid var(--line); border-top:0; border-radius:0 0 16px 16px; box-shadow:0 12px 32px rgba(16,42,67,.07); }
     h2 { margin:0 0 8px; font-size:21px; }
-    p { color:var(--muted); }
-    .intro { margin:0 0 22px; }
-    .launch-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; margin:18px 0 26px; }
-    .launch { display:block; height:100%; padding:18px 20px; color:var(--ink); text-decoration:none; background:#fffaf0; border:1px solid #e6c979; border-left:5px solid var(--gold); border-radius:12px; }
-    .launch:hover, .launch:focus-visible { outline:3px solid rgba(217,155,34,.2); }
-    .launch strong { display:block; margin-bottom:4px; font-size:18px; }
-    .launch span { color:var(--muted); font-size:14px; }
+    .intro { margin:0 0 22px; color:var(--muted); }
     .tool { display:block; padding:20px; margin:12px 0; color:var(--ink); text-decoration:none; background:#fbfcfd; border:1px solid var(--line); border-left:5px solid var(--gold); border-radius:12px; }
     .tool:hover, .tool:focus-visible { background:#fffaf0; border-color:var(--gold); outline:3px solid rgba(217,155,34,.18); }
     .tool strong { display:block; margin-bottom:4px; font-size:18px; }
     .tool span { color:var(--muted); font-size:14px; }
-    .tool--unavailable { color:#64707a; background:#f4f7f9; border-left-color:#aab4bd; }
-    .note { margin:22px 0 0; padding:13px 15px; color:#526374; background:#f4f7f9; border-radius:9px; font-size:13px; }
     footer { margin-top:22px; color:var(--muted); text-align:center; font-size:12px; }
   </style>
 </head>
@@ -38,28 +30,18 @@
     </header>
     <section>
       <h2>目前工具</h2>
-      <p class="intro">資料只在你的瀏覽器內處理，不會上傳；完成轉換後可下載檔案或複製 TSV 到工作小助理。</p>
-      <div class="launch-grid">
-        <a class="launch" href="teacher-workload/教師人力與行政架構工具_單檔離線版.html#workload">
-          <strong>課務與人力安排</strong>
-          <span>匯入課務 Excel，整理教師、班別及教擔資料。</span>
-        </a>
-        <a class="launch" href="teacher-workload/教師人力與行政架構工具_單檔離線版.html#admin">
-          <strong>行政架構與專責組別</strong>
-          <span>匯入行政架構 PDF，核對組別、從屬、組長及新老師。</span>
-        </a>
-        <a class="launch" href="teacher-workload/教師人力與行政架構工具_單檔離線版.html#meeting">
-          <strong>暑期會議</strong>
-          <span>匯入暑期會議 PDF，修訂後下載 CSV／Excel 或複製 TSV。</span>
-        </a>
-        <a class="launch" href="teacher-workload/活動資料分析工具.html">
-          <strong>活動資料分析</strong>
-          <span>核對活動分組統計、地點及活動列；公開版不含學校或人名示例。</span>
-        </a>
-      </div>
+      <p class="intro">瀏覽器工具在本機處理；CloudSAMS bridge tools 只提供本機 CLI source 及文件，不會連接 CloudSAMS server。</p>
+      <a class="tool" href="teacher-workload/教師人力與行政架構工具_單檔離線版.html#workload">
+        <strong>課務與人力安排</strong>
+        <span>匯入課務資料，整理教師、班別及教擔資料。</span>
+      </a>
+      <a class="tool" href="teacher-workload/活動資料分析工具.html">
+        <strong>活動資料分析</strong>
+        <span>公開版分析工具不含學校或人名示例。</span>
+      </a>
       <a class="tool" href="tools/image-upscaler/index.html">
         <strong>圖片像素提升工具</strong>
-        <span>瀏覽器內處理圖片像素提升及相關互動示範；檔案不會上傳。</span>
+        <span>瀏覽器內處理圖片像素提升；檔案不會上傳。</span>
       </a>
       <a class="tool" href="tools/photo-merge/index.html">
         <strong>相機圖片合併工具</strong>
@@ -71,14 +53,14 @@
       </a>
       <a class="tool" href="tools/class-photo-rename/README.md">
         <strong>CloudSAMS 班相改名</strong>
-        <span>本機 Python CLI；按班別及註冊編號規則整理相片檔名。</span>
+        <span>本機 Python CLI 預覽；目前仍在開發，尚未可用於正式改名。</span>
       </a>
-      <div class="tool tool--unavailable">
+      <div class="tool">
         <strong>PDF 工具箱（尚未公開）</strong>
         <span>私有版本仍依賴外部資源；完成內置依賴後才會加入公開首頁。</span>
       </div>
-      <p class="note">三個教師工具入口會開啟同一個單檔工具；進入後仍可在上方切換其他頁面。私有解析原始碼、開發文件及來源資料不在此公開網站。</p>
     </section>
+    <footer>公開輸出由 private source allowlist 產生；未列入工具不會發布。</footer>
   </main>
 </body>
 </html>
