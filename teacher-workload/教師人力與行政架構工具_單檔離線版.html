@@ -1235,7 +1235,13 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   ]);
   const DOMAIN_SEARCH_LEFT = 5;
   const LEVEL_LABELS = ["中一", "中二", "中三", "中四", "中五", "中六"];
-  const SUBJECT_CONFIDENCE_REASON_CODES = new Set(["SUBJECT_CROSS_BLOCK_FALLBACK", "SUBJECT_COMPOSITE_LABEL", "ELECTIVE_LABEL_MISSING"]);
+  const SUBJECT_CONFIDENCE_REASON_CODES = new Set([
+    "SUBJECT_CROSS_BLOCK_FALLBACK", "SUBJECT_COMPOSITE_LABEL", "ELECTIVE_LABEL_MISSING",
+    "SUBJECT_LEFT_FALLBACK", "SUBJECT_DEFAULT_COLUMN"
+  ]);
+  const PERIOD_CONFIDENCE_REASON_CODES = new Set([
+    "PERIOD_COUNT_MISMATCH", "PERIOD_COUNT_OUT_OF_RANGE", "PERIOD_COUNT_BLOCK_SPAN"
+  ]);
   const SUBJECT_CODE_HEADER_ALLOWLIST = new Set(["M2", "M2（中）", "M2（英）", "M2(中)", "M2(英)"]);
   const RANGE_CONTROLS = Object.freeze({
     teacher: ["#teacherStart", "#teacherEnd"],
@@ -1312,7 +1318,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     for (let r = range.start - 1; r <= Math.min(range.end - 1, matrix.length - 1); r += 1) {
       const row = matrix[r] || [];
       for (let c = 0; c <= row.length - 3; c += 1) {
-        if (!isLikelyShortName(row[c + 1]) || !isLoad(row[c + 2]) || isLikelyCode(row[c])) continue;
+        const candidate = compact(row[c]);
+        if (!/[A-Za-z]/.test(candidate) || !isLikelyShortName(row[c + 1]) || !isLoad(row[c + 2]) || isLikelyCode(candidate)) continue;
         rejected.push({ row: r + 1, col: c + 1, value: normalize(row[c]), reasons: codeRejectionReasons(row[c]) });
       }
     }
@@ -1327,7 +1334,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
 
   function isLoad(value) {
     const text = compact(value);
-    return text === "" || /\d/.test(text);
+    return /^\d+(?:\.\d+)?$/.test(text);
   }
 
   function teacherRecordColumns(row) {
@@ -1639,7 +1646,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         const rangeStart = levelIndex < 3 ? config.junior?.start : config.senior?.start;
         if (!rangeStart) continue;
         const current = findSubject(state.matrix, level.classRows.start - 1, col, rangeStart, knownShortNames).value;
-        const juniorWrong = levelIndex < 3 && directValues.length === 1 && current !== directValues[0];
+        const hasCompositeLabel = directValues.some(value => splitCompositeSubjectLabel(value).length > 1);
+        const juniorWrong = levelIndex < 3 && directValues.length === 1 && !hasCompositeLabel && current !== directValues[0];
         const seniorAmbiguous = levelIndex >= 3 && directValues.length > 1;
         const composite = directValues.some(value => splitCompositeSubjectLabel(value).length > 1);
         if (juniorWrong) wrongColumns.push(col + 1);
@@ -1647,21 +1655,25 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         if (composite) compositeColumns.push(col + 1);
       }
       const affectedColumns = [...new Set([...wrongColumns, ...ambiguousColumns, ...compositeColumns])];
-      const columnSet = new Set(affectedColumns);
-      const records = assignments.filter(item => gradeLabel(item) === level.label
-        && item.sourceCells.some(cell => columnSet.has(cell.col))).length;
-      const countRecords = columns => {
-        const set = new Set(columns);
-        return assignments.filter(item => gradeLabel(item) === level.label
-          && item.sourceCells.some(cell => set.has(cell.col))).length;
-      };
-      const electiveMissingRecords = assignments.filter(item => gradeLabel(item) === level.label
-        && item.subjectDiagnostic === "ELECTIVE_LABEL_MISSING").length;
+      const levelAssignments = assignments.filter(item => gradeLabel(item) === level.label);
+      const wrongDiagnostics = new Set(["SUBJECT_CROSS_BLOCK_FALLBACK", "SUBJECT_LEFT_FALLBACK", "SUBJECT_DEFAULT_COLUMN"]);
+      const wrongRecords = levelAssignments.filter(item => wrongDiagnostics.has(item.subjectDiagnostic)).length;
+      const electiveMissingRecords = levelAssignments.filter(item => item.subjectDiagnostic === "ELECTIVE_LABEL_MISSING").length;
+      const compositeRecords = levelAssignments.filter(item => item.subjectDiagnostic === "SUBJECT_COMPOSITE_LABEL").length;
+      const columnsFor = predicate => [...new Set(levelAssignments.filter(predicate).flatMap(item => (item.sourceCells || []).map(cell => cell.col)))].sort((a, b) => a - b);
+      const actualWrongColumns = columnsFor(item => wrongDiagnostics.has(item.subjectDiagnostic));
+      const actualAmbiguousColumns = columnsFor(item => item.subjectDiagnostic === "ELECTIVE_LABEL_MISSING");
+      const actualCompositeColumns = columnsFor(item => item.subjectDiagnostic === "SUBJECT_COMPOSITE_LABEL");
       return {
-        level: level.label, columns: affectedColumns, wrongColumns, ambiguousColumns, compositeColumns, records,
-        wrongRecords: countRecords(wrongColumns),
-        ambiguousRecords: levelIndex >= 3 ? electiveMissingRecords : countRecords(ambiguousColumns),
-        compositeRecords: countRecords(compositeColumns)
+        level: level.label,
+        columns: [...new Set([...actualWrongColumns, ...actualAmbiguousColumns, ...actualCompositeColumns])],
+        wrongColumns: actualWrongColumns,
+        ambiguousColumns: actualAmbiguousColumns,
+        compositeColumns: actualCompositeColumns,
+        records: wrongRecords + electiveMissingRecords + compositeRecords,
+        wrongRecords,
+        ambiguousRecords: electiveMissingRecords,
+        compositeRecords
       };
     });
     return {
@@ -1727,6 +1739,126 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return findHeaderValueDetail(matrix, rowIndex, colIndex, knownShortNames).value;
   }
 
+  function sourceMatrixOf(matrix) {
+    return matrix?.sourceMatrix || matrix;
+  }
+
+  function levelContextForRow(matrix, assignmentRow, rangeStart) {
+    const source = sourceMatrixOf(matrix);
+    const floor = Math.max(0, (Number.isInteger(rangeStart) ? rangeStart : 1) - 1);
+    let titleRow = null;
+    let label = "";
+    for (let r = Math.min(assignmentRow, source.length - 1); r >= floor; r -= 1) {
+      const candidate = compact(source[r]?.[0]);
+      if (!LEVEL_LABELS.includes(candidate)) continue;
+      titleRow = r;
+      label = candidate;
+      while (titleRow > floor && compact(source[titleRow - 1]?.[0]) === label) titleRow -= 1;
+      break;
+    }
+    if (titleRow === null) return null;
+    let boundary = source.length;
+    for (let r = titleRow + 1; r < source.length; r += 1) {
+      const candidate = compact(source[r]?.[0]);
+      if (LEVEL_LABELS.includes(candidate) && candidate !== label) { boundary = r; break; }
+    }
+    const classRows = [];
+    for (let r = titleRow; r < boundary; r += 1) {
+      if (looksLikeClass(source[r]?.[0])) classRows.push(r);
+    }
+    if (!classRows.length) return { label, titleRow, boundary, classRows: [], firstClass: null, lastClass: null, periodRow: null };
+    const firstClass = classRows[0];
+    const lastClass = classRows[classRows.length - 1];
+    let periodRow = null;
+    let numericCellCount = 0;
+    for (let r = titleRow + 1; r < firstClass; r += 1) {
+      const count = (source[r] || []).filter(isNumericCell).length;
+      if (count > numericCellCount) { periodRow = r; numericCellCount = count; }
+    }
+    const continuationRows = [];
+    for (let r = lastClass + 1; r < boundary && !rowIsEmpty(source[r]); r += 1) continuationRows.push(r);
+    return { label, titleRow, boundary, classRows, firstClass, lastClass, periodRow, continuationRows };
+  }
+
+  function directHeaderValueDetail(matrix, context, colIndex, knownShortNames) {
+    if (!context) return null;
+    const headerEnd = context.periodRow === null ? context.firstClass : context.periodRow;
+    for (let r = context.titleRow; r < headerEnd; r += 1) {
+      const raw = valueAt(matrix, r, colIndex);
+      if (!usableHeader(raw, knownShortNames)) continue;
+      return {
+        value: flattenUnsafeWhitespace(normalize(raw)),
+        confidence: /[\t\r\n]/.test(raw) ? "low" : "high",
+        diagnostic: /[\t\r\n]/.test(raw) ? "CELL_SOFT_WRAP" : ""
+      };
+    }
+    return null;
+  }
+
+  function sourceMergeForPeriodCell(matrix, periodRow, colIndex) {
+    const merge = (matrix?.sourceMerges || []).find(item => item.s.r === periodRow
+      && item.s.c <= colIndex && colIndex <= item.e.c);
+    if (!merge) return null;
+    return { start: merge.s.c, end: merge.e.c };
+  }
+
+  function periodBlockAtRow(matrix, periodRow, colIndex) {
+    if (!Number.isInteger(periodRow)) return { start: colIndex, end: colIndex };
+    const source = sourceMatrixOf(matrix);
+    const merged = sourceMergeForPeriodCell(matrix, periodRow, colIndex);
+    if (merged) return merged;
+    const expected = periodNumber(source[periodRow]?.[colIndex]) ?? periodNumber(matrix[periodRow]?.[colIndex]);
+    if (expected === null) return { start: colIndex, end: colIndex };
+    let start = colIndex;
+    let end = colIndex;
+    while (start > 0 && periodNumber(source[periodRow]?.[start - 1]) === expected) start -= 1;
+    while (end + 1 < (source[periodRow] || []).length && periodNumber(source[periodRow]?.[end + 1]) === expected) end += 1;
+    return { start, end };
+  }
+
+  function periodBlockForCell(matrix, assignmentRow, colIndex, range) {
+    const reference = periodReferenceForCell(matrix, assignmentRow, colIndex, range);
+    const periodRow = reference.row === null ? null : reference.row - 1;
+    const block = periodBlockAtRow(matrix, periodRow, colIndex);
+    return { ...block, row: reference.row, expected: reference.expected };
+  }
+
+  function periodBlocksForSpan(matrix, periodRow, startCol, endCol) {
+    const blocks = [];
+    for (let col = startCol; col <= endCol; col += 1) {
+      const block = periodBlockAtRow(matrix, periodRow, col);
+      if (!blocks.some(item => item.start === block.start && item.end === block.end)) blocks.push(block);
+      col = block.end;
+    }
+    return blocks;
+  }
+
+  function rowHasDataInSpan(matrix, rowIndex, startCol, endCol) {
+    const source = sourceMatrixOf(matrix);
+    return (source[rowIndex] || []).slice(startCol, endCol + 1).some(value => normalize(value) !== "");
+  }
+
+  function compositeSubjectByBlock(matrix, context, assignmentRow, colIndex, knownShortNames) {
+    if (!context || !["中一", "中二", "中三"].includes(context.label)) return null;
+    const headerEnd = context.periodRow === null ? context.firstClass : context.periodRow;
+    for (let r = context.titleRow; r < headerEnd; r += 1) {
+      const raw = valueAt(matrix, r, colIndex);
+      const parts = splitCompositeSubjectLabel(raw);
+      if (parts.length <= 1 || !usableHeader(raw, knownShortNames)) continue;
+      let spanStart = colIndex;
+      let spanEnd = colIndex;
+      while (spanStart > 0 && normalize(valueAt(matrix, r, spanStart - 1)) === normalize(raw)) spanStart -= 1;
+      while (spanEnd + 1 < (matrix[r] || []).length && normalize(valueAt(matrix, r, spanEnd + 1)) === normalize(raw)) spanEnd += 1;
+      const blocks = periodBlocksForSpan(matrix, context.periodRow, spanStart, spanEnd);
+      const selected = blocks.findIndex(block => block.start <= colIndex && colIndex <= block.end);
+      if (selected >= 0 && selected < parts.length && blocks.length === parts.length) {
+        return { value: parts[selected], confidence: "high", diagnostic: "" };
+      }
+      return { value: flattenUnsafeWhitespace(normalize(raw)), confidence: "low", diagnostic: "SUBJECT_COMPOSITE_LABEL" };
+    }
+    return null;
+  }
+
   function findClassForAssignmentRow(matrix, rowIndex, colIndex, range) {
     const row = matrix[rowIndex] || [];
     const direct = findClassInRow(row, colIndex);
@@ -1742,17 +1874,9 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   }
 
   function findElectiveSubjectByDataRow(matrix, assignmentRow, colIndex, rangeStart, knownShortNames) {
-    let titleRow = null;
-    for (let r = assignmentRow - 1; r >= rangeStart - 1; r -= 1) {
-      if (LEVEL_LABELS.slice(3).includes(compact(matrix[r]?.[0]))) { titleRow = r; break; }
-    }
-    if (titleRow === null) return null;
-    const nextTitle = matrix.findIndex((row, index) => index > titleRow && LEVEL_LABELS.includes(compact(row?.[0])));
-    const boundary = nextTitle >= 0 ? nextTitle : matrix.length;
-    const classRows = [];
-    for (let r = titleRow + 1; r < boundary; r += 1) if (looksLikeClass(matrix[r]?.[0])) classRows.push(r);
-    if (!classRows.length) return null;
-    const firstClass = classRows[0];
+    const context = levelContextForRow(matrix, assignmentRow, rangeStart);
+    if (!context || !LEVEL_LABELS.slice(3).includes(context.label) || !context.classRows.length) return null;
+    const { titleRow, firstClass } = context;
     const candidates = [];
     for (let r = titleRow; r < firstClass; r += 1) {
       const raw = valueAt(matrix, r, colIndex);
@@ -1761,9 +1885,12 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       if (!candidates.some(item => item.value === value)) candidates.push({ value, confidence: /[\t\r\n]/.test(raw) ? "low" : "high", diagnostic: /[\t\r\n]/.test(raw) ? "CELL_SOFT_WRAP" : "" });
     }
     if (candidates.length <= 1) return null;
-    const dataRows = [...classRows];
-    const lastClass = classRows[classRows.length - 1];
-    for (let r = lastClass + 1; r < boundary && !rowIsEmpty(matrix[r]); r += 1) dataRows.push(r);
+    const block = periodBlockAtRow(matrix, context.periodRow, colIndex);
+    const dataRows = context.classRows.filter(row => rowHasDataInSpan(matrix, row, block.start, block.end));
+    for (const row of context.continuationRows) {
+      if (!rowHasDataInSpan(matrix, row, block.start, block.end)) break;
+      dataRows.push(row);
+    }
     const ordinal = dataRows.indexOf(assignmentRow);
     if (ordinal < 0) return null;
     if (ordinal >= candidates.length) return { value: "", confidence: "low", diagnostic: "ELECTIVE_LABEL_MISSING" };
@@ -1774,8 +1901,15 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   }
 
   function findSubject(matrix, assignmentRow, colIndex, rangeStart, knownShortNames) {
-    const elective = findElectiveSubjectByDataRow(matrix, assignmentRow, colIndex, rangeStart, knownShortNames);
+    const context = levelContextForRow(matrix, assignmentRow, rangeStart);
+    const composite = compositeSubjectByBlock(matrix, context, assignmentRow, colIndex, knownShortNames);
+    if (composite) return composite;
+    const elective = context && LEVEL_LABELS.slice(3).includes(context.label)
+      ? findElectiveSubjectByDataRow(matrix, assignmentRow, colIndex, rangeStart, knownShortNames)
+      : null;
     if (elective) return elective;
+    const direct = directHeaderValueDetail(matrix, context, colIndex, knownShortNames);
+    if (direct) return direct;
     const searchFloor = Math.max(0, rangeStart - 1 - 7);
     const candidates = [];
     for (let r = assignmentRow - 1; r >= searchFloor; r -= 1) {
@@ -1818,6 +1952,40 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return periodRow === null ? { row: null, expected: null } : { row: periodRow + 1, expected: periodNumber(matrix[periodRow]?.[colIndex]) };
   }
 
+  function classRowsForPeriodRange(matrix, range) {
+    const source = sourceMatrixOf(matrix);
+    const rows = new Map();
+    let currentClass = "";
+    for (let row = range.start - 1; row <= Math.min(range.end - 1, source.length - 1); row += 1) {
+      const cells = source[row] || [];
+      const direct = findClassInRow(cells);
+      if (direct) currentClass = direct.name;
+      else if (rowIsEmpty(cells)) currentClass = "";
+      if (currentClass) rows.set(row, currentClass);
+    }
+    return rows;
+  }
+
+  function periodBlockStats(matrix, className, block, range, knownShortNames) {
+    const source = sourceMatrixOf(matrix);
+    const classRows = classRowsForPeriodRange(matrix, range);
+    const counts = new Map();
+    for (const [row, rowClass] of classRows) {
+      if (rowClass !== className) continue;
+      for (let col = block.start; col <= block.end; col += 1) {
+        for (const shortName of knownShortNames) {
+          if (cellHasTeacher(source[row]?.[col], shortName)) counts.set(shortName, (counts.get(shortName) || 0) + 1);
+        }
+      }
+    }
+    const values = [...counts.values()];
+    return {
+      max: values.length ? Math.max(...values) : 0,
+      sum: values.reduce((total, value) => total + value, 0),
+      counts
+    };
+  }
+
   function scanTimetable(matrix, teacher, range, level, knownShortNames) {
     const assignments = [];
     if (!range) return assignments;
@@ -1853,13 +2021,31 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       const references = item.sourceCells.map(cell => periodReferenceForCell(matrix, cell.row - 1, cell.col - 1, range));
       const expectedValues = [...new Set(references.map(reference => reference.expected).filter(Number.isInteger))];
       const expected = expectedValues.length === 1 ? expectedValues[0] : null;
-      const mismatch = !item.isHomeroom && expected !== null && expected !== item.sourceCells.length;
+      const blocks = item.sourceCells
+        .map(cell => periodBlockForCell(matrix, cell.row - 1, cell.col - 1, range))
+        .filter(block => Number.isInteger(block.start) && Number.isInteger(block.end));
+      const uniqueBlocks = [];
+      blocks.forEach(block => {
+        if (!uniqueBlocks.some(existing => existing.start === block.start && existing.end === block.end)) uniqueBlocks.push(block);
+      });
+      const blockSpan = uniqueBlocks.length > 1 || expectedValues.length > 1;
+      const stats = !item.isHomeroom && !blockSpan && uniqueBlocks.length === 1
+        ? periodBlockStats(matrix, item.className, uniqueBlocks[0], range, knownShortNames)
+        : null;
+      const inRange = !item.isHomeroom && expected !== null && stats
+        && stats.max <= expected && expected <= stats.sum;
+      const outOfRange = !item.isHomeroom && expected !== null && stats && !inRange;
+      const periodDiagnostic = blockSpan
+        ? "PERIOD_COUNT_BLOCK_SPAN"
+        : outOfRange ? "PERIOD_COUNT_OUT_OF_RANGE" : "";
       return {
         ...item,
         periodCount: item.sourceCells.length,
-        periodConfidence: mismatch ? "low" : "high",
-        periodDiagnostic: mismatch ? "PERIOD_COUNT_MISMATCH" : "",
+        periodConfidence: periodDiagnostic ? "low" : "high",
+        periodDiagnostic,
         periodExpected: expected,
+        periodRangeMin: stats?.max ?? null,
+        periodRangeMax: stats?.sum ?? null,
         periodRow: references.find(reference => reference.row !== null)?.row ?? null
       };
     });
@@ -1942,6 +2128,10 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       }
     }
     Object.defineProperty(output, "sourceMatrix", { value: matrix, enumerable: false });
+    Object.defineProperty(output, "sourceMerges", { value: merges.map(merge => ({
+      s: { r: merge.s.r, c: merge.s.c },
+      e: { r: merge.e.r, c: merge.e.c }
+    })), enumerable: false });
     Object.defineProperty(output, "sourceSoftWrapCells", {
       value: matrix.flatMap((row, rowIndex) => row.flatMap((value, colIndex) =>
         /[\t\r\n]/.test(String(value ?? "")) ? [{ row: rowIndex + 1, col: colIndex + 1 }] : [])),
@@ -2014,9 +2204,14 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
 
   function analyzeMatrix(matrix, sourceName, sourceMeta = {}) {
     const autoDetection = detectWorkloadRanges(matrix);
-    state.sourceSoftWrapCells = matrix.sourceSoftWrapCells || matrix.flatMap((row, rowIndex) => row.flatMap((value, colIndex) =>
-      /[\t\r\n]/.test(String(value ?? "")) ? [{ row: rowIndex + 1, col: colIndex + 1 }] : []));
-    state.matrix = matrix.map(row => row.map(normalize));
+    const sourceMatrix = matrix.sourceMatrix || matrix;
+    const normalizedMatrix = matrix.map(row => row.map(normalize));
+    Object.defineProperty(normalizedMatrix, "sourceMatrix", { value: sourceMatrix, enumerable: false });
+    Object.defineProperty(normalizedMatrix, "sourceMerges", { value: matrix.sourceMerges || [], enumerable: false });
+    Object.defineProperty(normalizedMatrix, "sourceSoftWrapCells", { value: matrix.sourceSoftWrapCells || sourceMatrix.flatMap((row, rowIndex) => row.flatMap((value, colIndex) =>
+      /[\t\r\n]/.test(String(value ?? "")) ? [{ row: rowIndex + 1, col: colIndex + 1 }] : [])) });
+    state.sourceSoftWrapCells = normalizedMatrix.sourceSoftWrapCells;
+    state.matrix = normalizedMatrix;
     state.sourceName = sourceName;
     state.activeTeacherId = "";
     state.snapshot = null;
@@ -2045,19 +2240,25 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     dom.emptyGuide.hidden = state.teachers.length > 0;
     const detectionMessage = detectionStatusText(state.autoDetection);
     const tutorialMessage = tutorialSourceHint(state.matrix);
+    const periodCheckMessage = "節數核對採區間檢查：max(單一教師格數) ≤ 節數列值 ≤ sum(全部教師格數)；通過不代表已確認正確。";
     const subjectRiskMessage = [
       subjectRisks.juniorWrong ? `${subjectRisks.juniorWrong} 筆科目取錯標題（合併列數不一致），待修正（單位：canonical assignment records）。` : "",
-      subjectRisks.seniorAmbiguous ? `${subjectRisks.seniorAmbiguous} 筆選修科目無法由位置判定，待人手指定（單位：canonical assignment records）。` : "",
+      subjectRisks.seniorAmbiguous ? `${subjectRisks.seniorAmbiguous} 筆高中選修科目標題不足，未能安全判定，待核對（單位：canonical assignment records）。` : "",
       subjectRisks.composite ? `${subjectRisks.composite} 筆科目為複合標籤，待人手拆分（單位：canonical assignment records）。` : ""
     ].filter(Boolean).join("");
+    const parsedAssignments = state.teachers.flatMap(teacher => recordsForTeacher(teacher).assignments);
+    const periodRiskCount = parsedAssignments.filter(item => item.periodDiagnostic).length;
+    const periodRiskMessage = periodRiskCount
+      ? `${periodRiskCount} 筆節數核對需要核對（單位：canonical assignment records）。`
+      : "";
     if (state.teachers.length) {
       const duplicated = duplicateShortNames(state.teachers).size;
-      if (rejectedCandidates.length || detectionMessage || subjectRiskMessage) {
+      if (rejectedCandidates.length || detectionMessage || subjectRiskMessage || periodRiskMessage) {
         const locations = rejectedCandidates.map(item => `第 ${item.row} 列第 ${item.col} 欄「${item.value.replace(/\s+/g, " ") || "空白"}」`).join("；");
         const rejectedText = rejectedCandidates.length ? `另有 ${rejectedCandidates.length} 筆符合右鄰短名／負載條件但代碼未通過：${locations}。` : "被規則拒絕的候選 0 筆。";
-        showStatus("warning", "資料已解析，但有項目需要核對", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師；${rejectedText}${duplicated ? `另有 ${duplicated} 個簡稱重複，請按代碼核對。` : ""}${subjectRiskMessage}${tutorialMessage}${detectionMessage}`);
+        showStatus("warning", "資料已解析，但有項目需要核對", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師；${rejectedText}${duplicated ? `另有 ${duplicated} 個簡稱重複，請按代碼核對。` : ""}${subjectRiskMessage}${periodRiskMessage}${periodCheckMessage}${tutorialMessage}${detectionMessage}`);
       } else {
-        showStatus("success", "資料解析完成", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師；被規則拒絕的候選 0 筆${duplicated ? `；其中 ${duplicated} 個簡稱重複，選擇時請按代碼核對` : ""}。${tutorialMessage}`);
+        showStatus("success", "資料解析完成", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師；被規則拒絕的候選 0 筆${duplicated ? `；其中 ${duplicated} 個簡稱重複，選擇時請按代碼核對` : ""}。${periodCheckMessage}${tutorialMessage}`);
       }
     } else {
       const rangeText = config.teacher ? `第 ${config.teacher.start}–${config.teacher.end} 列` : "目前的列範圍";
@@ -2427,7 +2628,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       const code = record.confidenceReason[key];
       const allowed = code === "CELL_SOFT_WRAP"
         || (/^assignments\[\d+\]$/.test(path) && key === "subject" && SUBJECT_CONFIDENCE_REASON_CODES.has(code))
-        || (/^assignments\[\d+\]$/.test(path) && key === "periodCount" && code === "PERIOD_COUNT_MISMATCH");
+        || (/^assignments\[\d+\]$/.test(path) && key === "periodCount" && PERIOD_CONFIDENCE_REASON_CODES.has(code));
       if (!allowed) throw new Error(`${path}.confidenceReason.${key} 含未凍結原因碼。`);
       if (record.confidence[key] !== "low") throw new Error(`${path}.confidenceReason.${key} 只可用於 low 欄位。`);
     }
@@ -3311,7 +3512,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   }
 
   function gasSeverity(code) {
-    if (/^(?:TEACHER_CODE_REJECTED|CLASS_CONTINUATION|SUBJECT_CROSS_BLOCK|LINK_NO_CANDIDATE|ELECTIVE_LABEL_MISSING)/u.test(code)) return "高";
+    if (/^(?:TEACHER_CODE_REJECTED|CLASS_CONTINUATION|SUBJECT_CROSS_BLOCK|LINK_NO_CANDIDATE|ELECTIVE_LABEL_MISSING|PERIOD_COUNT_OUT_OF_RANGE|PERIOD_COUNT_BLOCK_SPAN)/u.test(code)) return "高";
     if (/^(?:SUBJECT_|PERIOD_|CELL_SOFT_WRAP|MEETING_UNMATCHED|MEETING_AMBIGUOUS)/u.test(code)) return "中";
     return "低";
   }
@@ -3325,6 +3526,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       SUBJECT_DEFAULT_COLUMN: "未能由標題推導科目，請人手核對。",
       SUBJECT_LEFT_FALLBACK: "科目由左方標題 fallback 推導，請人手核對。",
       PERIOD_COUNT_MISMATCH: "教師實際命中格數與節數列不同，請按來源表核對。",
+      PERIOD_COUNT_OUT_OF_RANGE: "節數列值不在同一班別／區塊教師格數的 [max, sum] 範圍內，請核對來源表。",
+      PERIOD_COUNT_BLOCK_SPAN: "同一 assignment 的來源格橫跨多個節數區塊，未能安全核對節數。",
       CLASS_CONTINUATION_UNRESOLVED: "延續列命中教師但未能安全辨認班別，未納入課務 record。",
       TEACHER_CODE_REJECTED: "候選教師代碼未通過格式規則，未納入教師名單。",
       LINK_NO_CANDIDATE: "未能找到對應的教師連結。",
@@ -3400,9 +3603,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       rows: rows.map(row => row.map(gasCellValue)),
       unresolved,
       missingSubjects,
-      blocked: missingSubjects.length > 0,
+      // 保留完整課務列；無法判定的科目以空白輸出，並由 91_離線核對 及警告明確標示。
+      // 不得因少數來源異常而靜默遺失其餘可核對 records。
+      blocked: false,
       warning: missingSubjects.length
-        ? `教擔未匯出：${missingSubjects.length} 筆 assignment 缺少可判定科目（${missingSubjects.join("、")}），請先核對選修標題。`
+        ? `教擔已保留完整列，但有 ${missingSubjects.length} 筆 assignment 科目留空（${missingSubjects.join("、")}）；請按 91_離線核對核實後再於 GAS 修正。`
         : "",
       excludedActivities: snapshot.activities.map(activity => activity.recordId)
     };
@@ -3531,7 +3736,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       await navigator.clipboard.writeText(tsv);
       dom.gasTsvFallback.hidden = true;
       const warning = projection.warnings.find(item => item.sheet === name)?.message;
-      showDataLayerStatus(warning ? "warning" : "success", warning ? `${name} 暫停貼入` : `已複製 ${name} TSV`, warning || `${projection.rowCounts[name]} 筆資料；欄內 TAB／LF／CR 殘留 0 格，可貼入 GAS。`);
+      showDataLayerStatus(warning ? "warning" : "success", warning ? `已複製 ${name} TSV（有核對提醒）` : `已複製 ${name} TSV`, warning || `${projection.rowCounts[name]} 筆資料；欄內 TAB／LF／CR 殘留 0 格，可貼入 GAS。`);
     } catch (error) {
       if (error.code === "GAS_EXPORT_BLOCKED") {
         dom.gasTsvFallback.hidden = true;
