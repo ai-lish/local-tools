@@ -5470,7 +5470,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return match ? { start: match[1], end: match[2] } : { start: text, end: "" };
   }
 
-  function appendMeetingContinuation(row, fields) {
+  function appendMeetingContinuation(row, fields, lineY = null) {
     if (fields.time) {
       row.timeText = safeTsvCell([row.timeText, fields.time].filter(Boolean).join(" "));
       const parsedTime = parseMeetingTime(row.timeText);
@@ -5480,6 +5480,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     ["activity", "relatedStaff", "owner", "venue"].forEach(field => {
       if (fields[field]) row[field] = safeTsvCell([row[field], fields[field]].filter(Boolean).join(" "));
     });
+    if (Number.isFinite(Number(lineY))) row._lineY = Number(lineY);
   }
 
   function applyMeetingDate(row, dateInfo, raw) {
@@ -5540,18 +5541,175 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return safeTsvCell([existingText, ...additions].filter(Boolean).join(" "));
   }
 
-  function repairMeetingDateAlignment(rows) {
+  function extractMeetingDateBands(page) {
+    const operatorList = page?.operatorList;
+    if (!operatorList?.fnArray || !operatorList?.argsArray) return [];
+    const constructPath = window.pdfjsLib?.OPS?.constructPath || 91;
+    const moveTo = window.pdfjsLib?.OPS?.moveTo || 13;
+    const lineTo = window.pdfjsLib?.OPS?.lineTo || 14;
+    const segments = [];
+    for (let index = 0; index < operatorList.fnArray.length; index += 1) {
+      if (operatorList.fnArray[index] !== constructPath) continue;
+      const [ops, coords] = operatorList.argsArray[index] || [];
+      if (!ops || !coords || ops.length !== 2
+        || ops[0] !== moveTo || ops[1] !== lineTo || coords.length < 4) continue;
+      const [x1, y1, x2, y2] = coords;
+      if (![x1, y1, x2, y2].every(Number.isFinite) || Math.abs(y1 - y2) > 0.8 || Math.abs(x2 - x1) < 100) continue;
+      segments.push({ minX: Math.min(x1, x2), maxX: Math.max(x1, x2), y: (y1 + y2) / 2 });
+    }
+    if (segments.length < 2) return [];
+    const tableLeft = Math.min(...segments.map(segment => segment.minX));
+    const tableRight = Math.max(...segments.map(segment => segment.maxX));
+    const tolerance = Math.max(6, (tableRight - tableLeft) * 0.015);
+    const rules = segments
+      .filter(segment => Math.abs(segment.minX - tableLeft) <= tolerance && Math.abs(segment.maxX - tableRight) <= tolerance)
+      .map(segment => segment.y)
+      .sort((a, b) => b - a)
+      .filter((value, index, values) => index === 0 || Math.abs(value - values[index - 1]) > 1);
+    return rules;
+  }
+
+  function repairMeetingDateAlignment(rows, dateMarkers = [], year = new Date().getFullYear(), dateBands = []) {
     const repairs = [];
     const continuationRepairs = [];
+    const geometryPages = new Set();
+
+    const rowsByPage = new Map();
+    rows.forEach((row, index) => {
+      const page = Number(row._linePage || 1);
+      if (!rowsByPage.has(page)) rowsByPage.set(page, []);
+      rowsByPage.get(page).push({ row, index });
+    });
+    const markersByPage = new Map();
+    dateMarkers.forEach(marker => {
+      const page = Number(marker.page || 1);
+      if (!markersByPage.has(page)) markersByPage.set(page, []);
+      markersByPage.get(page).push(marker);
+    });
+    const dateBandsByPage = new Map();
+    dateBands.forEach(entry => {
+      const page = Number(entry.page || 1);
+      const rules = Array.isArray(entry.rules) ? entry.rules.filter(Number.isFinite).sort((a, b) => b - a) : [];
+      if (rules.length >= 2) dateBandsByPage.set(page, rules);
+    });
+    const applyDateGroup = (items, marker) => {
+      const dateInfo = parseMeetingDate(marker.raw, year);
+      items.forEach(({ row }) => {
+        const from = row.date;
+        const changed = from !== dateInfo.date || row.weekday !== dateInfo.weekday;
+        row.date = dateInfo.date;
+        row.weekday = dateInfo.weekday || row.weekday;
+        if (dateInfo.rangeLabel) appendMeetingNote(row, `日期範圍：${dateInfo.rangeLabel}`);
+        if (changed) {
+          row.dateProvenance = "PDF 合併日期修正";
+          repairs.push({ sourceRow: row.sourceRow, from, to: row.date, recordId: row.recordId });
+        }
+      });
+    };
+
+    // Prefer the table's full-width horizontal rules because a vertically
+    // merged date label is not guaranteed to be emitted beside its first row.
+    // For text-only inputs without operator geometry, fall back to the marker
+    // centre and row-span midpoint rather than treating the marker as a row.
+    for (const [page, pageRows] of rowsByPage.entries()) {
+      const pageMarkers = markersByPage.get(page) || [];
+      const pageRules = dateBandsByPage.get(page) || [];
+      if (pageRules.length >= 2 && pageMarkers.length >= 2 && pageRows.length >= pageMarkers.length
+        && pageRows.every(item => Number.isFinite(Number(item.row._lineY)))
+        && pageMarkers.every(marker => Number.isFinite(Number(marker.y)))) {
+        const rowGaps = pageRows.slice(1).map((item, index) => Math.abs(Number(item.row._lineY) - Number(pageRows[index].row._lineY))).filter(Boolean).sort((a, b) => a - b);
+        const rowTolerance = Math.max(3, (rowGaps.length ? rowGaps[Math.floor(rowGaps.length / 2)] : 24) * 0.35);
+        const boundaryTolerance = Math.min(3, rowTolerance);
+        const bandGroups = [];
+        const usedMarkers = new Set();
+        for (let ruleIndex = 0; ruleIndex < pageRules.length - 1; ruleIndex += 1) {
+          const top = Math.max(pageRules[ruleIndex], pageRules[ruleIndex + 1]);
+          const bottom = Math.min(pageRules[ruleIndex], pageRules[ruleIndex + 1]);
+          const markerIndex = pageMarkers.findIndex((marker, index) => !usedMarkers.has(index)
+            && Number(marker.y) <= top + rowTolerance && Number(marker.y) >= bottom - rowTolerance);
+          if (markerIndex < 0) continue;
+          const items = pageRows.filter(item => {
+            const y = Number(item.row._lineY);
+            return y <= top + boundaryTolerance && y >= bottom - boundaryTolerance;
+          });
+          if (!items.length) continue;
+          usedMarkers.add(markerIndex);
+          bandGroups.push({ items, marker: pageMarkers[markerIndex] });
+        }
+        const coveredRows = new Set(bandGroups.flatMap(group => group.items.map(item => item.index)));
+        if (bandGroups.length === pageMarkers.length && coveredRows.size === pageRows.length) {
+          geometryPages.add(page);
+          bandGroups.forEach(group => applyDateGroup(group.items, group.marker));
+          continue;
+        }
+      }
+      if (pageMarkers.length < 2 || pageRows.length < pageMarkers.length
+        || pageRows.some(item => !Number.isFinite(Number(item.row._lineY)))
+        || pageMarkers.some(marker => !Number.isFinite(Number(marker.y)))) continue;
+
+      const rowYs = pageRows.map(item => Number(item.row._lineY));
+      const markerYs = pageMarkers.map(marker => Number(marker.y));
+      const rowGaps = rowYs.slice(1).map((value, index) => Math.abs(value - rowYs[index])).filter(Boolean).sort((a, b) => a - b);
+      const typicalGap = rowGaps.length ? rowGaps[Math.floor(rowGaps.length / 2)] : 24;
+      const maxOutside = Math.max(36, typicalGap * 2.5);
+      const groupCount = pageMarkers.length;
+      const rowCount = pageRows.length;
+      const infinity = Number.POSITIVE_INFINITY;
+      const costs = Array.from({ length: groupCount + 1 }, () => Array(rowCount + 1).fill(infinity));
+      const previousStarts = Array.from({ length: groupCount + 1 }, () => Array(rowCount + 1).fill(-1));
+      costs[0][0] = 0;
+
+      for (let group = 1; group <= groupCount; group += 1) {
+        const markerY = markerYs[group - 1];
+        for (let end = group; end <= rowCount; end += 1) {
+          for (let start = group - 1; start < end; start += 1) {
+            if (!Number.isFinite(costs[group - 1][start])) continue;
+            const firstY = rowYs[start];
+            const lastY = rowYs[end - 1];
+            const lowY = Math.min(firstY, lastY);
+            const highY = Math.max(firstY, lastY);
+            const midpoint = (firstY + lastY) / 2;
+            const outside = Math.max(lowY - markerY, markerY - highY, 0);
+            if (outside > maxOutside) continue;
+            const cost = costs[group - 1][start]
+              + ((midpoint - markerY) ** 2)
+              + ((outside ** 2) * 4);
+            if (cost < costs[group][end]) {
+              costs[group][end] = cost;
+              previousStarts[group][end] = start;
+            }
+          }
+        }
+      }
+
+      if (!Number.isFinite(costs[groupCount][rowCount])) continue;
+      const groups = [];
+      let end = rowCount;
+      for (let group = groupCount; group > 0; group -= 1) {
+        const start = previousStarts[group][end];
+        if (start < 0) { groups.length = 0; break; }
+        groups.unshift({ start, end, marker: pageMarkers[group - 1] });
+        end = start;
+      }
+      if (groups.length !== groupCount) continue;
+      geometryPages.add(page);
+      groups.forEach(({ start, end: groupEnd, marker }) => {
+        applyDateGroup(pageRows.slice(start, groupEnd), marker);
+      });
+    }
+
+    // Retain the old monotonic fallback for sources without usable geometry.
     for (let index = 1; index < rows.length; index += 1) {
       const previous = rows[index - 1];
       const current = rows[index];
-      if (!/^\d{4}-\d{2}-\d{2}$/u.test(previous.date) || !/^\d{4}-\d{2}-\d{2}$/u.test(current.date) || previous.date <= current.date) continue;
-      const from = previous.date;
-      previous.date = current.date;
-      previous.weekday = current.weekday || previous.weekday;
-      previous.dateProvenance = "PDF 合併日期修正";
-      repairs.push({ sourceRow: previous.sourceRow, from, to: previous.date, recordId: previous.recordId });
+      if (/^\d{4}-\d{2}-\d{2}$/u.test(previous.date) && /^\d{4}-\d{2}-\d{2}$/u.test(current.date)
+        && previous.date > current.date) {
+        const from = previous.date;
+        previous.date = current.date;
+        previous.weekday = current.weekday || previous.weekday;
+        previous.dateProvenance = "PDF 合併日期修正";
+        repairs.push({ sourceRow: previous.sourceRow, from, to: previous.date, recordId: previous.recordId });
+      }
 
       if (/新老師/u.test(current.activity) && /銜接課程/u.test(previous.activity) && /^有關老師(?:\s+|$)/u.test(previous.relatedStaff)) {
         const extras = previous.relatedStaff.replace(/^有關老師\s*/u, "").trim();
@@ -5569,6 +5727,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       while (end + 1 < rows.length && rows[end + 1].date === date) end += 1;
       const nextDate = rows[end + 1]?.date;
       const hasNewTeacher = rows.slice(start, end + 1).some(row => /新老師/u.test(row.activity));
+      const page = Number(rows[start]._linePage || 1);
+      if (geometryPages.has(page)) {
+        start = end + 1;
+        continue;
+      }
       if (/^\d{4}-\d{2}-\d{2}$/u.test(date) && /^\d{4}-\d{2}-\d{2}$/u.test(nextDate) && date < nextDate && hasNewTeacher) {
         let lastTransitionRow = -1;
         for (let index = start; index <= end; index += 1) {
@@ -5592,6 +5755,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
 
   function parseMeetingRows(pages, year = meetingYearFromText(pages)) {
     const rows = [];
+    const dateMarkers = [];
+    const dateBands = pages.flatMap(page => {
+      const rules = extractMeetingDateBands(page);
+      return rules.length >= 2 ? [{ page: page.pageNumber || 1, rules }] : [];
+    });
     const diagnostics = {
       lineCount: 0,
       unclassified: [],
@@ -5614,11 +5782,14 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         const hasDate = isMeetingDateText(fields.date);
         const categoryValue = normalizeMeetingCategory(fields.category);
         const category = categoryValue && MEETING_CATEGORIES.has(categoryValue) ? categoryValue : "";
-        if (hasDate) currentDate = fields.date;
+        if (hasDate) {
+          currentDate = fields.date;
+          dateMarkers.push({ page: line.page || page.pageNumber || 1, y: Number(line.y), raw: fields.date, sourceRow });
+        }
         if (hasDate && !category && current && (fields.activity || fields.time || fields.relatedStaff || fields.owner || fields.venue)) {
           const dateInfo = parseMeetingDate(fields.date, year);
           applyMeetingDate(current, dateInfo, fields.date);
-          appendMeetingContinuation(current, fields);
+          appendMeetingContinuation(current, fields, line.y);
           continue;
         }
         if (hasDate && !category && !fields.activity && !fields.time && !fields.relatedStaff && !fields.owner && !fields.venue) {
@@ -5628,7 +5799,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         }
         if (!category) {
           if (current && (fields.activity || fields.time || fields.relatedStaff || fields.owner || fields.venue)) {
-            appendMeetingContinuation(current, fields);
+            appendMeetingContinuation(current, fields, line.y);
           } else if (current && fields.category) {
             diagnostics.unclassified.push({ sourceRow, text: lineText });
           }
@@ -5653,23 +5824,27 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
           edited: false,
           dateProvenance: fields.date ? "PDF 同列日期" : (currentDate ? "沿用上一個日期" : "未能辨認日期"),
           _lineDate: Boolean(fields.date),
-          _dateRaw: safeTsvCell(fields.date || currentDate)
+          _dateRaw: safeTsvCell(fields.date || currentDate),
+          _lineY: Number(line.y),
+          _linePage: line.page || page.pageNumber || 1
         };
         rows.push(current);
       }
     }
     diagnostics.sourceRecordCount = rows.length;
+    const alignment = repairMeetingDateAlignment(rows, dateMarkers, year, dateBands);
+    diagnostics.dateRepairCount = alignment.repairs.length;
+    diagnostics.dateRepairs = alignment.repairs;
+    diagnostics.continuationRepairCount = alignment.continuationRepairs.length;
     const expanded = rows.flatMap(splitMeetingRow);
     diagnostics.splitCount = expanded.length - rows.length;
     expanded.forEach((row, index) => {
       row.recordId = `meeting-${index + 1}`;
       delete row._lineDate;
       delete row._dateRaw;
+      delete row._lineY;
+      delete row._linePage;
     });
-    const alignment = repairMeetingDateAlignment(expanded);
-    diagnostics.dateRepairCount = alignment.repairs.length;
-    diagnostics.dateRepairs = alignment.repairs;
-    diagnostics.continuationRepairCount = alignment.continuationRepairs.length;
     state.meetingDiagnostics = diagnostics;
     return expanded;
   }
@@ -6121,8 +6296,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
         updateMeetingProgress(Math.round(10 + (pageNumber - 1) / pdf.numPages * 70), `正在提取第 ${pageNumber}／${pdf.numPages} 頁文字…`);
         const page = await pdf.getPage(pageNumber);
-        const content = await page.getTextContent({ normalizeWhitespace: true });
-        pages.push({ pageNumber, lines: textItemsToLines(content.items, pageNumber) });
+        const [content, operatorList] = await Promise.all([
+          page.getTextContent({ normalizeWhitespace: true }),
+          page.getOperatorList()
+        ]);
+        pages.push({ pageNumber, lines: textItemsToLines(content.items, pageNumber), operatorList });
       }
       updateMeetingProgress(88, "正在重組日期、活動及負責人欄位…");
       const rows = parseMeetingRows(pages);
