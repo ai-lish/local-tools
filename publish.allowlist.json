@@ -13,6 +13,11 @@
       "publicMode": "offline-single-file"
     },
     {
+      "source": "teacher-workload/活動資料分析工具.html",
+      "destination": "teacher-workload/活動資料分析工具.html",
+      "publicMode": "offline-single-file"
+    },
+    {
       "source": "tools/image-upscaler/index.html",
       "destination": "tools/image-upscaler/index.html",
       "publicMode": "offline-single-file"
