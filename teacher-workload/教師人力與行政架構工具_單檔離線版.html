@@ -1239,6 +1239,10 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     "SUBJECT_CROSS_BLOCK_FALLBACK", "SUBJECT_COMPOSITE_LABEL", "ELECTIVE_LABEL_MISSING",
     "SUBJECT_LEFT_FALLBACK", "SUBJECT_DEFAULT_COLUMN"
   ]);
+  // 來源表 R93 的 C43-C48 標題漏列；使用者已確認該選修組為「視覺藝術」。
+  const CONFIRMED_SUBJECT_OVERRIDES = Object.freeze([
+    Object.freeze({ sourceRow: 93, className: "6CD3", startCol: 43, endCol: 48, value: "視覺藝術" })
+  ]);
   const PERIOD_CONFIDENCE_REASON_CODES = new Set([
     "PERIOD_COUNT_MISMATCH", "PERIOD_COUNT_OUT_OF_RANGE", "PERIOD_COUNT_BLOCK_SPAN"
   ]);
@@ -1928,6 +1932,13 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       : selected;
   }
 
+  function confirmedSubjectOverrideForAssignment(className, row, col, subjectResult) {
+    if (!subjectResult || subjectResult.diagnostic !== "ELECTIVE_LABEL_MISSING") return null;
+    const match = CONFIRMED_SUBJECT_OVERRIDES.find(item => item.className === className
+      && item.sourceRow === row && item.startCol <= col && col <= item.endCol);
+    return match ? { value: match.value, confidence: "manual", diagnostic: "" } : null;
+  }
+
   function periodNumber(value) {
     const text = compact(value);
     return /^\d+$/.test(text) ? Number(text) : null;
@@ -1995,7 +2006,9 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         if (!cellHasTeacher(row[c], teacher.shortName)) continue;
         const classInfo = findClassForAssignmentRow(matrix, r, c, range);
         if (!classInfo || classInfo.col === c) continue;
-        const subjectResult = findSubject(matrix, r, c, range.start, knownShortNames);
+        const inferredSubject = findSubject(matrix, r, c, range.start, knownShortNames);
+        const subjectResult = confirmedSubjectOverrideForAssignment(classInfo.name, r + 1, c + 1, inferredSubject)
+          || inferredSubject;
         assignments.push({
           className: classInfo.name,
           subject: subjectResult.value,
