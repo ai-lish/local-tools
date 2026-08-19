@@ -18,59 +18,82 @@
       "publicMode": "offline-single-file"
     },
     {
+      "source": "README.md",
+      "destination": "README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/README.md",
+      "destination": "tools/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/image-upscaler/index.html",
       "destination": "tools/image-upscaler/index.html",
-      "publicMode": "offline-single-file"
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
     },
     {
       "source": "tools/photo-merge/index.html",
       "destination": "tools/photo-merge/index.html",
-      "publicMode": "offline-single-file"
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
     },
     {
       "source": "tools/slp-split-pdf/README.md",
       "destination": "tools/slp-split-pdf/README.md",
-      "publicMode": "cli-documentation"
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
     },
     {
       "source": "tools/slp-split-pdf/main.py",
       "destination": "tools/slp-split-pdf/main.py",
-      "publicMode": "cli-source"
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
     },
     {
       "source": "tools/slp-split-pdf/split.py",
       "destination": "tools/slp-split-pdf/split.py",
-      "publicMode": "cli-source"
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
     },
     {
       "source": "tools/slp-split-pdf/requirements.txt",
       "destination": "tools/slp-split-pdf/requirements.txt",
-      "publicMode": "cli-source"
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
     },
     {
       "source": "tools/slp-split-pdf/tool.yaml",
       "destination": "tools/slp-split-pdf/tool.yaml",
-      "publicMode": "cli-source"
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
     },
     {
       "source": "tools/class-photo-rename/README.md",
       "destination": "tools/class-photo-rename/README.md",
-      "publicMode": "cli-documentation"
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
     },
     {
       "source": "tools/class-photo-rename/main.py",
       "destination": "tools/class-photo-rename/main.py",
-      "publicMode": "cli-source"
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
     },
     {
       "source": "tools/class-photo-rename/requirements.txt",
       "destination": "tools/class-photo-rename/requirements.txt",
-      "publicMode": "cli-source"
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
     },
     {
       "source": "tools/class-photo-rename/tool.yaml",
       "destination": "tools/class-photo-rename/tool.yaml",
-      "publicMode": "cli-source"
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
     }
   ],
   "generatedFiles": [
