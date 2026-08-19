@@ -3568,7 +3568,12 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     });
     (state.rejectedTeacherCandidates || []).forEach(item => add("11_教擔_正規", item.row, item.col, "TEACHER_CODE_REJECTED", item));
     if (state.matrix.length && !state.snapshot) findExcludedContinuationCells().forEach(item => add("11_教擔_正規", item.row, item.col, item.code, item));
-    (snapshot.conflicts || []).forEach(conflict => add("11_教擔_正規", "", "", "DUPLICATE_SHORT_NAME", { detail: conflict.detail }));
+    (snapshot.conflicts || []).forEach(conflict => {
+      const refs = Array.isArray(conflict.refs) && conflict.refs.length ? conflict.refs : [""];
+      if (conflict.type === "unlinkedTeacher") refs.forEach(recordId => add("11_教擔_正規", "", "", "LINK_NO_CANDIDATE", { recordId, detail: conflict.detail }));
+      else if (conflict.type === "unlinkedMember") refs.forEach(recordId => add("20_行政架構_匯入", "", "", "LINK_NO_CANDIDATE", { recordId, detail: conflict.detail }));
+      else if (conflict.type === "duplicateShortName") add("11_教擔_正規", "", "", "DUPLICATE_SHORT_NAME", { detail: conflict.detail, recordId: refs[0] });
+    });
     const adminDiagnostics = window.AdminStructureTool?.getConfidenceDiagnostics?.() || [];
     adminDiagnostics.forEach(item => add("20_行政架構_匯入", item.page || "", item.col || "", item.code, item));
     const meetingData = window.SummerMeetingTool?.getMeetingExportData?.() || null;
