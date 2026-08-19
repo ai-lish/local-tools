@@ -1235,7 +1235,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   ]);
   const DOMAIN_SEARCH_LEFT = 5;
   const LEVEL_LABELS = ["中一", "中二", "中三", "中四", "中五", "中六"];
-  const SUBJECT_CONFIDENCE_REASON_CODES = new Set(["SUBJECT_CROSS_BLOCK_FALLBACK", "SUBJECT_COMPOSITE_LABEL"]);
+  const SUBJECT_CONFIDENCE_REASON_CODES = new Set(["SUBJECT_CROSS_BLOCK_FALLBACK", "SUBJECT_COMPOSITE_LABEL", "ELECTIVE_LABEL_MISSING"]);
+  const SUBJECT_CODE_HEADER_ALLOWLIST = new Set(["M2", "M2（中）", "M2（英）", "M2(中)", "M2(英)"]);
   const RANGE_CONTROLS = Object.freeze({
     teacher: ["#teacherStart", "#teacherEnd"],
     junior: ["#juniorStart", "#juniorEnd"],
@@ -1654,10 +1655,12 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         return assignments.filter(item => gradeLabel(item) === level.label
           && item.sourceCells.some(cell => set.has(cell.col))).length;
       };
+      const electiveMissingRecords = assignments.filter(item => gradeLabel(item) === level.label
+        && item.subjectDiagnostic === "ELECTIVE_LABEL_MISSING").length;
       return {
         level: level.label, columns: affectedColumns, wrongColumns, ambiguousColumns, compositeColumns, records,
         wrongRecords: countRecords(wrongColumns),
-        ambiguousRecords: countRecords(ambiguousColumns),
+        ambiguousRecords: levelIndex >= 3 ? electiveMissingRecords : countRecords(ambiguousColumns),
         compositeRecords: countRecords(compositeColumns)
       };
     });
@@ -1700,7 +1703,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const text = compact(value).replace(/[：:]$/, "");
     if (!text || text.length > 30 || GENERIC_HEADERS.has(text)) return false;
     if (/^\d+(?:\.\d+)?$/.test(text) || knownShortNames.has(text)) return false;
-    if (looksLikeClass(text) || isLikelyCode(text)) return false;
+    if (looksLikeClass(text) || (isLikelyCode(text) && !SUBJECT_CODE_HEADER_ALLOWLIST.has(text))) return false;
     return true;
   }
 
@@ -1724,7 +1727,55 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     return findHeaderValueDetail(matrix, rowIndex, colIndex, knownShortNames).value;
   }
 
+  function findClassForAssignmentRow(matrix, rowIndex, colIndex, range) {
+    const row = matrix[rowIndex] || [];
+    const direct = findClassInRow(row, colIndex);
+    if (direct && direct.col !== colIndex) return direct;
+    if (rowIsEmpty(row)) return null;
+    for (let r = rowIndex - 1; r >= range.start - 1; r -= 1) {
+      const previous = matrix[r] || [];
+      if (rowIsEmpty(previous) || LEVEL_LABELS.includes(compact(previous[0]))) return null;
+      const previousClass = findClassInRow(previous);
+      if (previousClass) return previousClass;
+    }
+    return null;
+  }
+
+  function findElectiveSubjectByDataRow(matrix, assignmentRow, colIndex, rangeStart, knownShortNames) {
+    let titleRow = null;
+    for (let r = assignmentRow - 1; r >= rangeStart - 1; r -= 1) {
+      if (LEVEL_LABELS.slice(3).includes(compact(matrix[r]?.[0]))) { titleRow = r; break; }
+    }
+    if (titleRow === null) return null;
+    const nextTitle = matrix.findIndex((row, index) => index > titleRow && LEVEL_LABELS.includes(compact(row?.[0])));
+    const boundary = nextTitle >= 0 ? nextTitle : matrix.length;
+    const classRows = [];
+    for (let r = titleRow + 1; r < boundary; r += 1) if (looksLikeClass(matrix[r]?.[0])) classRows.push(r);
+    if (!classRows.length) return null;
+    const firstClass = classRows[0];
+    const candidates = [];
+    for (let r = titleRow; r < firstClass; r += 1) {
+      const raw = valueAt(matrix, r, colIndex);
+      if (!usableHeader(raw, knownShortNames)) continue;
+      const value = flattenUnsafeWhitespace(normalize(raw));
+      if (!candidates.some(item => item.value === value)) candidates.push({ value, confidence: /[\t\r\n]/.test(raw) ? "low" : "high", diagnostic: /[\t\r\n]/.test(raw) ? "CELL_SOFT_WRAP" : "" });
+    }
+    if (candidates.length <= 1) return null;
+    const dataRows = [...classRows];
+    const lastClass = classRows[classRows.length - 1];
+    for (let r = lastClass + 1; r < boundary && !rowIsEmpty(matrix[r]); r += 1) dataRows.push(r);
+    const ordinal = dataRows.indexOf(assignmentRow);
+    if (ordinal < 0) return null;
+    if (ordinal >= candidates.length) return { value: "", confidence: "low", diagnostic: "ELECTIVE_LABEL_MISSING" };
+    const selected = candidates[ordinal];
+    return splitCompositeSubjectLabel(selected.value).length > 1
+      ? { ...selected, confidence: "low", diagnostic: "SUBJECT_COMPOSITE_LABEL" }
+      : selected;
+  }
+
   function findSubject(matrix, assignmentRow, colIndex, rangeStart, knownShortNames) {
+    const elective = findElectiveSubjectByDataRow(matrix, assignmentRow, colIndex, rangeStart, knownShortNames);
+    if (elective) return elective;
     const searchFloor = Math.max(0, rangeStart - 1 - 7);
     const candidates = [];
     for (let r = assignmentRow - 1; r >= searchFloor; r -= 1) {
@@ -1774,7 +1825,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       const row = matrix[r] || [];
       for (let c = 0; c < row.length; c += 1) {
         if (!cellHasTeacher(row[c], teacher.shortName)) continue;
-        const classInfo = findClassInRow(row, c);
+        const classInfo = findClassForAssignmentRow(matrix, r, c, range);
         if (!classInfo || classInfo.col === c) continue;
         const subjectResult = findSubject(matrix, r, c, range.start, knownShortNames);
         assignments.push({
@@ -1993,6 +2044,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     dom.resultSection.hidden = true;
     dom.emptyGuide.hidden = state.teachers.length > 0;
     const detectionMessage = detectionStatusText(state.autoDetection);
+    const tutorialMessage = tutorialSourceHint(state.matrix);
     const subjectRiskMessage = [
       subjectRisks.juniorWrong ? `${subjectRisks.juniorWrong} 筆科目取錯標題（合併列數不一致），待修正（單位：canonical assignment records）。` : "",
       subjectRisks.seniorAmbiguous ? `${subjectRisks.seniorAmbiguous} 筆選修科目無法由位置判定，待人手指定（單位：canonical assignment records）。` : "",
@@ -2003,19 +2055,27 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       if (rejectedCandidates.length || detectionMessage || subjectRiskMessage) {
         const locations = rejectedCandidates.map(item => `第 ${item.row} 列第 ${item.col} 欄「${item.value.replace(/\s+/g, " ") || "空白"}」`).join("；");
         const rejectedText = rejectedCandidates.length ? `另有 ${rejectedCandidates.length} 筆符合右鄰短名／負載條件但代碼未通過：${locations}。` : "被規則拒絕的候選 0 筆。";
-        showStatus("warning", "資料已解析，但有項目需要核對", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師；${rejectedText}${duplicated ? `另有 ${duplicated} 個簡稱重複，請按代碼核對。` : ""}${subjectRiskMessage}${detectionMessage}`);
+        showStatus("warning", "資料已解析，但有項目需要核對", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師；${rejectedText}${duplicated ? `另有 ${duplicated} 個簡稱重複，請按代碼核對。` : ""}${subjectRiskMessage}${tutorialMessage}${detectionMessage}`);
       } else {
-        showStatus("success", "資料解析完成", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師；被規則拒絕的候選 0 筆${duplicated ? `；其中 ${duplicated} 個簡稱重複，選擇時請按代碼核對` : ""}。`);
+        showStatus("success", "資料解析完成", `已讀取 ${dimensions.rows} 列 × ${dimensions.cols} 欄，找到 ${state.teachers.length} 位教師；被規則拒絕的候選 0 筆${duplicated ? `；其中 ${duplicated} 個簡稱重複，選擇時請按代碼核對` : ""}。${tutorialMessage}`);
       }
     } else {
       const rangeText = config.teacher ? `第 ${config.teacher.start}–${config.teacher.end} 列` : "目前的列範圍";
-      showStatus("warning", "未找到教師名單", `已讀取資料，但在${rangeText}找不到「代碼、簡稱、節數、職務」格式；被規則拒絕的候選 ${rejectedCandidates.length} 筆。${detectionMessage || "請檢查工作表或調整進階設定。"}`);
+      showStatus("warning", "未找到教師名單", `已讀取資料，但在${rangeText}找不到「代碼、簡稱、節數、職務」格式；被規則拒絕的候選 ${rejectedCandidates.length} 筆。${tutorialMessage}${detectionMessage || "請檢查工作表或調整進階設定。"}`);
     }
     refreshConfidenceSummary();
   }
 
   function matrixDimensions(matrix) {
     return { rows: matrix.length, cols: matrix.reduce((max, row) => Math.max(max, row.length), 0) };
+  }
+
+  function tutorialSourceHint(matrix) {
+    const values = matrix.flatMap(row => row.map(value => compact(value)));
+    const hasTutorial = values.includes("導修");
+    const hasLifeEducation = values.includes("生活教育");
+    if (!hasTutorial && hasLifeEducation) return "來源表沒有「導修」標籤，只找到「生活教育」；工具保留來源原名，未擅自改名。";
+    return hasTutorial ? "來源表已找到「導修」標籤，會按原名輸出。" : "";
   }
 
   function duplicateShortNames(teachers) {
@@ -3064,7 +3124,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
           const row = state.matrix[r] || [];
           for (let c = 0; c < row.length; c += 1) {
             if (!cellHasTeacher(row[c], teacher.shortName)) continue;
-            const classInfo = findClassInRow(row, c);
+            const classInfo = findClassForAssignmentRow(state.matrix, r, c, range);
             if (classInfo && classInfo.col !== c) continue;
             const key = `${teacher.id}|${r}|${c}`;
             found.set(key, { code: "CLASS_CONTINUATION_UNRESOLVED", field: "excluded.assignment", row: r + 1, col: c + 1, teacherCode: teacher.code });
@@ -3243,7 +3303,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   function gasSubjectValue(value) {
     const label = gasCellValue(value);
     const aliases = {
-      "M2": "數學", "M2（中）": "數學", "M2（英）": "數學", "M2(中)": "數學", "M2(英)": "數學",
+      "M2": "M2", "M2（中）": "M2（中）", "M2（英）": "M2（英）", "M2(中)": "M2(中)", "M2(英)": "M2(英)",
       "英文口語": "英國語文", "英文科": "英國語文", "英文": "英國語文", "英國語文": "英國語文",
       "中文": "中國語文", "中國語文": "中國語文"
     };
@@ -3261,6 +3321,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       CELL_SOFT_WRAP: "來源儲存格含換行或 TAB，已攤平為單一空格，請人手核對。",
       SUBJECT_CROSS_BLOCK_FALLBACK: "科目標題曾跨區塊向左 fallback，可能取錯標題，請人手核對。",
       SUBJECT_COMPOSITE_LABEL: "科目標題含多個以分隔符連接的科目，尚未拆分。",
+      ELECTIVE_LABEL_MISSING: "高中選修資料列沒有對應科目標題，未能安全判定科目。",
       SUBJECT_DEFAULT_COLUMN: "未能由標題推導科目，請人手核對。",
       SUBJECT_LEFT_FALLBACK: "科目由左方標題 fallback 推導，請人手核對。",
       PERIOD_COUNT_MISMATCH: "教師實際命中格數與節數列不同，請按來源表核對。",
@@ -3321,11 +3382,13 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const year = gasSchoolYear(snapshot);
     const rows = [GAS_EXPORT_COLUMNS["11_教擔_正規"]];
     const unresolved = [];
+    const missingSubjects = [];
     snapshot.assignments.forEach(assignment => {
       const teacher = teachers.get(assignment.teacherId);
       if (!teacher) unresolved.push(assignment.recordId);
       const homeroom = assignment.homeroomRank !== null;
       const level = gradeLabel(assignment) || assignment.level || "";
+      if (!homeroom && !gasSubjectValue(assignment.subject)) missingSubjects.push(assignment.recordId);
       rows.push([
         year, level, assignment.className || (level ? `${level} 選修組` : ""),
         homeroom ? "班務" : gasSubjectValue(assignment.subject), teacher?.shortName || "",
@@ -3333,19 +3396,34 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         assignment.row || ""
       ]);
     });
-    return { rows: rows.map(row => row.map(gasCellValue)), unresolved, excludedActivities: snapshot.activities.map(activity => activity.recordId) };
+    return {
+      rows: rows.map(row => row.map(gasCellValue)),
+      unresolved,
+      missingSubjects,
+      blocked: missingSubjects.length > 0,
+      warning: missingSubjects.length
+        ? `教擔未匯出：${missingSubjects.length} 筆 assignment 缺少可判定科目（${missingSubjects.join("、")}），請先核對選修標題。`
+        : "",
+      excludedActivities: snapshot.activities.map(activity => activity.recordId)
+    };
   }
 
   function buildGasOrgRows(snapshot) {
     const liveAdmin = window.AdminStructureTool?.getAdminSnapshotData?.() || null;
     try {
       const rows = window.AdminStructureTool?.buildOrgTsvProjection?.()?.rows;
-      if (rows?.length) return { rows: rows.map(row => row.map(gasCellValue)), warning: "" };
+      if (rows?.length) return { rows: rows.map(row => row.map(gasCellValue)), warning: "", blocked: false };
+      if (liveAdmin?.orgGroups?.length) return {
+        rows: [GAS_EXPORT_COLUMNS["20_行政架構_匯入"]],
+        warning: "行政架構未匯出：PDF 組別資料未產生完整列；請先在行政頁完成核對，勿以空表覆蓋 GAS。",
+        blocked: true
+      };
     } catch (error) {
       if (liveAdmin?.orgGroups?.length) {
         return {
           rows: [GAS_EXPORT_COLUMNS["20_行政架構_匯入"]],
-          warning: `行政架構未匯出：${error.message || "PDF 顏色訊號未能可靠核對"}；請先在行政頁完成核對，勿以空表覆蓋 GAS。`
+          warning: `行政架構未匯出：${error.message || "PDF 顏色訊號未能可靠核對"}；請先在行政頁完成核對，勿以空表覆蓋 GAS。`,
+          blocked: true
         };
       }
     }
@@ -3358,7 +3436,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         member.isLeader ? "組長" : "組員", member.isNewTeacherFromPdf ? "TRUE" : "FALSE"
       ]));
     });
-    return { rows: rows.map(row => row.map(gasCellValue)), warning: "" };
+    return { rows: rows.map(row => row.map(gasCellValue)), warning: "", blocked: false };
   }
 
   function gasRowsToCsv(rows) {
@@ -3388,9 +3466,27 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
         "30_會議日程": Math.max(0, meeting.length - 1),
         "91_離線核對": Math.max(0, diagnostics.length - 1)
       },
-      warnings: org.warning ? [{ sheet: "20_行政架構_匯入", message: org.warning }] : [],
+      warnings: [
+        ...(workload.warning ? [{ sheet: "11_教擔_正規", message: workload.warning }] : []),
+        ...(org.warning ? [{ sheet: "20_行政架構_匯入", message: org.warning }] : [])
+      ],
+      blockedSheets: [
+        ...(workload.blocked ? ["11_教擔_正規"] : []),
+        ...(org.blocked ? ["20_行政架構_匯入"] : [])
+      ],
+      blockedMessages: {
+        ...(workload.blocked ? { "11_教擔_正規": workload.warning } : {}),
+        ...(org.blocked ? { "20_行政架構_匯入": org.warning } : {})
+      },
       excludedActivities: workload.excludedActivities
     };
+  }
+
+  function assertGasSheetExportable(projection, name) {
+    if (!projection.blockedSheets?.includes(name)) return;
+    const error = new Error(projection.blockedMessages?.[name] || `${name} 暫停匯出，資料尚未完整。`);
+    error.code = "GAS_EXPORT_BLOCKED";
+    throw error;
   }
 
   function gasSheetRows(projection, name) {
@@ -3416,8 +3512,9 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       const emptySheets = GAS_EXPORT_SHEETS.filter(name => projection.rowCounts[name] === 0);
       const emptyWarning = emptySheets.length ? ` 尚未有資料：${emptySheets.join("、")}；不要以空表覆蓋 GAS。` : "";
       const projectionWarnings = projection.warnings.map(item => ` ${item.message}`).join("");
+      const blockedWarning = projection.blockedSheets?.length ? ` 已暫停匯出：${projection.blockedSheets.join("、")}；資料未完整前不會產生可貼入內容。` : "";
       const activityWarning = projection.excludedActivities.length ? ` GAS v2 沒有聯課獨立分頁，未納入聯課活動 ${projection.excludedActivities.length} 筆（${projection.excludedActivities.join("、")}）。` : "";
-      dom.gasExportSummary.textContent = `11_教擔_正規 ${projection.rowCounts["11_教擔_正規"]} 筆；20_行政架構_匯入 ${projection.rowCounts["20_行政架構_匯入"]} 筆；30_會議日程 ${projection.rowCounts["30_會議日程"]} 筆；91_離線核對 ${projection.rowCounts["91_離線核對"]} 筆；未能連結的課務教師 ${unresolved} 筆${unresolved ? `（${unresolved.join("、")}）` : ""}。${activityWarning}${emptyWarning}${projectionWarnings}`;
+      dom.gasExportSummary.textContent = `11_教擔_正規 ${projection.rowCounts["11_教擔_正規"]} 筆；20_行政架構_匯入 ${projection.rowCounts["20_行政架構_匯入"]} 筆；30_會議日程 ${projection.rowCounts["30_會議日程"]} 筆；91_離線核對 ${projection.rowCounts["91_離線核對"]} 筆；未能連結的課務教師 ${unresolved} 筆${unresolved ? `（${unresolved.join("、")}）` : ""}。${blockedWarning}${activityWarning}${emptyWarning}${projectionWarnings}`;
       dom.gasExportPanel.hidden = false;
     } catch (error) {
       dom.gasExportPanel.hidden = false;
@@ -3428,6 +3525,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   async function copyGasSheet(name) {
     try {
       const projection = buildGasExportProjections();
+      assertGasSheetExportable(projection, name);
       const tsv = gasSheetRows(projection, name).map(row => row.join("\t")).join("\r\n");
       if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
       await navigator.clipboard.writeText(tsv);
@@ -3435,8 +3533,14 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       const warning = projection.warnings.find(item => item.sheet === name)?.message;
       showDataLayerStatus(warning ? "warning" : "success", warning ? `${name} 暫停貼入` : `已複製 ${name} TSV`, warning || `${projection.rowCounts[name]} 筆資料；欄內 TAB／LF／CR 殘留 0 格，可貼入 GAS。`);
     } catch (error) {
+      if (error.code === "GAS_EXPORT_BLOCKED") {
+        dom.gasTsvFallback.hidden = true;
+        showDataLayerStatus("error", `${name} 暫停匯出`, error.message);
+        return;
+      }
       try {
         const projection = buildGasExportProjections();
+        assertGasSheetExportable(projection, name);
         dom.gasTsvFallbackText.value = gasSheetRows(projection, name).map(row => row.join("\t")).join("\r\n");
         dom.gasTsvFallback.hidden = false;
         dom.gasTsvFallbackText.focus();
@@ -3450,6 +3554,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
 
   function downloadGasCsv(name) {
     const projection = buildGasExportProjections();
+    assertGasSheetExportable(projection, name);
     const blob = new Blob(["\uFEFF" + gasRowsToCsv(gasSheetRows(projection, name))], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -3464,6 +3569,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   function downloadGasXlsx() {
     if (!window.XLSX?.utils?.aoa_to_sheet || !window.XLSX.writeFile) throw new Error("找不到內置 SheetJS，無法產生 GAS v2 Excel。");
     const projection = buildGasExportProjections();
+    if (projection.blockedSheets?.length) {
+      const error = new Error(projection.blockedSheets.map(name => projection.blockedMessages?.[name] || `${name} 暫停匯出。`).join(" "));
+      error.code = "GAS_EXPORT_BLOCKED";
+      throw error;
+    }
     const workbook = window.XLSX.utils.book_new();
     GAS_EXPORT_SHEETS.forEach(name => {
       const worksheet = window.XLSX.utils.aoa_to_sheet(gasSheetRows(projection, name));
@@ -3837,6 +3947,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     scanTimetable,
     cellHasTeacher,
     findClassInRow,
+    findClassForAssignmentRow,
+    findElectiveSubjectByDataRow,
     detectPeriodRows,
     periodReferenceForCell,
     scanActivities,
@@ -3854,6 +3966,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     detectWorkloadRanges,
     splitCompositeSubjectLabel,
     collectSubjectPositionRisks,
+    tutorialSourceHint,
     analyzeMatrix,
     buildSnapshot,
     collectConfidenceStats,
@@ -3869,6 +3982,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     exportProfile,
     buildSheetProjection,
     buildGasWorkloadRows,
+    gasSubjectValue,
     buildGasExportProjections,
     refreshGasExportPanel,
     copyGasSheet,
