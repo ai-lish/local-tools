@@ -3591,15 +3591,22 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const rows = [GAS_EXPORT_COLUMNS["11_教擔_正規"]];
     const unresolved = [];
     const missingSubjects = [];
+    const missingSubjectDetails = [];
     snapshot.assignments.forEach(assignment => {
       const teacher = teachers.get(assignment.teacherId);
       if (!teacher) unresolved.push(assignment.recordId);
       const homeroom = assignment.homeroomRank !== null;
       const level = gradeLabel(assignment) || assignment.level || "";
-      if (!homeroom && !gasSubjectValue(assignment.subject)) missingSubjects.push(assignment.recordId);
+      const subjectMissing = !homeroom && !gasSubjectValue(assignment.subject);
+      const exportRow = rows.length + 1;
+      if (subjectMissing) {
+        missingSubjects.push(assignment.recordId);
+        missingSubjectDetails.push({ recordId: assignment.recordId, exportRow, sourceRow: assignment.row, sourceCol: assignment.col });
+      }
+      const subject = subjectMissing ? "【待核對科目】" : gasSubjectValue(assignment.subject);
       rows.push([
         year, level, assignment.className || (level ? `${level} 選修組` : ""),
-        homeroom ? "班務" : gasSubjectValue(assignment.subject), teacher?.shortName || "",
+        homeroom ? "班務" : subject, teacher?.shortName || "",
         homeroom ? "0" : String(assignment.periodCount ?? 0), homeroom ? homeroomLabel(assignment.homeroomRank) : "教學",
         assignment.row || ""
       ]);
@@ -3608,11 +3615,13 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       rows: rows.map(row => row.map(gasCellValue)),
       unresolved,
       missingSubjects,
-      // 保留完整課務列；無法判定的科目以空白輸出，並由 91_離線核對 及警告明確標示。
+      missingSubjectDetails,
+      // 保留完整課務列；canonical 的空白科目只在 GAS 投影層顯示待核對標記，並由 91_離線核對 及警告明確標示。
+      // GAS 匯入器拒絕空白「科目/組別」，故只在投影層使用明確的待核對標記；canonical 仍保留空白。
       // 不得因少數來源異常而靜默遺失其餘可核對 records。
       blocked: false,
       warning: missingSubjects.length
-        ? `教擔已保留完整列，但有 ${missingSubjects.length} 筆 assignment 科目留空（${missingSubjects.join("、")}）；請按 91_離線核對核實後再於 GAS 修正。`
+        ? `教擔已保留完整列；${missingSubjects.length} 筆 assignment 的「科目/組別」以「【待核對科目】」輸出（TSV 第 ${missingSubjectDetails.map(item => item.exportRow).join("、")} 列：${missingSubjects.join("、")}），請按 91_離線核對核實後再於 GAS 修正。`
         : "",
       excludedActivities: snapshot.activities.map(activity => activity.recordId)
     };
