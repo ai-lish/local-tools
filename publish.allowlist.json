@@ -49,6 +49,12 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/slp-split-pdf/index.html",
+      "destination": "tools/slp-split-pdf/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/slp-split-pdf/main.py",
       "destination": "tools/slp-split-pdf/main.py",
       "publicMode": "cli-source",

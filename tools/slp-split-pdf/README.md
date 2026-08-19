@@ -8,6 +8,10 @@
 
 ## Quick Start
 
+如要直接在瀏覽器使用，可開啟同一目錄的 browser HTML（index.html）。
+HTML 只在瀏覽器處理 PDF；首次開啟需從固定版本 CDN 載入函式庫，
+亦可在頁面內下載已內嵌函式庫的 offline copy。
+
 ```bash
 cd tools/slp-split-pdf
 python3 -m venv .venv

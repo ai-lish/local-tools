@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudSAMS SLP PDF 分割工具</title>
+    <!-- 引入 Tailwind CSS 進行美化 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 PDF.js 用於讀取 PDF 文字 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- 引入 pdf-lib 用於分割與建立新的 PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <!-- 引入 JSZip 用於打包下載 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- 引入 FileSaver 用於觸發下載 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* 自定義捲軸 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        /* 隱藏 details 預設的箭頭 */
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+    </style>
+</head>
+<body class="p-4 md:p-8 text-gray-800">
+
+    <div class="max-w-5xl mx-auto bg-white p-6 md:p-8 rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-blue-600 mb-3">CloudSAMS SLP PDF 分割工具</h1>
+        <p class="text-center text-sm text-gray-500 mb-4">📚 CloudSAMS bridge tool · 本機處理</p>
+
+        <!-- 離線下載按鈕（突出顯示） -->
+        <div class="mb-6 bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-300 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+            <div class="flex items-start gap-3">
+                <span class="text-3xl">📥</span>
+                <div>
+                    <div class="font-bold text-amber-900 text-base">下載離線版（單機使用）</div>
+                    <div class="text-xs text-amber-800 mt-1 leading-relaxed">
+                        所有函式庫會自動內嵌成單一 HTML 檔，下載後可離線使用、無需連網，完全符合校內封閉網絡要求。<br>
+                        <span class="text-amber-700">⚠️ 首次下載需連網，之後可永久離線。</span>
+                    </div>
+                </div>
+            </div>
+            <button id="downloadOfflineBtn" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-5 rounded-lg transition duration-200 flex items-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap">
+                <span>⬇</span>
+                <span>下載離線版</span>
+            </button>
+        </div>
+
+        <!-- 可摺疊的使用說明 -->
+        <details class="mb-6 bg-blue-50 rounded-lg border border-blue-200 shadow-sm group">
+            <summary class="font-bold text-blue-800 p-4 cursor-pointer select-none list-none flex justify-between items-center hover:bg-blue-100 transition-colors rounded-lg">
+                <span class="text-lg flex items-center gap-2">
+                    📖 點擊查閱：簡明操作手冊與安全聲明
+                </span>
+                <span class="transition-transform duration-300 group-open:rotate-180">
+                    <svg fill="none" height="24" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                </span>
+            </summary>
+
+            <div class="p-5 pt-2 text-sm text-gray-800 space-y-5 border-t border-blue-100">
+                <div class="bg-green-50 text-green-800 p-3 rounded border border-green-200">
+                    <strong>🛡️ 資訊安全聲明</strong>：本工具 100% 喺瀏覽器內執行，PDF 檔案從不離開你的電腦，絕不上傳任何雲端伺服器。離線版更可完全拔掉網絡線使用，方便在本機處理校務文件；請按校內私隱規定使用。
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg text-blue-900 border-b border-blue-200 pb-1 mb-2">📋 事前準備</h3>
+                    <ul class="list-disc pl-5 space-y-1 text-gray-700">
+                        <li><strong>全班 SLP 總檔 (.pdf)</strong>：必須是系統匯出的 PDF（需包含可選取的文字，非掃描圖片）。</li>
+                        <li><strong>學生名單</strong>：建議從 Excel 複製。格式建議為 <code>班別 學號 姓名</code>（每行一位，用於自動命名檔案，例如：<code>6A 01 學生甲</code>）。</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg text-blue-900 border-b border-blue-200 pb-1 mb-2">🚀 快速操作 3 步驟</h3>
+                    <ol class="list-decimal pl-5 space-y-3 text-gray-700">
+                        <li><strong>載入檔案與名單：</strong>上傳全班 SLP 總檔，並在下方文字框貼上學生名單。</li>
+                        <li><strong>分析 PDF 與核對頁數：</strong>點擊「第一步：分析 PDF 頁數」。系統會自動以「學生學習概覽」及「完 End of Report」尋找分頁點。<br>
+                        <span class="text-red-600 font-semibold">⚠️ 重要防呆：</span>掃描完成後，請檢視下方審核表格。若發現頁數有誤（如缺少「完」字導致誤判），可直接在表格內修改數字。</li>
+                        <li><strong>分割與下載：</strong>表格核對無誤後，點擊「第二步：確認無誤，開始分割並下載 ZIP」。系統會自動切割打包，下載完成後解壓縮，即可取得各學生的獨立 PDF 檔。</li>
+                    </ol>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg text-blue-900 border-b border-blue-200 pb-1 mb-2">❓ 常見排解</h3>
+                    <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                        <li><strong>錯誤：找不到關鍵字</strong> - 請確認您的 PDF 是否為純圖片檔。本工具必須能夠讀取文字才能運作。</li>
+                        <li><strong>錯誤：幾位學生的報告被合併在同一個檔案中</strong> - 這通常代表上一位學生的報告尾頁漏印了「完 End of Report」。<br>
+                        <strong>解決方法：</strong>只需在下方表格中，<strong>手動輸入正確的結束頁碼與下一位的起始頁碼</strong>即可。</li>
+                    </ul>
+                </div>
+            </div>
+        </details>
+
+        <!-- 輸入區 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">1. 選擇全班 SLP PDF 檔案</label>
+                <input type="file" id="pdfFileInput" accept="application/pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border rounded-lg p-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">2. 貼上學生資料 (用於命名，每行一位)</label>
+                <textarea id="studentNamesInput" rows="4" class="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="6A 01 學生甲&#10;6A 02 學生乙"></textarea>
+            </div>
+        </div>
+
+        <!-- 分析按鈕 -->
+        <button id="analyzeBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex justify-center items-center mb-6 shadow-md hover:shadow-lg">
+            第一步：分析 PDF 頁數
+        </button>
+
+        <!-- 狀態顯示區 -->
+        <div id="statusArea" class="hidden mb-6 bg-gray-50 p-4 rounded-lg border">
+            <div class="flex items-center space-x-3 mb-2">
+                <div id="loader" class="loader hidden"></div>
+                <p id="statusText" class="font-semibold text-gray-700">準備中...</p>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 審核與修改區 (預設隱藏) -->
+        <div id="reviewArea" class="hidden border-t border-gray-200 pt-6 mt-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-2">📋 審核結果與修改</h3>
+            <p class="text-sm text-gray-600 mb-4">系統已自動找出以下分頁範圍。請核對是否正確，如有需要可直接在框內修改數字。</p>
+
+            <div class="overflow-x-auto max-h-[400px] border border-gray-300 rounded-lg shadow-inner bg-gray-50 mb-6 relative">
+                <table class="min-w-full text-sm text-left text-gray-500">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-200 sticky top-0 z-10 shadow-sm">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 w-16">序號</th>
+                            <th scope="col" class="px-6 py-3">預期檔名 (可修改)</th>
+                            <th scope="col" class="px-6 py-3 w-32">起始頁</th>
+                            <th scope="col" class="px-6 py-3 w-32">結束頁</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultTableBody" class="divide-y divide-gray-200">
+                        <!-- 表格內容由 JS 動態產生 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分割按鈕 -->
+            <button id="splitBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg transition duration-200 flex justify-center items-center text-lg shadow-md hover:shadow-lg">
+                第二步：確認無誤，開始分割並下載 ZIP
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 設定 PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // 綁定 DOM 元素
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const splitBtn = document.getElementById('splitBtn');
+        const downloadOfflineBtn = document.getElementById('downloadOfflineBtn');
+        const fileInput = document.getElementById('pdfFileInput');
+        const namesInput = document.getElementById('studentNamesInput');
+        const statusArea = document.getElementById('statusArea');
+        const statusText = document.getElementById('statusText');
+        const progressBar = document.getElementById('progressBar');
+        const loader = document.getElementById('loader');
+        const reviewArea = document.getElementById('reviewArea');
+        const resultTableBody = document.getElementById('resultTableBody');
+
+        // UI 狀態更新函數
+        function setStatus(text, progress, showLoader = true) {
+            statusArea.classList.remove('hidden');
+            statusText.textContent = text;
+            progressBar.style.width = `${progress}%`;
+            if (showLoader) {
+                loader.classList.remove('hidden');
+            } else {
+                loader.classList.add('hidden');
+            }
+        }
+
+        // 統一的關鍵字偵測：去除所有 unicode 空白（NBSP、零寬空格等）以容錯 PDF 排版差異
+        function normalizePdfText(s) {
+            // 移除: 一般空白 \s、NBSP \u00A0、零寬空格 \u200B、零寬不斷行空格 \uFEFF、BOM 等
+            return s.replace(/[\s\u00A0\u1680\u2000-\u200B\u2028\u2029\u202F\u205F\u3000\uFEFF]/g, '');
+        }
+
+        // --- 第一階段：分析 PDF 頁數 ---
+        analyzeBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('請先上傳 PDF 檔案！');
+                return;
+            }
+
+            // 初始化 UI
+            reviewArea.classList.add('hidden');
+            resultTableBody.innerHTML = '';
+            statusText.className = 'font-semibold text-gray-700'; // 重置顏色
+
+            // 處理學生名單
+            const rawNames = namesInput.value.trim().split('\n').filter(line => line.trim() !== '');
+            const studentNames = rawNames.map(line => line.trim().replace(/\s+/g, '_'));
+
+            try {
+                setStatus("正在載入 PDF...", 10);
+
+                // 讀取檔案為 ArrayBuffer 供 PDF.js 分析
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                const numPages = pdf.numPages;
+
+                let studentRanges = [];
+                let currentStartPage = null;
+
+                setStatus("正在分析頁面關鍵字...", 20);
+
+                // 逐頁掃描
+                for (let i = 1; i <= numPages; i++) {
+                    progressBar.style.width = `${20 + (i / numPages) * 70}%`; // 20% ~ 90%
+
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = normalizePdfText(textContent.items.map(item => item.str).join(''));
+
+                    // 檢查起點 (兼容中英文)
+                    if (pageText.includes("學生學習概覽") || pageText.includes("StudentLearningProfile")) {
+                        if (currentStartPage !== null) {
+                            // 遇到新的起點但舊的沒結束，強制結束上一位
+                            studentRanges.push({ start: currentStartPage, end: i - 1 });
+                        }
+                        currentStartPage = i;
+                    }
+
+                    // 檢查終點 (兼容多種寫法，已 normalize 過空白)
+                    if (currentStartPage !== null && (
+                        pageText.includes("完EndofReport") ||
+                        pageText.includes("EndofReport") ||
+                        pageText.includes("完Endofreport")
+                    )) {
+                        studentRanges.push({ start: currentStartPage, end: i });
+                        currentStartPage = null;
+                    }
+                }
+
+                // 處理最後一位
+                if (currentStartPage !== null) {
+                    studentRanges.push({ start: currentStartPage, end: numPages });
+                }
+
+                if (studentRanges.length === 0) {
+                    throw new Error("找不到『學生學習概覽』或『Student Learning Profile』關鍵字。");
+                }
+
+                setStatus(`分析完成！共找到 ${studentRanges.length} 位學生，請核對下方表格。`, 100, false);
+                statusText.classList.remove('text-gray-700');
+                statusText.classList.add('text-green-600');
+
+                // 產生表格內容
+                studentRanges.forEach((range, index) => {
+                    const defaultName = index < studentNames.length ? studentNames[index] : `Student_${index + 1}`;
+                    const rowHtml = `
+                        <tr class="bg-white hover:bg-blue-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-gray-900">${index + 1}</td>
+                            <td class="px-6 py-2">
+                                <input type="text" class="stu-name w-full border border-gray-300 rounded p-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" value="${defaultName}">
+                            </td>
+                            <td class="px-6 py-2">
+                                <input type="number" min="1" max="${numPages}" class="stu-start w-full border border-gray-300 rounded p-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center" value="${range.start}">
+                            </td>
+                            <td class="px-6 py-2">
+                                <input type="number" min="1" max="${numPages}" class="stu-end w-full border border-gray-300 rounded p-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-center" value="${range.end}">
+                            </td>
+                        </tr>
+                    `;
+                    resultTableBody.insertAdjacentHTML('beforeend', rowHtml);
+                });
+
+                // 顯示核對區塊
+                reviewArea.classList.remove('hidden');
+                // 平滑捲動至核對區
+                setTimeout(() => {
+                    reviewArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+
+            } catch (error) {
+                console.error(error);
+                setStatus(`分析失敗: ${error.message}`, 0, false);
+                statusText.classList.remove('text-gray-700');
+                statusText.classList.add('text-red-600');
+            }
+        });
+
+        // --- 第二階段：根據表格資料分割並下載 ---
+        splitBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("找不到 PDF 檔案，請重新上傳檔案！");
+                return;
+            }
+
+            try {
+                // 1. 從表格中讀取使用者確認/修改過的資料
+                const rows = document.querySelectorAll('#resultTableBody tr');
+                const finalTasks = [];
+
+                rows.forEach(row => {
+                    const nameInput = row.querySelector('.stu-name').value.trim();
+                    const startInput = parseInt(row.querySelector('.stu-start').value);
+                    const endInput = parseInt(row.querySelector('.stu-end').value);
+
+                    if (nameInput && !isNaN(startInput) && !isNaN(endInput)) {
+                        finalTasks.push({ name: nameInput, start: startInput, end: endInput });
+                    }
+                });
+
+                if (finalTasks.length === 0) {
+                    alert("表格中沒有有效的資料！");
+                    return;
+                }
+
+                // 2. 開始分割
+                setStatus("正在重新載入原始 PDF 進行分割...", 10);
+                statusText.className = 'font-semibold text-gray-700'; // 重置顏色
+
+                // 重新讀取一次未被 Detached 的 ArrayBuffer 供 pdf-lib 使用
+                const arrayBuffer = await file.arrayBuffer();
+                const { PDFDocument } = PDFLib;
+                const sourcePdfDoc = await PDFDocument.load(arrayBuffer);
+                const maxPages = sourcePdfDoc.getPageCount();
+                const zip = new JSZip();
+
+                for (let i = 0; i < finalTasks.length; i++) {
+                    const task = finalTasks[i];
+                    setStatus(`正在產生 ${task.name}.pdf...`, 10 + ((i + 1) / finalTasks.length) * 80);
+
+                    // 檢查頁數合理性 (防呆)
+                    let pStart = task.start;
+                    let pEnd = task.end;
+                    if (pStart > pEnd) { pStart = task.end; pEnd = task.start; } // 起終反轉保護
+                    if (pStart < 1) pStart = 1;
+                    if (pEnd > maxPages) pEnd = maxPages;
+
+                    // pdf-lib index starts from 0
+                    const pageIndices = [];
+                    for (let p = pStart - 1; p <= pEnd - 1; p++) {
+                        pageIndices.push(p);
+                    }
+
+                    // 建立新文件並拷貝頁面
+                    const newPdf = await PDFDocument.create();
+                    const copiedPages = await newPdf.copyPages(sourcePdfDoc, pageIndices);
+                    copiedPages.forEach((page) => newPdf.addPage(page));
+
+                    // 存入 ZIP
+                    const pdfBytes = await newPdf.save();
+                    // 確保檔名有 .pdf 副檔名
+                    const safeFileName = task.name.toLowerCase().endsWith('.pdf') ? task.name : `${task.name}.pdf`;
+                    zip.file(safeFileName, pdfBytes);
+                }
+
+                // 3. 打包與下載
+                setStatus("正在打包壓縮檔...", 95);
+                const zipBlob = await zip.generateAsync({ type: "blob" });
+
+                setStatus("✅ 完成！已觸發下載 ZIP 壓縮檔。", 100, false);
+                statusText.classList.remove('text-gray-700');
+                statusText.classList.add('text-green-600');
+
+                const originalFileName = file.name.replace('.pdf', '');
+                saveAs(zipBlob, `${originalFileName}_已分割.zip`);
+
+            } catch (error) {
+                console.error(error);
+                setStatus(`分割失敗: ${error.message}`, 0, false);
+                statusText.classList.remove('text-gray-700');
+                statusText.classList.add('text-red-600');
+            }
+        });
+
+        // --- 第三階段：下載離線版（內嵌所有函式庫為單一 HTML） ---
+        downloadOfflineBtn.addEventListener('click', async () => {
+            const originalText = downloadOfflineBtn.innerHTML;
+            downloadOfflineBtn.disabled = true;
+            downloadOfflineBtn.innerHTML = '<span class="loader" style="border-color:#fff;border-top-color:#fde68a;width:16px;height:16px;"></span><span>準備中...</span>';
+
+            try {
+                // 偵測是否已經在離線版中（file:// 協議下 fetch 會失敗，所以特別處理）
+                if (window.location.protocol === 'file:') {
+                    throw new Error('你已經在使用離線版，無需重新下載。');
+                }
+
+                setStatus("正在下載所有函式庫...", 5);
+
+                // 1. 抓取所有 CDN 函式庫
+                const libs = [
+                    { url: 'https://cdn.tailwindcss.com', type: 'script' },
+                    { url: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', type: 'script' },
+                    { url: 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js', type: 'script' },
+                    { url: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', type: 'script' },
+                    { url: 'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js', type: 'script' },
+                    { url: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', type: 'worker' },
+                ];
+
+                setStatus("正在下載函式庫 1/6...", 10);
+
+                const fetched = [];
+                for (let i = 0; i < libs.length; i++) {
+                    const lib = libs[i];
+                    setStatus(`正在下載函式庫 ${i + 1}/${libs.length}...`, 10 + (i / libs.length) * 60);
+                    const resp = await fetch(lib.url, { cache: 'no-store' });
+                    if (!resp.ok) throw new Error(`無法下載 ${lib.url}（HTTP ${resp.status}）`);
+                    const content = await resp.text();
+                    fetched.push({ ...lib, content });
+                }
+
+                setStatus("正在內嵌函式庫...", 75);
+
+                // 2. 抓取目前頁面的 HTML 原始碼
+                const pageResp = await fetch(window.location.href, { cache: 'no-store' });
+                if (!pageResp.ok) throw new Error('無法讀取目前頁面原始碼');
+                let offlineHtml = await pageResp.text();
+
+                // 3. 替換每個 CDN script 為內嵌
+                for (const lib of fetched) {
+                    if (lib.type === 'script') {
+                        // 用 regex 找對應的 script element 並替換
+                        const escapedUrl = lib.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const regex = new RegExp(`<script\\s+src=["']${escapedUrl}["']\\s*><\/script>`, 'g');
+                        const replacement = `<script>/* ${lib.url} */\n${lib.content}\n<\/script>`;
+                        const newHtml = offlineHtml.replace(regex, replacement);
+                        if (newHtml === offlineHtml) {
+                            console.warn(`找不到 script tag: ${lib.url}`);
+                        }
+                        offlineHtml = newHtml;
+                    }
+                }
+
+                // 4. 處理 PDF.js worker — 轉成 base64 data URI
+                const worker = fetched.find(l => l.type === 'worker');
+                if (worker) {
+                    // 用 TextEncoder 確保 unicode 正確
+                    const bytes = new TextEncoder().encode(worker.content);
+                    let binary = '';
+                    const chunkSize = 0x8000;
+                    for (let i = 0; i < bytes.length; i += chunkSize) {
+                        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+                    }
+                    const workerB64 = btoa(binary);
+                    const workerDataUri = `data:application/javascript;base64,${workerB64}`;
+                    // 替換 workerSrc 行
+                    offlineHtml = offlineHtml.replace(
+                        /pdfjsLib\.GlobalWorkerOptions\.workerSrc\s*=\s*['"][^'"]+['"]/,
+                        `pdfjsLib.GlobalWorkerOptions.workerSrc = '${workerDataUri}' /* offline: inlined worker */`
+                    );
+                }
+
+                // 5. 加入「離線版」banner 喺 title 下面
+                const offlineBanner = `<div style="background:#fef3c7;border:2px solid #f59e0b;padding:12px 16px;border-radius:10px;margin:0 0 20px 0;text-align:center;color:#78350f;font-size:0.95em;font-weight:600;box-shadow:0 2px 6px rgba(245,158,11,0.15);">📦 <strong>離線版</strong> · 所有函式庫已內嵌，無需網絡連線</div>`;
+                offlineHtml = offlineHtml.replace(
+                    /<p class="text-center text-sm text-gray-500 mb-4">[^<]*<\/p>/,
+                    `<p class="text-center text-sm text-gray-500 mb-4">📚 CloudSAMS bridge tool · 本機處理</p>${offlineBanner}`
+                );
+
+                // 6. 觸發下載
+                setStatus("正在打包離線版...", 92);
+                const blob = new Blob([offlineHtml], { type: 'text/html;charset=utf-8' });
+                const sizeMB = (blob.size / 1024 / 1024).toFixed(1);
+                saveAs(blob, `slp-split-pdf-offline-v1.html`);
+
+                setStatus(`✅ 完成！已下載離線版（${sizeMB} MB）。可直接用瀏覽器開啟，無需連網。`, 100, false);
+                statusText.classList.remove('text-gray-700');
+                statusText.classList.add('text-green-600');
+
+            } catch (error) {
+                console.error(error);
+                setStatus(`離線版下載失敗: ${error.message}`, 0, false);
+                statusText.classList.remove('text-gray-700');
+                statusText.classList.add('text-red-600');
+            } finally {
+                downloadOfflineBtn.disabled = false;
+                downloadOfflineBtn.innerHTML = originalText;
+            }
+        });
+    </script>
+</body>
+</html>

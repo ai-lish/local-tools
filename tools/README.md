@@ -5,7 +5,8 @@ CloudSAMS server；請先閱讀各工具的 README，再處理任何真實資料
 
 ## 工具狀態
 
-- `slp-split-pdf`：`stable`，可按頁或指定範圍分割 SLP PDF。
+- `slp-split-pdf`：`stable`，可用 browser HTML（slp-split-pdf/index.html）
+  或 Python CLI 按頁或指定範圍分割 SLP PDF；PDF 只在本機處理。
 - `class-photo-rename`：`wip` skeleton，改名邏輯尚未完成，不可用於正式學生相片。
 
 使用者需要自行安裝 Python 及各工具的 `requirements.txt` 依賴。input、output、
