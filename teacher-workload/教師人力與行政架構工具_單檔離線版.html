@@ -1239,9 +1239,11 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     "SUBJECT_CROSS_BLOCK_FALLBACK", "SUBJECT_COMPOSITE_LABEL", "ELECTIVE_LABEL_MISSING",
     "SUBJECT_LEFT_FALLBACK", "SUBJECT_DEFAULT_COLUMN"
   ]);
-  // 來源表 R93 的 C43-C48 標題漏列；使用者已確認該選修組為「視覺藝術」。
+  // 中六 C43-C48 的「視覺藝術」標題漏列；使用者已確認科目順序需向後校正一列。
   const CONFIRMED_SUBJECT_OVERRIDES = Object.freeze([
-    Object.freeze({ sourceRow: 93, className: "6CD3", startCol: 43, endCol: 48, value: "視覺藝術" })
+    Object.freeze({ sourceRow: 91, className: "6D(CD2)", startCol: 43, endCol: 48, value: "視覺藝術" }),
+    Object.freeze({ sourceRow: 92, className: "6CD3", startCol: 43, endCol: 48, value: "核心科目強化科1" }),
+    Object.freeze({ sourceRow: 93, className: "6CD3", startCol: 43, endCol: 48, value: "核心科目強化科2" })
   ]);
   const PERIOD_CONFIDENCE_REASON_CODES = new Set([
     "PERIOD_COUNT_MISMATCH", "PERIOD_COUNT_OUT_OF_RANGE", "PERIOD_COUNT_BLOCK_SPAN"
@@ -1933,7 +1935,6 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   }
 
   function confirmedSubjectOverrideForAssignment(className, row, col, subjectResult) {
-    if (!subjectResult || subjectResult.diagnostic !== "ELECTIVE_LABEL_MISSING") return null;
     const match = CONFIRMED_SUBJECT_OVERRIDES.find(item => item.className === className
       && item.sourceRow === row && item.startCol <= col && col <= item.endCol);
     return match ? { value: match.value, confidence: "manual", diagnostic: "" } : null;
