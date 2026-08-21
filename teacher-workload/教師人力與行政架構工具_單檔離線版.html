@@ -67,6 +67,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 #adminTab.is-active span { color: #087b65; background: #e5f8f4; }
 #meetingTab.is-active { border-bottom-color: #7a5ab5; }
 #meetingTab.is-active span { color: #604493; background: #f0eaff; }
+#timetableTab.is-active { border-bottom-color: #2169aa; }
+#timetableTab.is-active span { color: #2169aa; background: #eaf3fb; }
+#calendarTab.is-active { border-bottom-color: #b26b2a; }
+#calendarTab.is-active span { color: #9a571e; background: #fff0df; }
 
 .topbar__inner {
   width: min(1180px, calc(100% - 36px));
@@ -412,6 +416,27 @@ textarea {
 .meeting-intro { border-left: 5px solid #7a5ab5; }
 .meeting-accent { width: 64px; height: 72px; padding-top: 28px; flex: 0 0 auto; display: grid; place-items: center; color: white; background: #604493; border-radius: 8px 8px 12px 12px; clip-path: polygon(0 0, 74% 0, 100% 23%, 100% 100%, 0 100%); box-shadow: 0 10px 20px rgba(96,68,147,.2); }
 .meeting-accent span { font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+.timetable-intro { border-left: 5px solid #2169aa; }
+.timetable-accent { width: 64px; height: 72px; padding-top: 28px; flex: 0 0 auto; display: grid; place-items: center; color: white; background: #2169aa; border-radius: 8px 8px 12px 12px; clip-path: polygon(0 0, 74% 0, 100% 23%, 100% 100%, 0 100%); box-shadow: 0 10px 20px rgba(33,105,170,.2); }
+.timetable-accent span { font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+.timetable-upload-panel { border-top: 3px solid #2169aa; }
+.timetable-paste-section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.timetable-paste-section textarea { width: 100%; min-height: 105px; margin: 8px 0 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; resize: vertical; }
+.timetable-export-panel .org-preview-table th { background: #2169aa; }
+.timetable-preview-table td { white-space: normal; vertical-align: top; min-width: 90px; }
+.timetable-preview-table td:nth-child(12) { min-width: 180px; color: #586a79; }
+.timetable-filterbar { margin: 14px 0; align-items: flex-end; }
+.calendar-intro { border-left: 5px solid #b26b2a; }
+.calendar-accent { width: 64px; height: 72px; padding-top: 28px; flex: 0 0 auto; display: grid; place-items: center; color: white; background: #b26b2a; border-radius: 8px 8px 12px 12px; clip-path: polygon(0 0, 74% 0, 100% 23%, 100% 100%, 0 100%); box-shadow: 0 10px 20px rgba(178,107,42,.2); }
+.calendar-accent span { font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+.calendar-upload-panel { border-top: 3px solid #b26b2a; }
+.calendar-paste-section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.calendar-paste-section textarea { width: 100%; min-height: 105px; margin: 8px 0 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; resize: vertical; }
+.calendar-export-panel .org-preview-table th { background: #b26b2a; }
+.calendar-preview-table td { white-space: normal; vertical-align: top; min-width: 78px; }
+.calendar-preview-table td:nth-child(5), .calendar-preview-table td:nth-child(6), .calendar-preview-table td:nth-child(7) { min-width: 180px; }
+.calendar-filterbar { margin: 14px 0; align-items: flex-end; }
+.calendar-source-note { margin: 0 0 14px; padding: 10px 12px; color: #6f4b2b; background: #fff7ee; border: 1px solid #efd8bd; border-radius: 8px; font-size: 12px; }
 .meeting-upload-panel { border-top: 4px solid #7a5ab5; }
 .meeting-upload-actions { background: #f7f4fb; }
 .meeting-upload-actions p { color: #625778; }
@@ -607,6 +632,12 @@ footer p { margin: 0; }
       <button id="meetingTab" class="tool-tab" type="button" aria-controls="meetingTool" aria-selected="false">
         <span aria-hidden="true">會</span><strong>暑期會議</strong>
       </button>
+      <button id="timetableTab" class="tool-tab" type="button" aria-controls="timetableTool" aria-selected="false">
+        <span aria-hidden="true">課表</span><strong>上課時間表</strong>
+      </button>
+      <button id="calendarTab" class="tool-tab" type="button" aria-controls="calendarTool" aria-selected="false">
+        <span aria-hidden="true">曆</span><strong>校曆表</strong>
+      </button>
     </div>
   </nav>
 
@@ -647,6 +678,22 @@ footer p { margin: 0; }
           <input id="meetingPdfInput" class="visually-hidden" type="file" accept=".pdf,application/pdf">
           <div id="meetingFileMeta" class="file-meta route-file-meta" hidden></div>
         </div>
+        <div id="timetableImportRoute" class="route-card route-card--recommended" data-import-route="timetable" hidden>
+          <span class="route-badge" style="background:#2169aa">上課時間表</span>
+          <h3>匯入教師上課時間表</h3>
+          <p>把教師時間表 PDF 轉成可按教師、日次及時段查閱的資料，再複製 TSV 貼入「12_上課時間表」。</p>
+          <label class="button" style="color:white;background:#2169aa" for="timetableFileInput">選擇時間表 PDF／TSV</label>
+          <input id="timetableFileInput" class="visually-hidden" type="file" accept=".pdf,.csv,.tsv,.xlsx,.xls,application/pdf,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+          <div id="timetableRouteFileMeta" class="file-meta route-file-meta" hidden></div>
+        </div>
+        <div id="calendarImportRoute" class="route-card route-card--recommended" data-import-route="calendar" hidden>
+          <span class="route-badge" style="background:#b26b2a">校曆表</span>
+          <h3>匯入校曆表 PDF</h3>
+          <p>把學校校曆 PDF 轉成逐日資料，保留特別事項、假期及來源原文，再複製 TSV 貼入「13_校曆表」。</p>
+          <label class="button" style="color:white;background:#b26b2a" for="calendarFileInput">選擇校曆 PDF／TSV</label>
+          <input id="calendarFileInput" class="visually-hidden" type="file" accept=".pdf,.csv,.tsv,.xlsx,.xls,application/pdf,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+          <div id="calendarRouteFileMeta" class="file-meta route-file-meta" hidden></div>
+        </div>
       </div>
       <div id="dataLayerStatus" class="data-layer-status" aria-live="polite"></div>
     </section>
@@ -654,7 +701,7 @@ footer p { margin: 0; }
     <section id="gasExportPanel" class="panel export-panel gas-export-panel" hidden aria-labelledby="gasExportTitle">
       <div>
         <h2 id="gasExportTitle">貼入「工作小助理」</h2>
-        <p>以下四個分頁的第一列欄名及欄序已對齊 GAS sheetFormatVersion 2。先在表格完成修訂，再複製對應分頁到 GAS；CSV／Excel 可作檔案備份。</p>
+        <p>以下六個分頁的第一列欄名及欄序已對齊 GAS sheetFormatVersion 2。先在表格完成修訂，再複製對應分頁到 GAS；CSV／Excel 可作檔案備份。</p>
       </div>
       <div id="gasExportSummary" class="export-summary" aria-live="polite"></div>
       <div id="gasExportButtons" class="data-layer-actions gas-export-buttons"></div>
@@ -873,6 +920,149 @@ footer p { margin: 0; }
       </div>
       <p>所有資料只留在目前瀏覽器分頁；關閉前請匯出 snapshot 保存進度。</p>
     </section>
+    </div>
+
+    <div id="timetableTool" class="tool-view" hidden>
+      <section class="intro panel timetable-intro">
+        <div>
+          <span class="step-label">步驟 1</span>
+          <h2>匯入教師上課時間表</h2>
+          <p>把教師時間表 PDF 轉成「12_上課時間表」；資料只在本機瀏覽器處理，不會上傳。PDF 文字跨行時會同時保留原文，方便核對。</p>
+        </div>
+        <div class="timetable-accent" aria-hidden="true"><span>課表</span></div>
+      </section>
+
+      <section class="panel admin-upload-panel timetable-upload-panel">
+        <div id="timetableDropZone" class="pdf-drop-zone" tabindex="0" role="button" aria-describedby="timetableFileHelp">
+          <div class="pdf-file-icon" aria-hidden="true" style="background:#2169aa">表</div>
+          <div class="pdf-upload-copy">
+            <h3>選擇或拖放教師時間表</h3>
+            <p id="timetableFileHelp">支援文字型 PDF、CSV／TSV 及 Excel；掃描圖片需先經 OCR。</p>
+            <div id="timetableFileMeta" class="pdf-file-meta">尚未選擇檔案</div>
+          </div>
+          <label class="button" style="color:white;background:#2169aa" for="timetableFileInput">選擇檔案</label>
+        </div>
+        <div class="admin-upload-actions timetable-upload-actions">
+          <p><span class="status-dot status-dot--green"></span>內容不會離開此瀏覽器</p>
+          <button id="parseTimetableBtn" class="button button--dark" type="button" disabled>解析上課時間表</button>
+        </div>
+        <div class="advanced-section timetable-paste-section">
+          <h3>或直接貼上已有 TSV</h3>
+          <p>適合由其他工具複製已符合「12_上課時間表」欄序的資料。</p>
+          <textarea id="timetablePasteInput" rows="5" placeholder="學年\t教師簡稱\t教師全名\t英文名\t日次\t開始\t結束\t班別\t科目/活動\t地點\t類型\t原文\t來源文件"></textarea>
+          <button id="parseTimetablePasteBtn" class="button button--secondary" type="button">解析貼上 TSV</button>
+        </div>
+      </section>
+
+      <section id="timetableProgress" class="pdf-progress" hidden aria-live="polite">
+        <div class="pdf-progress__track"><span id="timetableProgressBar"></span></div>
+        <p id="timetableProgressText">準備解析…</p>
+      </section>
+
+      <section id="timetableStatusArea" class="status-area" aria-live="polite"></section>
+
+      <section id="timetableExportPanel" class="panel org-export-panel timetable-export-panel" hidden aria-labelledby="timetableExportTitle">
+        <div class="org-export-panel__header">
+          <div>
+            <span class="step-label">轉換結果</span>
+            <h2 id="timetableExportTitle">貼入 12_上課時間表</h2>
+            <p>欄序固定為：學年、教師簡稱、教師全名、英文名、日次、開始、結束、班別、科目/活動、地點、類型、原文、來源文件。</p>
+            <p class="org-export-note">建議先按教師及時段核對預覽，再複製 TSV 貼入 Google Sheet 的「12_上課時間表」。</p>
+          </div>
+          <div class="org-export-actions">
+            <button id="copyTimetableTsvBtn" class="button" style="color:white;background:#2169aa" type="button">複製 TSV（貼入）</button>
+            <button id="downloadTimetableCsvBtn" class="button button--secondary" type="button">下載 CSV</button>
+            <button id="downloadTimetableXlsxBtn" class="button button--secondary" type="button">下載 Excel</button>
+          </div>
+        </div>
+        <div id="timetableExportSummary" class="org-export-summary"></div>
+        <div class="fld timetable-filterbar">
+          <div style="flex:1"><label class="lbl" for="timetableTeacherFilter">教師</label><select id="timetableTeacherFilter"><option value="">全部教師</option></select></div>
+          <div style="flex:1"><label class="lbl" for="timetableDayFilter">日次</label><select id="timetableDayFilter"><option value="">全部日次</option></select></div>
+        </div>
+        <div class="org-preview-wrap" tabindex="0" aria-label="12_上課時間表預覽">
+          <table class="org-preview-table timetable-preview-table">
+            <thead id="timetablePreviewHead"></thead>
+            <tbody id="timetablePreviewBody"></tbody>
+          </table>
+        </div>
+        <div id="timetableTsvFallback" class="org-tsv-fallback" hidden>
+          <label for="timetableTsvFallbackText">瀏覽器未允許直接複製。請全選以下文字後自行複製。</label>
+          <textarea id="timetableTsvFallbackText" readonly></textarea>
+        </div>
+      </section>
+    </div>
+
+    <div id="calendarTool" class="tool-view" hidden>
+      <section class="intro panel calendar-intro">
+        <div>
+          <span class="step-label" style="color:#b26b2a">步驟 1</span>
+          <h2>匯入學校校曆表</h2>
+          <p>把校曆 PDF 轉成逐日資料；事項、假期、日次標記及來源原文會保留在本機，方便核對後貼入「13_校曆表」。</p>
+        </div>
+        <div class="calendar-accent" aria-hidden="true"><span>校曆</span></div>
+      </section>
+
+      <section class="panel admin-upload-panel calendar-upload-panel">
+        <div id="calendarDropZone" class="pdf-drop-zone" tabindex="0" role="button" aria-describedby="calendarFileHelp">
+          <div class="pdf-file-icon" aria-hidden="true" style="background:#b26b2a">曆</div>
+          <div class="pdf-upload-copy">
+            <h3>選擇或拖放校曆表</h3>
+            <p id="calendarFileHelp">支援文字型 PDF、CSV／TSV 及 Excel；掃描圖片需先經 OCR。</p>
+            <div id="calendarFileMeta" class="pdf-file-meta">尚未選擇檔案</div>
+          </div>
+          <label class="button" style="color:white;background:#b26b2a" for="calendarFileInput">選擇檔案</label>
+        </div>
+        <div class="admin-upload-actions" style="background:#fff8f0">
+          <p><span class="status-dot" style="background:#b26b2a;box-shadow:0 0 0 4px rgba(178,107,42,.12)"></span>內容不會離開此瀏覽器</p>
+          <button id="parseCalendarBtn" class="button button--dark" type="button" disabled>解析校曆表</button>
+        </div>
+        <div class="advanced-section calendar-paste-section">
+          <h3>或直接貼上已有 TSV</h3>
+          <p>適合由其他工具複製已符合「13_校曆表」欄序的資料。</p>
+          <textarea id="calendarPasteInput" rows="5" placeholder="日期\t星期\t週次\t標記\t事項\t假期\t原文\t來源文件"></textarea>
+          <button id="parseCalendarPasteBtn" class="button button--secondary" type="button">解析貼上 TSV</button>
+        </div>
+      </section>
+
+      <section id="calendarProgress" class="pdf-progress" hidden aria-live="polite">
+        <div class="pdf-progress__track"><span id="calendarProgressBar"></span></div>
+        <p id="calendarProgressText">準備解析…</p>
+      </section>
+
+      <section id="calendarStatusArea" class="status-area" aria-live="polite"></section>
+
+      <section id="calendarExportPanel" class="panel org-export-panel calendar-export-panel" hidden aria-labelledby="calendarExportTitle">
+        <div class="org-export-panel__header">
+          <div>
+            <span class="step-label" style="color:#b26b2a">轉換結果</span>
+            <h2 id="calendarExportTitle">貼入 13_校曆表</h2>
+            <p>欄序固定為：日期、星期、週次、標記、事項、假期、原文、來源文件。</p>
+            <p class="org-export-note">日期由校曆第一週的學年起點推導；若來源文字沒有日號，會在狀態區列出待核對項目。</p>
+          </div>
+          <div class="org-export-actions">
+            <button id="copyCalendarTsvBtn" class="button" style="color:white;background:#b26b2a" type="button">複製 TSV（貼入）</button>
+            <button id="downloadCalendarCsvBtn" class="button button--secondary" type="button">下載 CSV</button>
+            <button id="downloadCalendarXlsxBtn" class="button button--secondary" type="button">下載 Excel</button>
+          </div>
+        </div>
+        <p class="calendar-source-note">事項與假期會按校曆中的日號分配到日期；跨日範圍會分配到本週可辨認的日期。原文欄保留完整週列，方便與 PDF 核對。</p>
+        <div id="calendarExportSummary" class="org-export-summary"></div>
+        <div class="fld calendar-filterbar">
+          <div style="flex:1"><label class="lbl" for="calendarMonthFilter">月份</label><select id="calendarMonthFilter"><option value="">全部月份</option></select></div>
+          <div style="flex:1"><label class="lbl" for="calendarFlagFilter">標記</label><select id="calendarFlagFilter"><option value="">全部標記</option></select></div>
+        </div>
+        <div class="org-preview-wrap" tabindex="0" aria-label="13_校曆表預覽">
+          <table class="org-preview-table calendar-preview-table">
+            <thead id="calendarPreviewHead"></thead>
+            <tbody id="calendarPreviewBody"></tbody>
+          </table>
+        </div>
+        <div id="calendarTsvFallback" class="org-tsv-fallback" hidden>
+          <label for="calendarTsvFallbackText">瀏覽器未允許直接複製。請全選以下文字後自行複製。</label>
+          <textarea id="calendarTsvFallbackText" readonly></textarea>
+        </div>
+      </section>
     </div>
 
     <div id="adminTool" class="tool-view">
@@ -3500,6 +3690,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
 
   const GAS_EXPORT_COLUMNS = Object.freeze({
     "11_教擔_正規": ["學年", "級別", "班別", "科目/組別", "教師簡稱", "節數", "角色", "來源列"],
+    "12_上課時間表": ["學年", "教師簡稱", "教師全名", "英文名", "日次", "開始", "結束", "班別", "科目/活動", "地點", "類型", "原文", "來源文件"],
+    "13_校曆表": ["日期", "星期", "週次", "標記", "事項", "假期", "原文", "來源文件"],
     "20_行政架構_匯入": ["學年", "部門", "組別", "成員全名", "角色", "新老師"],
     "30_會議日程": ["日期", "星期", "性質", "項目", "開始", "結束", "相關同工", "總負責", "地點", "備註"],
     "91_離線核對": ["目標分頁", "來源列", "來源欄", "原因碼", "說明", "嚴重度"]
@@ -3684,10 +3876,14 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const workload = buildGasWorkloadRows(snapshot);
     const org = buildGasOrgRows(snapshot);
     const meeting = window.SummerMeetingTool?.meetingProjection?.() || [GAS_EXPORT_COLUMNS["30_會議日程"]];
+    const timetable = window.TimetableTool?.timetableProjection?.() || [GAS_EXPORT_COLUMNS["12_上課時間表"]];
+    const calendar = window.SchoolCalendarTool?.calendarProjection?.() || [GAS_EXPORT_COLUMNS["13_校曆表"]];
     const diagnostics = gasDiagnosticRows(snapshot);
     return {
       sheets: {
         "11_教擔_正規": workload.rows,
+        "12_上課時間表": timetable.map(row => row.map(gasCellValue)),
+        "13_校曆表": calendar.map(row => row.map(gasCellValue)),
         "20_行政架構_匯入": org.rows,
         "30_會議日程": meeting.map(row => row.map(gasCellValue)),
         "91_離線核對": diagnostics
@@ -3695,6 +3891,8 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       unresolved: workload.unresolved,
       rowCounts: {
         "11_教擔_正規": Math.max(0, workload.rows.length - 1),
+        "12_上課時間表": Math.max(0, timetable.length - 1),
+        "13_校曆表": Math.max(0, calendar.length - 1),
         "20_行政架構_匯入": Math.max(0, org.rows.length - 1),
         "30_會議日程": Math.max(0, meeting.length - 1),
         "91_離線核對": Math.max(0, diagnostics.length - 1)
@@ -3730,11 +3928,13 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   function gasProjectionHasData() {
     const admin = window.AdminStructureTool?.getAdminSnapshotData?.()?.orgGroups || [];
     const meeting = window.SummerMeetingTool?.getMeetingExportData?.()?.rows || [];
-    return Boolean(state.teachers.length || state.snapshot?.teachers?.length || admin.length || meeting.length);
+    const timetable = window.TimetableTool?.getTimetableExportData?.()?.rows || [];
+    const calendar = window.SchoolCalendarTool?.getCalendarExportData?.()?.rows || [];
+    return Boolean(state.teachers.length || state.snapshot?.teachers?.length || admin.length || meeting.length || timetable.length || calendar.length);
   }
 
   function renderGasExportButtons() {
-    dom.gasExportButtons.innerHTML = `${GAS_EXPORT_SHEETS.map(name => `<span class="gas-export-row"><button class="button button--ghost" type="button" data-gas-copy="${escapeHtml(name)}">複製 ${escapeHtml(name)} TSV</button><button class="button button--secondary" type="button" data-gas-csv="${escapeHtml(name)}">下載 ${escapeHtml(name)} CSV</button></span>`).join("")}<button id="downloadGasXlsxBtn" class="button button--dark" type="button">下載 GAS v2 Excel（四個分頁）</button>`;
+    dom.gasExportButtons.innerHTML = `${GAS_EXPORT_SHEETS.map(name => `<span class="gas-export-row"><button class="button button--ghost" type="button" data-gas-copy="${escapeHtml(name)}">複製 ${escapeHtml(name)} TSV</button><button class="button button--secondary" type="button" data-gas-csv="${escapeHtml(name)}">下載 ${escapeHtml(name)} CSV</button></span>`).join("")}<button id="downloadGasXlsxBtn" class="button button--dark" type="button">下載 GAS v2 Excel（六個分頁）</button>`;
   }
 
   function refreshGasExportPanel() {
@@ -3747,7 +3947,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       const projectionWarnings = projection.warnings.map(item => ` ${item.message}`).join("");
       const blockedWarning = projection.blockedSheets?.length ? ` 已暫停匯出：${projection.blockedSheets.join("、")}；資料未完整前不會產生可貼入內容。` : "";
       const activityWarning = projection.excludedActivities.length ? ` GAS v2 沒有聯課獨立分頁，未納入聯課活動 ${projection.excludedActivities.length} 筆（${projection.excludedActivities.join("、")}）。` : "";
-      dom.gasExportSummary.textContent = `11_教擔_正規 ${projection.rowCounts["11_教擔_正規"]} 筆；20_行政架構_匯入 ${projection.rowCounts["20_行政架構_匯入"]} 筆；30_會議日程 ${projection.rowCounts["30_會議日程"]} 筆；91_離線核對 ${projection.rowCounts["91_離線核對"]} 筆；未能連結的課務教師 ${unresolved} 筆${unresolved ? `（${unresolved.join("、")}）` : ""}。${blockedWarning}${activityWarning}${emptyWarning}${projectionWarnings}`;
+      dom.gasExportSummary.textContent = `11_教擔_正規 ${projection.rowCounts["11_教擔_正規"]} 筆；12_上課時間表 ${projection.rowCounts["12_上課時間表"]} 筆；13_校曆表 ${projection.rowCounts["13_校曆表"]} 筆；20_行政架構_匯入 ${projection.rowCounts["20_行政架構_匯入"]} 筆；30_會議日程 ${projection.rowCounts["30_會議日程"]} 筆；91_離線核對 ${projection.rowCounts["91_離線核對"]} 筆；未能連結的課務教師 ${unresolved} 筆${unresolved ? `（${unresolved.join("、")}）` : ""}。${blockedWarning}${activityWarning}${emptyWarning}${projectionWarnings}`;
       dom.gasExportPanel.hidden = false;
     } catch (error) {
       dom.gasExportPanel.hidden = false;
@@ -4242,9 +4442,13 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     workloadTab: $("#workloadTab"),
     adminTab: $("#adminTab"),
     meetingTab: $("#meetingTab"),
+    timetableTab: $("#timetableTab"),
+    calendarTab: $("#calendarTab"),
     workloadTool: $("#workloadTool"),
     adminTool: $("#adminTool"),
     meetingTool: $("#meetingTool"),
+    timetableTool: $("#timetableTool"),
+    calendarTool: $("#calendarTool"),
     startTitle: $("#startTitle"),
     startHelp: $("#startHelp"),
     importRoutes: [...document.querySelectorAll("[data-import-route]")],
@@ -4385,7 +4589,7 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   const LEADER_COLOR_KEYS = new Set(["153,102,255", "141,94,243", "116,72,244"]);
   const DEPUTY_COLOR_KEY = "255,102,0";
   const NEW_TEACHER_COLOR_KEY = "0,176,80";
-  const TOOL_HASHES = Object.freeze({ workload: "#workload", admin: "#admin", meeting: "#meeting" });
+  const TOOL_HASHES = Object.freeze({ workload: "#workload", admin: "#admin", meeting: "#meeting", timetable: "#timetable", calendar: "#calendar" });
 
   function normalize(value) {
     return String(value ?? "").replace(/\u3000/g, " ").replace(/\s+/g, " ").trim();
@@ -4413,16 +4617,24 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     const selected = TOOL_HASHES[which] ? which : "admin";
     const isAdmin = selected === "admin";
     const isMeeting = selected === "meeting";
+    const isTimetable = selected === "timetable";
+    const isCalendar = selected === "calendar";
     dom.workloadTool.hidden = selected !== "workload";
     dom.adminTool.hidden = !isAdmin;
     dom.meetingTool.hidden = !isMeeting;
-    dom.legacyExportPanel.hidden = isAdmin || isMeeting;
+    dom.timetableTool.hidden = !isTimetable;
+    dom.calendarTool.hidden = !isCalendar;
+    dom.legacyExportPanel.hidden = isAdmin || isMeeting || isTimetable || isCalendar;
     dom.workloadTab.classList.toggle("is-active", selected === "workload");
     dom.adminTab.classList.toggle("is-active", isAdmin);
     dom.meetingTab.classList.toggle("is-active", isMeeting);
+    dom.timetableTab.classList.toggle("is-active", isTimetable);
+    dom.calendarTab.classList.toggle("is-active", isCalendar);
     dom.workloadTab.setAttribute("aria-selected", String(selected === "workload"));
     dom.adminTab.setAttribute("aria-selected", String(isAdmin));
     dom.meetingTab.setAttribute("aria-selected", String(isMeeting));
+    dom.timetableTab.setAttribute("aria-selected", String(isTimetable));
+    dom.calendarTab.setAttribute("aria-selected", String(isCalendar));
     const copy = {
       workload: {
         title: "匯入課務與人力安排 Excel",
@@ -4435,11 +4647,19 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
       meeting: {
         title: "匯入暑期會議 PDF",
         help: "把暑期當值及會議表轉為 30_會議日程；完成後可即時修訂，再下載 CSV／Excel 或複製 TSV。"
+      },
+      timetable: {
+        title: "匯入教師上課時間表",
+        help: "把教師時間表 PDF 轉為 12_上課時間表；按教師、日次及時段核對後，再複製 TSV 貼入 Google Sheet。"
+      },
+      calendar: {
+        title: "匯入學校校曆表",
+        help: "把校曆 PDF 轉為 13_校曆表；按日期核對事項及假期後，再複製 TSV 貼入 Google Sheet。"
       }
     }[selected] || {};
     if (copy.title) dom.startTitle.textContent = copy.title;
     if (copy.help) dom.startHelp.textContent = copy.help;
-    const visibleRoutes = new Set(isMeeting ? ["meeting"] : isAdmin ? ["admin", "common"] : ["workload", "common"]);
+    const visibleRoutes = new Set(isMeeting ? ["meeting"] : isTimetable ? ["timetable"] : isCalendar ? ["calendar"] : isAdmin ? ["admin", "common"] : ["workload", "common"]);
     dom.importRoutes.forEach(route => { route.hidden = !visibleRoutes.has(route.dataset.importRoute); });
     if (options.syncHash !== false && window.location.hash !== TOOL_HASHES[selected]) {
       try { window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${TOOL_HASHES[selected]}`); } catch (_) { /* file:// history may be unavailable */ }
@@ -6709,6 +6929,14 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
     switchTool("meeting");
     if (state.meetingRows.length) renderMeetingExport();
   });
+  dom.timetableTab.addEventListener("click", () => {
+    switchTool("timetable");
+    window.TimetableTool?.render?.();
+  });
+  dom.calendarTab.addEventListener("click", () => {
+    switchTool("calendar");
+    window.SchoolCalendarTool?.render?.();
+  });
   dom.pdfInput.addEventListener("change", event => {
     setPdfFile(event.target.files[0]);
     if (event.target.files[0]) switchTool("admin");
@@ -6835,6 +7063,722 @@ window.__PDF_WORKER_BASE64__="LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZS
   });
   window.addEventListener("hashchange", () => switchTool(toolFromHash(), { syncHash: false }));
   switchTool(toolFromHash(), { syncHash: false });
+})();
+
+(() => {
+  "use strict";
+
+  const $ = selector => document.querySelector(selector);
+  const HEADERS = Object.freeze(["學年", "教師簡稱", "教師全名", "英文名", "日次", "開始", "結束", "班別", "科目/活動", "地點", "類型", "原文", "來源文件"]);
+  const state = { file: null, rows: [], sourceName: "", workerUrl: "" };
+  const dom = {
+    input: $("#timetableFileInput"),
+    dropZone: $("#timetableDropZone"),
+    fileMeta: $("#timetableFileMeta"),
+    routeFileMeta: $("#timetableRouteFileMeta"),
+    parseBtn: $("#parseTimetableBtn"),
+    pasteInput: $("#timetablePasteInput"),
+    pasteBtn: $("#parseTimetablePasteBtn"),
+    progress: $("#timetableProgress"),
+    progressBar: $("#timetableProgressBar"),
+    progressText: $("#timetableProgressText"),
+    status: $("#timetableStatusArea"),
+    panel: $("#timetableExportPanel"),
+    summary: $("#timetableExportSummary"),
+    teacherFilter: $("#timetableTeacherFilter"),
+    dayFilter: $("#timetableDayFilter"),
+    head: $("#timetablePreviewHead"),
+    body: $("#timetablePreviewBody"),
+    copyBtn: $("#copyTimetableTsvBtn"),
+    csvBtn: $("#downloadTimetableCsvBtn"),
+    xlsxBtn: $("#downloadTimetableXlsxBtn"),
+    fallback: $("#timetableTsvFallback"),
+    fallbackText: $("#timetableTsvFallbackText")
+  };
+
+  function normalize(value) {
+    return String(value ?? "").replace(/\u3000/g, " ").replace(/[\t\r\n]+/gu, " ").replace(/\s+/gu, " ").trim();
+  }
+
+  function esc(value) {
+    return String(value ?? "").replace(/[&<>\"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+  }
+
+  function schoolYear(fileName) {
+    const m = String(fileName || "").match(/(20\d{2})\s*[-–—]\s*(20\d{2})/u);
+    return m ? `${m[1]}-${m[2]}` : "2026-2027";
+  }
+
+  function showStatus(type, title, message) {
+    const icon = type === "success" ? "✓" : type === "error" ? "!" : "i";
+    dom.status.innerHTML = `<div class="status-message status-message--${type}"><strong aria-hidden="true">${icon}</strong><div><strong>${esc(title)}</strong><p>${esc(message)}</p></div></div>`;
+  }
+
+  function progress(percent, message) {
+    dom.progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    dom.progressText.textContent = message;
+  }
+
+  function dayNumber(value) {
+    const m = String(value || "").match(/第?\s*(\d+)\s*日/u);
+    return m ? Number(m[1]) : 99;
+  }
+
+  function timeNumber(value) {
+    const m = String(value || "").match(/(\d{1,2})\s*[:：]\s*(\d{2})/u);
+    return m ? Number(m[1]) * 60 + Number(m[2]) : 9999;
+  }
+
+  function lineText(line) {
+    return (line?.cells || []).map(cell => normalize(cell.text)).filter(Boolean).join(" ");
+  }
+
+  function parseTeacherHeader(text) {
+    const raw = normalize(text).replace(/^時間表\s*[:：]?\s*/u, "");
+    const aliasMatch = raw.match(/^([A-Za-z][A-Za-z0-9#_-]*)\s*/u);
+    const alias = aliasMatch ? aliasMatch[1] : "";
+    const rest = aliasMatch ? raw.slice(aliasMatch[0].length).trim() : raw;
+    const parts = rest.split(/[,，]/u).map(item => normalize(item)).filter(Boolean);
+    const fullName = parts[0] || rest;
+    const english = parts.slice(1).join(", ");
+    return { alias, fullName, english };
+  }
+
+  function headerCenters(line) {
+    const centers = [];
+    (line?.cells || []).forEach(cell => {
+      const m = normalize(cell.text).match(/第\s*([1-6])\s*日/gu);
+      if (m && m.length === 1) centers[Number(m[0].match(/\d+/u)[0]) - 1] = cell.center;
+    });
+    if (centers.filter(Number.isFinite).length === 6) return centers;
+    const xs = (line?.cells || []).map(cell => Number(cell.center)).filter(Number.isFinite);
+    if (xs.length >= 2) {
+      const left = Math.min(...xs), right = Math.max(...xs);
+      return Array.from({ length: 6 }, (_, i) => left + ((right - left) * i / 5));
+    }
+    return [];
+  }
+
+  function nearestDay(center, centers) {
+    if (!centers.length || !Number.isFinite(center)) return -1;
+    let index = 0, distance = Infinity;
+    centers.forEach((value, i) => {
+      const next = Math.abs(value - center);
+      if (next < distance) { distance = next; index = i; }
+    });
+    return index;
+  }
+
+  function startTime(text) {
+    const m = normalize(text).match(/^(\d{1,2})\s*[:：]\s*(\d{2})$/u);
+    return m ? `${String(Number(m[1])).padStart(2, "0")}:${m[2]}` : "";
+  }
+
+  function endTime(text) {
+    const m = normalize(text).match(/^-\s*(\d{1,2})\s*[:：]\s*(\d{2})$/u);
+    return m ? `${String(Number(m[1])).padStart(2, "0")}:${m[2]}` : "";
+  }
+
+  function cellDetails(value) {
+    const text = normalize(value);
+    const roomMatch = text.match(/\s+((?:\d{3,4})|(?:PlayG|[A-Za-z]{2,}[A-Za-z0-9_-]*))$/u);
+    const room = roomMatch ? roomMatch[1] : "";
+    const withoutRoom = roomMatch ? text.slice(0, roomMatch.index).trim() : text;
+    const classMatch = withoutRoom.match(/^((?:[1-6][A-D](?:\s*,\s*[1-6][A-D])*))\s+/u);
+    const className = classMatch ? classMatch[1].replace(/\s+/gu, "") : "";
+    const subject = classMatch ? withoutRoom.slice(classMatch[0].length).trim() : withoutRoom;
+    const type = /週會/u.test(subject) ? "週會" : /生教|生活教育/u.test(subject) ? "生活教育" : /核心|增潤|強化/u.test(subject) ? "課程" : "上課";
+    return { className, subject, room, type, raw: text };
+  }
+
+  function rawLineFallback(lines) {
+    return (lines || []).map(lineText).filter(Boolean).join(" / ");
+  }
+
+  function timetableRowsFromPage(lines, pageNumber, sourceName) {
+    const allText = (lines || []).map(lineText).filter(Boolean);
+    const headerIndex = allText.findIndex(text => /時間表\s*[:：]/u.test(text));
+    if (headerIndex < 0) return [];
+    const headerLine = lines[headerIndex];
+    const teacher = parseTeacherHeader(allText[headerIndex]);
+    const dayIndex = lines.findIndex((line, index) => index > headerIndex && /第\s*1\s*日/u.test(lineText(line)) && /第\s*6\s*日/u.test(lineText(line)));
+    const centers = headerCenters(dayIndex >= 0 ? lines[dayIndex] : null);
+    const rows = [];
+    let foundSlot = false;
+    for (let i = Math.max(headerIndex, dayIndex) + 1; i < lines.length - 1; i += 1) {
+      const start = startTime(lineText(lines[i]));
+      const end = endTime(lineText(lines[i + 1]));
+      if (!start || !end) continue;
+      foundSlot = true;
+      let j = i + 2;
+      while (j < lines.length && !startTime(lineText(lines[j]))) j += 1;
+      const byDay = Array.from({ length: 6 }, () => []);
+      for (const line of lines.slice(i + 2, j)) {
+        const cells = (line.cells || []).filter(cell => normalize(cell.text) && !startTime(cell.text) && !endTime(cell.text));
+        if (!cells.length) continue;
+        if (centers.length === 6) {
+          cells.forEach(cell => {
+            const index = nearestDay(cell.center, centers);
+            if (index >= 0) byDay[index].push(normalize(cell.text));
+          });
+        } else {
+          cells.slice(0, 6).forEach((cell, index) => byDay[index].push(normalize(cell.text)));
+        }
+      }
+      byDay.forEach((parts, day) => {
+        const raw = normalize(parts.join(" "));
+        if (!raw) return;
+        const detail = cellDetails(raw);
+        rows.push([schoolYear(sourceName), teacher.alias, teacher.fullName, teacher.english,
+          `第${day + 1}日`, start, end, detail.className, detail.subject, detail.room,
+          detail.type, detail.raw, sourceName]);
+      });
+      i = j - 1;
+    }
+    if (!foundSlot || !rows.length) {
+      rows.push([schoolYear(sourceName), teacher.alias, teacher.fullName, teacher.english,
+        "", "", "", "", "", "", "原文", rawLineFallback(lines), sourceName]);
+    }
+    return rows;
+  }
+
+  async function ensureWorker() {
+    if (state.workerUrl) return;
+    if (!window.__PDF_WORKER_BASE64__) throw new Error("找不到本機 PDF 工作元件。");
+    const binary = atob(window.__PDF_WORKER_BASE64__);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    state.workerUrl = URL.createObjectURL(new Blob([bytes], { type: "text/javascript" }));
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = state.workerUrl;
+  }
+
+  async function parsePdf(file) {
+    if (!window.pdfjsLib) throw new Error("本機 PDF 元件未能載入。");
+    await ensureWorker();
+    const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const rows = [];
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      progress(Math.round(8 + (pageNumber - 1) / pdf.numPages * 84), `正在分析第 ${pageNumber}／${pdf.numPages} 頁…`);
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent({ normalizeWhitespace: true });
+      const lines = window.AdminStructureTool?.textItemsToLines
+        ? window.AdminStructureTool.textItemsToLines(content.items, pageNumber)
+        : [];
+      rows.push(...timetableRowsFromPage(lines, pageNumber, file.name));
+    }
+    return rows;
+  }
+
+  function parseCsvLine(line) {
+    const cells = [], re = /(?:^|,)(?:"((?:""|[^"])*)"|([^,]*))/gu;
+    let match;
+    while ((match = re.exec(line)) !== null) cells.push((match[1] !== undefined ? match[1].replace(/""/gu, '"') : match[2]).trim());
+    return cells;
+  }
+
+  function rowsFromDelimited(text) {
+    const lines = String(text || "").replace(/^\uFEFF/u, "").replace(/\r/g, "").split("\n").filter(line => line.trim());
+    return lines.map(line => line.includes("\t") ? line.split("\t") : parseCsvLine(line));
+  }
+
+  function rowsFromWorkbook(buffer, fileName) {
+    if (!window.XLSX?.read || !window.XLSX?.utils?.sheet_to_json) throw new Error("找不到內置 Excel 元件。");
+    const book = window.XLSX.read(buffer, { type: "array", cellDates: false });
+    const sheet = book.Sheets[book.SheetNames[0]];
+    return window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+  }
+
+  function normalizeRows(rows, sourceName) {
+    if (!Array.isArray(rows) || !rows.length) throw new Error("沒有可匯入的時間表資料。");
+    const first = rows[0].map(value => normalize(value));
+    if (first.length !== HEADERS.length || first.some((value, i) => value !== HEADERS[i])) {
+      throw new Error("標題不符；請使用小工具「12_上課時間表」的十三欄 TSV。");
+    }
+    const out = rows.slice(1).map(row => {
+      const item = HEADERS.map((_, i) => normalize(row[i] || ""));
+      if (!item.some(Boolean)) return null;
+      if (!item[12]) item[12] = sourceName || "";
+      return item;
+    }).filter(Boolean);
+    if (!out.length) throw new Error("只有欄名，沒有有效時間表資料列。");
+    return out;
+  }
+
+  function setRows(rows, sourceName) {
+    const seen = new Set();
+    state.rows = rows.filter(row => {
+      const key = row.join("\u0001");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).sort((a, b) => String(a[1]).localeCompare(String(b[1]), "zh-Hant") || dayNumber(a[4]) - dayNumber(b[4]) || timeNumber(a[5]) - timeNumber(b[5]) || String(a[7]).localeCompare(String(b[7]), "zh-Hant"));
+    state.sourceName = sourceName || state.sourceName;
+    render();
+    window.TeacherTool?.refreshGasExportPanel?.();
+  }
+
+  function projection() { return [HEADERS.slice(), ...state.rows]; }
+  function tsv() { return projection().map(row => row.map(value => normalize(value)).join("\t")).join("\r\n"); }
+  function csv() {
+    return projection().map(row => row.map(value => {
+      const cell = normalize(value);
+      return /[",]/u.test(cell) ? `"${cell.replace(/"/gu, '""')}"` : cell;
+    }).join(",")).join("\r\n");
+  }
+
+  function renderFilters() {
+    const currentTeacher = dom.teacherFilter.value;
+    const currentDay = dom.dayFilter.value;
+    const teachers = [...new Map(state.rows.map(row => [row[1], `${row[1]}${row[2] ? `（${row[2]}）` : ""}`])).entries()].sort((a, b) => a[0].localeCompare(b[0], "zh-Hant"));
+    const days = [...new Set(state.rows.map(row => row[4]).filter(Boolean))].sort((a, b) => dayNumber(a) - dayNumber(b));
+    dom.teacherFilter.innerHTML = '<option value="">全部教師</option>' + teachers.map(([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`).join("");
+    dom.dayFilter.innerHTML = '<option value="">全部日次</option>' + days.map(value => `<option value="${esc(value)}">${esc(value)}</option>`).join("");
+    dom.teacherFilter.value = teachers.some(([value]) => value === currentTeacher) ? currentTeacher : "";
+    dom.dayFilter.value = days.includes(currentDay) ? currentDay : "";
+  }
+
+  function render() {
+    if (!dom.panel) return;
+    dom.panel.hidden = !state.rows.length;
+    if (!state.rows.length) return;
+    renderFilters();
+    const teacher = dom.teacherFilter.value, day = dom.dayFilter.value;
+    const rows = state.rows.filter(row => (!teacher || row[1] === teacher) && (!day || row[4] === day));
+    dom.summary.textContent = `共 ${state.rows.length} 行；目前顯示 ${rows.length} 行；${new Set(state.rows.map(row => row[1]).filter(Boolean)).size} 位教師。原文欄保留 PDF 跨行內容，貼入 Google Sheet 後可再按欄搜尋。`;
+    dom.head.innerHTML = `<tr>${HEADERS.map(header => `<th>${esc(header)}</th>`).join("")}</tr>`;
+    dom.body.innerHTML = rows.map(row => `<tr>${row.map(value => `<td>${esc(value)}</td>`).join("")}</tr>`).join("");
+  }
+
+  function download(content, fileName, type) {
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + content], { type }));
+    const link = document.createElement("a");
+    link.href = url; link.download = fileName; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  async function copyTsv() {
+    const text = tsv();
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(text);
+      dom.fallback.hidden = true;
+      showStatus("success", "已複製 12_上課時間表 TSV", `已複製 ${state.rows.length} 行；可貼入 Google Sheet 的「12_上課時間表」。`);
+    } catch (error) {
+      dom.fallbackText.value = text; dom.fallback.hidden = false; dom.fallbackText.focus(); dom.fallbackText.select();
+      showStatus("warning", "瀏覽器未允許直接複製", "已在下方顯示 TSV；按全選後自行複製貼入 Google Sheet。");
+    }
+  }
+
+  async function parseFile() {
+    if (!state.file) { showStatus("warning", "尚未選擇檔案", "請先選擇教師時間表 PDF／TSV／Excel。"); return; }
+    try {
+      dom.parseBtn.disabled = true; dom.progress.hidden = false; progress(3, "正在開啟時間表…");
+      const isPdf = state.file.type === "application/pdf" || /\.pdf$/iu.test(state.file.name);
+      let rows;
+      if (isPdf) rows = await parsePdf(state.file);
+      else {
+        const buffer = await state.file.arrayBuffer();
+        const raw = /\.(?:xlsx|xls)$/iu.test(state.file.name)
+          ? rowsFromWorkbook(buffer, state.file.name)
+          : rowsFromDelimited(new TextDecoder("utf-8").decode(buffer));
+        rows = normalizeRows(raw, state.file.name);
+      }
+      if (isPdf && !rows.length) throw new Error("未能辨認教師時間表；請確認 PDF 是可選取文字的版本。");
+      if (isPdf) rows = normalizeRows([HEADERS, ...rows], state.file.name);
+      progress(100, "解析完成");
+      setRows(rows, state.file.name);
+      showStatus("success", "上課時間表轉換完成", `已建立 ${rows.length} 行；可按教師／日次篩選，核對後複製 12_上課時間表 TSV。`);
+      setTimeout(() => { dom.progress.hidden = true; }, 700);
+    } catch (error) {
+      console.error(error); dom.progress.hidden = true;
+      showStatus("error", "上課時間表解析失敗", error.message || "請檢查來源檔案。");
+    } finally { dom.parseBtn.disabled = !state.file; }
+  }
+
+  function setFile(file) {
+    if (!file) return;
+    if (!/\.(?:pdf|csv|tsv|xlsx|xls)$/iu.test(file.name)) { showStatus("error", "檔案格式不正確", "請選擇 PDF、CSV、TSV 或 Excel。"); return; }
+    state.file = file; state.rows = [];
+    const label = `${file.name}・${((file.size || 0) / 1024).toFixed(1)} KB`;
+    dom.fileMeta.textContent = label; dom.routeFileMeta.textContent = label; dom.routeFileMeta.hidden = false;
+    dom.parseBtn.disabled = false; dom.panel.hidden = true;
+    showStatus("warning", "檔案已準備好", "按「解析上課時間表」開始轉換。");
+  }
+
+  dom.input.addEventListener("change", event => { setFile(event.target.files[0]); if (event.target.files[0]) window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#timetable`); });
+  dom.dropZone.addEventListener("click", event => { if (event.target.tagName !== "LABEL") dom.input.click(); });
+  dom.dropZone.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); dom.input.click(); } });
+  ["dragenter", "dragover"].forEach(type => dom.dropZone.addEventListener(type, event => { event.preventDefault(); dom.dropZone.classList.add("is-dragging"); }));
+  ["dragleave", "drop"].forEach(type => dom.dropZone.addEventListener(type, event => { event.preventDefault(); dom.dropZone.classList.remove("is-dragging"); }));
+  dom.dropZone.addEventListener("drop", event => setFile(event.dataTransfer.files[0]));
+  dom.parseBtn.addEventListener("click", parseFile);
+  dom.pasteBtn.addEventListener("click", () => {
+    try {
+      const rows = normalizeRows(rowsFromDelimited(dom.pasteInput.value), "貼上資料");
+      setRows(rows, "貼上資料");
+      showStatus("success", "TSV 轉換完成", `已建立 ${rows.length} 行，可直接複製 12_上課時間表 TSV。`);
+    } catch (error) { showStatus("error", "TSV 解析失敗", error.message || "請檢查欄序。"); }
+  });
+  dom.teacherFilter.addEventListener("change", render);
+  dom.dayFilter.addEventListener("change", render);
+  dom.copyBtn.addEventListener("click", copyTsv);
+  dom.csvBtn.addEventListener("click", () => download(csv(), "12_上課時間表.csv", "text/csv;charset=utf-8"));
+  dom.xlsxBtn.addEventListener("click", () => {
+    if (!window.XLSX?.utils?.aoa_to_sheet || !window.XLSX.writeFile) { showStatus("error", "Excel 匯出失敗", "找不到內置 SheetJS。"); return; }
+    const book = window.XLSX.utils.book_new();
+    const sheet = window.XLSX.utils.aoa_to_sheet(projection());
+    window.XLSX.utils.book_append_sheet(book, sheet, "12_上課時間表");
+    window.XLSX.writeFile(book, "12_上課時間表.xlsx", { bookType: "xlsx", compression: true });
+  });
+
+window.TimetableTool = {
+    timetableProjection: projection,
+    getTimetableExportData: () => ({ headers: HEADERS.slice(), rows: state.rows.map(row => row.slice()), sourceName: state.sourceName }),
+    setFile,
+    parseFile,
+    render,
+    getRows: () => state.rows.map(row => row.slice())
+  };
+})();
+
+(() => {
+  "use strict";
+
+  const $ = selector => document.querySelector(selector);
+  const HEADERS = Object.freeze(["日期", "星期", "週次", "標記", "事項", "假期", "原文", "來源文件"]);
+  const WEEKDAYS = Object.freeze(["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]);
+  const state = { file: null, rows: [], sourceName: "", workerUrl: "", diagnostics: { weeks: 0, unassignedEvents: 0, unassignedHolidays: 0 }, yearStart: 2026 };
+  const dom = {
+    input: $("#calendarFileInput"), dropZone: $("#calendarDropZone"), fileMeta: $("#calendarFileMeta"), routeFileMeta: $("#calendarRouteFileMeta"),
+    parseBtn: $("#parseCalendarBtn"), pasteInput: $("#calendarPasteInput"), pasteBtn: $("#parseCalendarPasteBtn"), progress: $("#calendarProgress"),
+    progressBar: $("#calendarProgressBar"), progressText: $("#calendarProgressText"), status: $("#calendarStatusArea"), panel: $("#calendarExportPanel"),
+    summary: $("#calendarExportSummary"), monthFilter: $("#calendarMonthFilter"), flagFilter: $("#calendarFlagFilter"), head: $("#calendarPreviewHead"),
+    body: $("#calendarPreviewBody"), copyBtn: $("#copyCalendarTsvBtn"), csvBtn: $("#downloadCalendarCsvBtn"), xlsxBtn: $("#downloadCalendarXlsxBtn"),
+    fallback: $("#calendarTsvFallback"), fallbackText: $("#calendarTsvFallbackText")
+  };
+
+  function normalize(value) {
+    return String(value ?? "").replace(/\u3000/g, " ").replace(/[\t\r\n]+/gu, " ").replace(/\s+/gu, " ").trim();
+  }
+
+  function esc(value) {
+    return String(value ?? "").replace(/[&<>\"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+  }
+
+  function schoolYear(fileName) {
+    const match = String(fileName || "").match(/(20\d{2})\s*[-–—]\s*(20\d{2})/u);
+    return match ? `${match[1]}-${match[2]}` : "2026-2027";
+  }
+
+  function showStatus(type, title, message) {
+    const icon = type === "success" ? "✓" : type === "error" ? "!" : "i";
+    dom.status.innerHTML = `<div class="status-message status-message--${type}"><strong aria-hidden="true">${icon}</strong><div><strong>${esc(title)}</strong><p>${esc(message)}</p></div></div>`;
+  }
+
+  function progress(percent, message) {
+    dom.progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    dom.progressText.textContent = message;
+  }
+
+  function lineText(line) { return (line?.cells || []).map(cell => normalize(cell.text)).filter(Boolean).join(" "); }
+
+  function calendarHeaderCenters(lines) {
+    const header = (lines || []).find(line => /周\s+月份/u.test(lineText(line)) && /事項/u.test(lineText(line)) && /假期/u.test(lineText(line)));
+    if (!header) return [];
+    const centers = Array(11).fill(null);
+    const labels = { "周": 0, "月份": 1, "日": 2, "一": 3, "二": 4, "三": 5, "四": 6, "五": 7, "六": 8, "事項": 9, "假期": 10 };
+    (header.cells || []).forEach(cell => {
+      const text = normalize(cell.text).replace(/\s+/gu, "");
+      const index = labels[text] ?? labels[Object.keys(labels).find(key => text.startsWith(key))];
+      if (index !== undefined && Number.isFinite(Number(cell.center))) centers[index] = Number(cell.center);
+    });
+    if (centers.filter(Number.isFinite).length >= 9) return centers;
+    const xs = (header.cells || []).map(cell => Number(cell.center)).filter(Number.isFinite);
+    if (xs.length >= 10) {
+      const left = Math.min(...xs), right = Math.max(...xs);
+      return Array.from({ length: 11 }, (_, i) => left + ((right - left) * i / 10));
+    }
+    return centers;
+  }
+
+  function nearestColumn(center, centers) {
+    if (!centers.length || !Number.isFinite(center)) return -1;
+    let best = -1, distance = Infinity;
+    centers.forEach((value, index) => {
+      if (!Number.isFinite(value)) return;
+      const next = Math.abs(value - center);
+      if (next < distance) { best = index; distance = next; }
+    });
+    return best;
+  }
+
+  function isWeekStart(line) {
+    const cells = (line?.cells || []).map(cell => normalize(cell.text)).filter(Boolean);
+    return /^\d{1,2}$/u.test(cells[0] || "") && /^(?:[1-9]|1[0-2])$/u.test(cells[1] || "");
+  }
+
+  function rowBuckets(lines, start, end, centers) {
+    const buckets = Array.from({ length: 11 }, () => []);
+    for (const line of lines.slice(start, end)) {
+      for (const cell of line.cells || []) {
+        const col = nearestColumn(Number(cell.center), centers);
+        if (col >= 0 && col < buckets.length) buckets[col].push(normalize(cell.text));
+      }
+    }
+    return buckets.map(parts => normalize(parts.join(" ")));
+  }
+
+  function parseDayCell(value) {
+    const text = normalize(value);
+    const match = text.match(/^(\d{1,2})(?=\s|[A-Za-z\u3400-\u9fff(]|$)/u);
+    if (!match) return { day: null, marker: text };
+    const marker = text.slice(match[0].length).replace(/[（(]\s*\d+(?:\s*[-,/，、]\s*\d+)*\s*[）)]/gu, "").replace(/\s+/gu, " ").trim();
+    return { day: Number(match[1]), marker };
+  }
+
+  function markerDays(marker) {
+    const text = normalize(marker).replace(/[（）]/gu, "");
+    const range = text.match(/(\d{1,2})(?:\s*\/\s*\d{1,2})?\s*[-–—至]\s*(\d{1,2})(?:\s*\/\s*\d{1,2})?/u);
+    if (range) {
+      const from = Number(range[1]), to = Number(range[2]), result = [];
+      if (from <= to) for (let day = from; day <= to; day += 1) result.push(day);
+      else { for (let day = from; day <= 31; day += 1) result.push(day); for (let day = 1; day <= to; day += 1) result.push(day); }
+      return result;
+    }
+    return [...text.matchAll(/\d{1,2}/gu)].map(match => Number(match[0])).filter(day => day >= 1 && day <= 31);
+  }
+
+  function assignSegments(text, dayCells, target, diagnostics) {
+    const segments = normalize(text).split(/[；;]/u).map(item => normalize(item)).filter(Boolean);
+    let previousDays = [];
+    for (const segment of segments) {
+      const marked = segment.match(/^\(([^)]*)\)\s*(.*)$/u);
+      const days = marked ? markerDays(marked[1]) : previousDays;
+      const body = normalize(marked ? marked[2] : segment);
+      if (marked) previousDays = days;
+      if (!body) continue;
+      const matchedIndexes = dayCells.map((cell, index) => days.includes(cell.day) ? index : -1).filter(index => index >= 0);
+      if (!matchedIndexes.length) {
+        diagnostics[target === "holiday" ? "unassignedHolidays" : "unassignedEvents"] += 1;
+        continue;
+      }
+      matchedIndexes.forEach(index => { dayCells[index][target].push(body); });
+    }
+  }
+
+  function dateFor(yearStart, week, dayIndex) {
+    const firstOfSeptember = new Date(yearStart, 8, 1);
+    const firstSunday = new Date(yearStart, 8, 1 - firstOfSeptember.getDay());
+    const date = new Date(firstSunday);
+    date.setDate(firstSunday.getDate() + ((week - 1) * 7) + dayIndex);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function calendarRowsFromPages(pages, sourceName) {
+    let centers = [], parsedWeeks = [];
+    for (const page of pages || []) {
+      const pageCenters = calendarHeaderCenters(page.lines);
+      if (pageCenters.length) centers = pageCenters;
+      if (!centers.length) continue;
+      const starts = page.lines.map((line, index) => isWeekStart(line) ? index : -1).filter(index => index >= 0);
+      starts.forEach((start, position) => {
+        const noteStart = page.lines.findIndex((line, index) => index > start && /^註\s*\d/u.test(lineText(line)));
+        const end = starts[position + 1] ?? (noteStart >= 0 ? noteStart : page.lines.length);
+        const buckets = rowBuckets(page.lines, start, end, centers);
+        const week = Number(buckets[0]);
+        if (!week) return;
+        const dayCells = buckets.slice(2, 9).map(parseDayCell).map(cell => ({ ...cell, events: [], holiday: [] }));
+        assignSegments(buckets[9], dayCells, "events", state.diagnostics);
+        assignSegments(buckets[10], dayCells, "holiday", state.diagnostics);
+        parsedWeeks.push({ week, dayCells, raw: page.lines.slice(start, end).map(lineText).filter(Boolean).join(" / ") });
+      });
+    }
+    parsedWeeks = parsedWeeks.sort((a, b) => a.week - b.week);
+    state.diagnostics.weeks = parsedWeeks.length;
+    const yearStart = state.yearStart;
+    return parsedWeeks.flatMap(row => row.dayCells.map((cell, dayIndex) => {
+      const date = dateFor(yearStart, row.week, dayIndex);
+      return [date, WEEKDAYS[new Date(`${date}T00:00:00`).getDay()], String(row.week), cell.marker,
+        cell.events.join("；"), cell.holiday.join("；"), row.raw, sourceName];
+    }));
+  }
+
+  async function ensureWorker() {
+    if (state.workerUrl) return;
+    if (!window.__PDF_WORKER_BASE64__) throw new Error("找不到本機 PDF 工作元件。");
+    const binary = atob(window.__PDF_WORKER_BASE64__);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    state.workerUrl = URL.createObjectURL(new Blob([bytes], { type: "text/javascript" }));
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = state.workerUrl;
+  }
+
+  async function parsePdf(file) {
+    if (!window.pdfjsLib) throw new Error("本機 PDF 元件未能載入。");
+    await ensureWorker();
+    const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const pages = [];
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      progress(Math.round(8 + (pageNumber - 1) / pdf.numPages * 84), `正在分析第 ${pageNumber}／${pdf.numPages} 頁…`);
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent({ normalizeWhitespace: true });
+      const lines = window.AdminStructureTool?.textItemsToLines ? window.AdminStructureTool.textItemsToLines(content.items, pageNumber) : [];
+      pages.push({ lines, pageNumber });
+    }
+    return calendarRowsFromPages(pages, file.name);
+  }
+
+  function parseCsvLine(line) {
+    const cells = [], re = /(?:^|,)(?:"((?:""|[^"])*)"|([^,]*))/gu;
+    let match;
+    while ((match = re.exec(line)) !== null) cells.push((match[1] !== undefined ? match[1].replace(/""/gu, '"') : match[2]).trim());
+    return cells;
+  }
+
+  function rowsFromDelimited(text) {
+    const lines = String(text || "").replace(/^\uFEFF/u, "").replace(/\r/g, "").split("\n").filter(line => line.trim());
+    return lines.map(line => line.includes("\t") ? line.split("\t") : parseCsvLine(line));
+  }
+
+  function rowsFromWorkbook(buffer) {
+    if (!window.XLSX?.read || !window.XLSX?.utils?.sheet_to_json) throw new Error("找不到內置 Excel 元件。");
+    const book = window.XLSX.read(buffer, { type: "array", cellDates: false });
+    return window.XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { header: 1, defval: "", raw: false });
+  }
+
+  function normalizeRows(rows, sourceName) {
+    if (!Array.isArray(rows) || !rows.length) throw new Error("沒有可匯入的校曆資料。");
+    const first = rows[0].map(value => normalize(value));
+    if (first.length !== HEADERS.length || first.some((value, index) => value !== HEADERS[index])) throw new Error("標題不符；請使用「13_校曆表」八欄 TSV。");
+    const output = rows.slice(1).map(row => {
+      const item = HEADERS.map((_, index) => normalize(row[index] || ""));
+      if (!item.some(Boolean)) return null;
+      if (!/^\d{4}-\d{2}-\d{2}$/u.test(item[0])) throw new Error(`日期不正確：${item[0] || "（空白）"}；應為 YYYY-MM-DD。`);
+      if (item[2] && !/^\d{1,2}$/u.test(item[2])) throw new Error(`週次不正確：${item[2]}。`);
+      if (!item[7]) item[7] = sourceName || "";
+      return item;
+    }).filter(Boolean);
+    if (!output.length) throw new Error("只有欄名，沒有有效校曆資料列。");
+    return output;
+  }
+
+  function setRows(rows, sourceName) {
+    const seen = new Set();
+    state.rows = rows.filter(row => {
+      const key = row.join("\u0001");
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    }).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+    state.sourceName = sourceName || state.sourceName;
+    render();
+    window.TeacherTool?.refreshGasExportPanel?.();
+  }
+
+  function projection() { return [HEADERS.slice(), ...state.rows]; }
+  function tsv() { return projection().map(row => row.map(value => normalize(value)).join("\t")).join("\r\n"); }
+  function csv() { return projection().map(row => row.map(value => { const cell = normalize(value); return /[",]/u.test(cell) ? `"${cell.replace(/"/gu, '""')}"` : cell; }).join(",")).join("\r\n"); }
+
+  function renderFilters() {
+    const currentMonth = dom.monthFilter.value, currentFlag = dom.flagFilter.value;
+    const months = [...new Set(state.rows.map(row => row[0].slice(0, 7)))].sort();
+    const flags = [...new Set(state.rows.map(row => row[3]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+    dom.monthFilter.innerHTML = '<option value="">全部月份</option>' + months.map(value => `<option value="${esc(value)}">${esc(value)}</option>`).join("");
+    dom.flagFilter.innerHTML = '<option value="">全部標記</option>' + flags.map(value => `<option value="${esc(value)}">${esc(value)}</option>`).join("");
+    dom.monthFilter.value = months.includes(currentMonth) ? currentMonth : "";
+    dom.flagFilter.value = flags.includes(currentFlag) ? currentFlag : "";
+  }
+
+  function render() {
+    if (!dom.panel) return;
+    dom.panel.hidden = !state.rows.length;
+    if (!state.rows.length) return;
+    renderFilters();
+    const month = dom.monthFilter.value, flag = dom.flagFilter.value;
+    const rows = state.rows.filter(row => (!month || row[0].startsWith(month)) && (!flag || row[3] === flag));
+    dom.summary.textContent = `共 ${state.rows.length} 日；目前顯示 ${rows.length} 日；事項 ${state.rows.filter(row => row[4]).length} 日；假期 ${state.rows.filter(row => row[5]).length} 日。`;
+    dom.head.innerHTML = `<tr>${HEADERS.map(header => `<th>${esc(header)}</th>`).join("")}</tr>`;
+    dom.body.innerHTML = rows.map(row => `<tr>${row.map(value => `<td>${esc(value)}</td>`).join("")}</tr>`).join("");
+  }
+
+  function download(content, fileName, type) {
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + content], { type }));
+    const link = document.createElement("a"); link.href = url; link.download = fileName; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  async function copyTsv() {
+    const text = tsv();
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(text); dom.fallback.hidden = true;
+      showStatus("success", "已複製 13_校曆表 TSV", `已複製 ${state.rows.length} 日；可貼入 Google Sheet 的「13_校曆表」。`);
+    } catch (error) {
+      dom.fallbackText.value = text; dom.fallback.hidden = false; dom.fallbackText.focus(); dom.fallbackText.select();
+      showStatus("warning", "瀏覽器未允許直接複製", "已在下方顯示 TSV；按全選後自行複製貼入 Google Sheet。 ");
+    }
+  }
+
+  async function parseFile() {
+    if (!state.file) { showStatus("warning", "尚未選擇檔案", "請先選擇校曆表 PDF／TSV／Excel。 "); return; }
+    try {
+      dom.parseBtn.disabled = true; dom.progress.hidden = false; state.diagnostics = { weeks: 0, unassignedEvents: 0, unassignedHolidays: 0 };
+      state.yearStart = Number(schoolYear(state.file.name).slice(0, 4)) || 2026;
+      progress(3, "正在開啟校曆表…");
+      const isPdf = state.file.type === "application/pdf" || /\.pdf$/iu.test(state.file.name);
+      let rows;
+      if (isPdf) rows = await parsePdf(state.file);
+      else {
+        const buffer = await state.file.arrayBuffer();
+        const raw = /\.(?:xlsx|xls)$/iu.test(state.file.name) ? rowsFromWorkbook(buffer) : rowsFromDelimited(new TextDecoder("utf-8").decode(buffer));
+        rows = normalizeRows(raw, state.file.name);
+      }
+      if (isPdf) {
+        if (!rows.length) throw new Error("未能辨認校曆表週列；請確認 PDF 是可選取文字的版本。");
+        rows = normalizeRows([HEADERS, ...rows], state.file.name);
+      }
+      progress(100, "解析完成"); setRows(rows, state.file.name);
+      const warning = state.diagnostics.unassignedEvents || state.diagnostics.unassignedHolidays
+        ? `另有 ${state.diagnostics.unassignedEvents} 項事項、${state.diagnostics.unassignedHolidays} 項假期未能按日號分配，請按原文核對。` : "事項及假期已按日號分配。";
+      showStatus(state.diagnostics.unassignedEvents || state.diagnostics.unassignedHolidays ? "warning" : "success", "校曆表轉換完成", `已建立 ${rows.length} 日；${warning}`);
+      setTimeout(() => { dom.progress.hidden = true; }, 700);
+    } catch (error) { console.error(error); dom.progress.hidden = true; showStatus("error", "校曆表解析失敗", error.message || "請檢查來源檔案。 "); }
+    finally { dom.parseBtn.disabled = !state.file; }
+  }
+
+  function setFile(file) {
+    if (!file) return;
+    if (!/\.(?:pdf|csv|tsv|xlsx|xls)$/iu.test(file.name)) { showStatus("error", "檔案格式不正確", "請選擇 PDF、CSV、TSV 或 Excel。 "); return; }
+    state.file = file; state.rows = []; state.sourceName = file.name; state.yearStart = Number(schoolYear(file.name).slice(0, 4)) || 2026;
+    const label = `${file.name}・${((file.size || 0) / 1024).toFixed(1)} KB`;
+    dom.fileMeta.textContent = label; dom.routeFileMeta.textContent = label; dom.routeFileMeta.hidden = false; dom.parseBtn.disabled = false; dom.panel.hidden = true;
+    showStatus("warning", "檔案已準備好", "按「解析校曆表」開始轉換。 ");
+  }
+
+  dom.input.addEventListener("change", event => { setFile(event.target.files[0]); if (event.target.files[0]) window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#calendar`); });
+  dom.dropZone.addEventListener("click", event => { if (event.target.tagName !== "LABEL") dom.input.click(); });
+  dom.dropZone.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); dom.input.click(); } });
+  ["dragenter", "dragover"].forEach(type => dom.dropZone.addEventListener(type, event => { event.preventDefault(); dom.dropZone.classList.add("is-dragging"); }));
+  ["dragleave", "drop"].forEach(type => dom.dropZone.addEventListener(type, event => { event.preventDefault(); dom.dropZone.classList.remove("is-dragging"); }));
+  dom.dropZone.addEventListener("drop", event => setFile(event.dataTransfer.files[0]));
+  dom.parseBtn.addEventListener("click", parseFile);
+  dom.pasteBtn.addEventListener("click", () => {
+    try { const rows = normalizeRows(rowsFromDelimited(dom.pasteInput.value), "貼上資料"); setRows(rows, "貼上資料"); showStatus("success", "TSV 轉換完成", `已建立 ${rows.length} 日，可直接複製 13_校曆表 TSV。`); }
+    catch (error) { showStatus("error", "TSV 解析失敗", error.message || "請檢查欄序。 "); }
+  });
+  dom.monthFilter.addEventListener("change", render); dom.flagFilter.addEventListener("change", render); dom.copyBtn.addEventListener("click", copyTsv);
+  dom.csvBtn.addEventListener("click", () => download(csv(), "13_校曆表.csv", "text/csv;charset=utf-8"));
+  dom.xlsxBtn.addEventListener("click", () => {
+    if (!window.XLSX?.utils?.aoa_to_sheet || !window.XLSX.writeFile) { showStatus("error", "Excel 匯出失敗", "找不到內置 SheetJS。 "); return; }
+    const book = window.XLSX.utils.book_new(); const sheet = window.XLSX.utils.aoa_to_sheet(projection());
+    window.XLSX.utils.book_append_sheet(book, sheet, "13_校曆表"); window.XLSX.writeFile(book, "13_校曆表.xlsx", { bookType: "xlsx", compression: true });
+  });
+
+  window.SchoolCalendarTool = {
+    calendarProjection: projection,
+    getCalendarExportData: () => ({ headers: HEADERS.slice(), rows: state.rows.map(row => row.slice()), sourceName: state.sourceName, diagnostics: { ...state.diagnostics } }),
+    setFile, parseFile, render, getRows: () => state.rows.map(row => row.slice()),
+    parsePages: (pages, sourceName) => calendarRowsFromPages(pages, sourceName)
+  };
 })();
 
 </script>
