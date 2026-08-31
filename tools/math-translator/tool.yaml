@@ -1,0 +1,7 @@
+# tools/math-translator/tool.yaml
+name: math-translator
+summary: Translate mathematics documents with a public terminology seed
+status: beta
+runtime: node
+entry: server.mjs
+requires_node: ">=18"

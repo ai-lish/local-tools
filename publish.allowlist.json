@@ -101,6 +101,78 @@
       "destination": "tools/class-photo-rename/tool.yaml",
       "publicMode": "cli-source",
       "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/README.md",
+      "destination": "tools/math-translator/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/index.html",
+      "destination": "tools/math-translator/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/app.js",
+      "destination": "tools/math-translator/app.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/styles.css",
+      "destination": "tools/math-translator/styles.css",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/publisher-glossary.js",
+      "destination": "tools/math-translator/publisher-glossary.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/drive-sample.js",
+      "destination": "tools/math-translator/drive-sample.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/server.mjs",
+      "destination": "tools/math-translator/server.mjs",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/extract_text.py",
+      "destination": "tools/math-translator/extract_text.py",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/package.json",
+      "destination": "tools/math-translator/package.json",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/tool.yaml",
+      "destination": "tools/math-translator/tool.yaml",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/.env.example",
+      "destination": "tools/math-translator/.env.example",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/math-translator/tests/test_extractor.py",
+      "destination": "tools/math-translator/tests/test_extractor.py",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
     }
   ],
   "generatedFiles": [

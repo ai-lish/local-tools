@@ -1,0 +1,14 @@
+{
+  "name": "mathlingo",
+  "version": "0.2.0",
+  "private": true,
+  "description": "MathLingo public mathematics translation tool",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "python3 -m unittest discover -s tests -v"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

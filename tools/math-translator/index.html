@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="保留 LaTeX 公式的數學文件翻譯小工具"
+    />
+    <title>MathLingo — 數學文件翻譯</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="publisher-glossary.js" defer></script>
+    <script src="drive-sample.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="主選單">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">∑</div>
+          <div>
+            <div class="brand-name">MathLingo</div>
+            <div class="brand-caption">MATH-AWARE TRANSLATION</div>
+          </div>
+        </div>
+
+        <nav class="side-nav">
+          <a class="nav-item active" href="#workspace" aria-current="page">
+            <span class="nav-icon">↔</span>
+            <span>文件翻譯</span>
+            <span class="nav-dot"></span>
+          </a>
+          <a class="nav-item" href="#terms">
+            <span class="nav-icon">⌕</span>
+            <span>常見用詞</span>
+          </a>
+          <a class="nav-item" href="#guide">
+            <span class="nav-icon">⌘</span>
+            <span>使用說明</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="mini-note">
+            <span class="mini-note-mark">∫</span>
+            <div>
+              <strong>公式保護中</strong>
+              <p>辨識到的 LaTeX、變數與符號會原樣保留。</p>
+            </div>
+          </div>
+          <div class="sidebar-version">LOCAL TOOL <span>v0.2</span></div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="breadcrumb"><span>工具</span><b>/</b><strong>文件翻譯</strong></div>
+          <div class="topbar-status"><span class="status-pulse"></span><span id="serviceStatus">離線可用</span></div>
+        </header>
+
+        <section class="hero" aria-labelledby="page-title">
+          <div class="hero-copy">
+            <div class="eyebrow"><span></span> MATH-AWARE TRANSLATION</div>
+            <h1 id="page-title">翻譯數學，<br /><em>不翻譯公式。</em></h1>
+            <p id="heroDescription">
+              以數學常見用語整理翻譯結果；需要更完整語境時，可切換 GPT-5.6-sol，同時守住每一個公式、變數與 LaTeX 結構。
+            </p>
+            <div class="hero-actions">
+              <button class="button button-primary" id="loadSample" type="button">
+                試用示例 <span aria-hidden="true">↗</span>
+              </button>
+              <button class="button button-quiet drive-sample-button" id="loadDriveSample" type="button">
+                <span class="drive-mark" aria-hidden="true">▣</span> <span id="driveSampleLabel">實例示範</span>
+              </button>
+              <a class="button button-quiet" href="#terms">查找常見用詞 <span aria-hidden="true">↓</span></a>
+              <button class="button button-quiet" id="clearAll" type="button">清除內容</button>
+            </div>
+          </div>
+
+          <div class="hero-diagram" aria-label="工具處理流程示意">
+            <div class="orbit orbit-one"></div>
+            <div class="orbit orbit-two"></div>
+            <div class="diagram-center"><span>∑</span><small>KEEP<br />MATH</small></div>
+            <div class="diagram-node node-top"><span>01</span>文字</div>
+            <div class="diagram-node node-right"><span>02</span>公式</div>
+            <div class="diagram-node node-bottom"><span>03</span>譯文</div>
+          </div>
+        </section>
+
+        <section class="workspace-section" id="workspace" aria-labelledby="workspace-title">
+          <div class="workspace-heading">
+            <div>
+              <div class="section-label">WORKSPACE <span>01</span></div>
+              <h2 id="workspace-title">翻譯工作區</h2>
+            </div>
+            <div class="language-controls" aria-label="語言設定">
+              <label class="select-wrap">
+                <span class="sr-only">來源語言</span>
+                <select id="sourceLanguage">
+                  <option value="en">English</option>
+                  <option value="zh-Hant">繁體中文</option>
+                </select>
+              </label>
+              <button class="swap-button" id="swapLanguages" type="button" aria-label="交換來源與目標語言">⇄</button>
+              <label class="select-wrap target-select">
+                <span class="sr-only">目標語言</span>
+                <select id="targetLanguage">
+                  <option value="zh-Hant">繁體中文</option>
+                  <option value="en">English</option>
+                </select>
+              </label>
+              <label class="mode-chip mode-select">
+                <span class="mode-dot"></span>
+                <span class="sr-only">翻譯模式</span>
+                <select id="translationMode" aria-label="翻譯模式">
+                  <option value="offline">離線詞庫</option>
+                  <option value="ai">GPT-5.6-sol</option>
+                  <option value="local">Local LLM</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="translation-grid">
+            <article class="editor-card source-card">
+              <div class="card-head">
+                <div>
+                  <span class="card-kicker">SOURCE</span>
+                  <h3>原文文件</h3>
+                </div>
+                <button class="icon-button" id="openFile" type="button" aria-label="匯入文件" title="匯入 TXT、MD、TEX、DOCX 或 PDF 文件">＋</button>
+              </div>
+
+              <div class="dropzone" id="dropzone">
+                <textarea
+                  id="sourceText"
+                  spellcheck="false"
+                  aria-label="原文內容"
+                  placeholder="在這裡貼上數學文件，或將 TXT / MD / TEX / DOCX / PDF 文件拖放至此…"
+                ></textarea>
+                <div class="drop-hint" aria-hidden="true">
+                  <div class="drop-icon">↓</div>
+                  <strong>拖放文件至此</strong>
+                  <span>支援 .txt · .md · .tex · .docx · .pdf</span>
+                </div>
+              </div>
+
+              <div class="source-import-tools">
+                <label class="source-import-label" for="googleDocsUrl">Google Docs 連結</label>
+                <div class="source-import-row">
+                  <input id="googleDocsUrl" type="url" inputmode="url" placeholder="貼上 docs.google.com/document/d/..." autocomplete="off" />
+                  <button class="source-import-button" id="importGoogleDocs" type="button">匯入</button>
+                </div>
+                <p>只支援可供檢視的 Google Docs；私人文件請先下載為 DOCX 或 PDF。</p>
+              </div>
+
+              <div class="card-foot">
+                <div class="file-status" id="fileStatus"><span class="file-status-dot"></span>尚未載入文件</div>
+                <div class="char-count" id="sourceStats">0 字元</div>
+              </div>
+            </article>
+
+            <div class="translate-column">
+              <div class="connector-line" aria-hidden="true"><span></span></div>
+              <button class="translate-button" id="translateButton" type="button">
+                <span class="translate-button-icon" aria-hidden="true">→</span>
+                <span class="translate-button-label">翻譯</span>
+              </button>
+              <div class="connector-line bottom-line" aria-hidden="true"><span></span></div>
+            </div>
+
+            <article class="editor-card output-card">
+              <div class="card-head">
+                <div>
+                  <span class="card-kicker accent">TRANSLATION</span>
+                  <h3>翻譯結果</h3>
+                </div>
+                <div class="output-actions">
+                  <button class="text-icon-button" id="copyOutput" type="button" disabled><span aria-hidden="true">□</span>複製</button>
+                  <button class="text-icon-button" id="downloadOutput" type="button" disabled><span aria-hidden="true">↓</span>下載</button>
+                </div>
+              </div>
+
+              <div class="output-body empty" id="outputText" aria-live="polite">
+                <div class="empty-state">
+                  <div class="empty-glyph">∴</div>
+                  <strong>翻譯結果會出現在這裡</strong>
+                  <span>貼上原文後，按下中央的翻譯按鈕。</span>
+                </div>
+              </div>
+
+              <div class="card-foot">
+                <div class="file-status output-note"><span class="file-status-dot accent-dot"></span><span id="outputStatus">等待翻譯</span></div>
+                <div class="char-count" id="outputStats">0 字元</div>
+              </div>
+            </article>
+          </div>
+
+          <div class="workspace-note">
+            <span class="note-symbol">i</span>
+            <span id="workspaceNoteText">目前為離線示範模式：內建數學詞庫會翻譯常見術語，辨識到的數學公式與 LaTeX 指令保持原樣。</span>
+            <a href="#guide">了解處理方式 <span aria-hidden="true">↗</span></a>
+          </div>
+        </section>
+
+        <section class="terms-section" id="terms" aria-labelledby="terms-title">
+          <div class="terms-heading">
+            <div>
+              <div class="section-label">COMMON WORDING <span>02</span></div>
+              <h2 id="terms-title">數學常見用詞</h2>
+              <p id="termsDescription">搜尋英文、繁體中文或題目指令；按「套用」即可把詞條放回翻譯工作區。</p>
+            </div>
+            <div class="terms-total"><strong id="termCount">0</strong><span>條詞條</span></div>
+          </div>
+
+          <div class="terms-tools" aria-label="詞庫篩選器">
+            <label class="term-search">
+              <span aria-hidden="true">⌕</span>
+              <span class="sr-only">搜尋詞條</span>
+              <input id="termSearch" type="search" placeholder="搜尋英文、中文或題目指令…" autocomplete="off" />
+            </label>
+            <label class="select-wrap">
+              <span class="sr-only">詞條分類</span>
+              <select id="termCategory">
+                <option value="all">所有分類</option>
+              </select>
+            </label>
+            <label class="select-wrap">
+                <span class="sr-only">詞庫來源</span>
+              <select id="termPublisher">
+                <option value="all">所有來源</option>
+              </select>
+            </label>
+            <button class="button button-quiet term-reset" id="resetTermFilters" type="button">重設</button>
+          </div>
+
+          <div class="terms-meta">
+            <span id="termFilterNote">按分類、年級和信心標籤整理</span>
+            <a id="sourceFolderLink" href="#" target="_blank" rel="noreferrer" hidden>開啟示例來源 <span aria-hidden="true">↗</span></a>
+          </div>
+
+          <div class="term-grid" id="termList"></div>
+          <div class="terms-empty" id="termsEmpty" hidden>
+            <span class="empty-glyph">∅</span>
+            <strong>找不到相符詞條</strong>
+            <span>試試英文術語、繁體中文或另一個分類。</span>
+          </div>
+        </section>
+
+        <section class="guide-section" id="guide" aria-labelledby="guide-title">
+          <div class="guide-intro">
+            <div class="section-label">DESIGNED FOR MATH <span>03</span></div>
+            <h2 id="guide-title">讓語言變動，<br /><em>讓數學保持不動。</em></h2>
+          </div>
+          <div class="guide-cards">
+            <article class="guide-card">
+              <div class="guide-number">01</div>
+              <h3>保留公式</h3>
+              <p>辨識行內與獨立 LaTeX，先鎖定公式，再處理自然語言。</p>
+              <div class="code-pills"><code>$x^2$</code><code>\[∫f(x)dx\]</code></div>
+            </article>
+            <article class="guide-card featured-guide">
+              <div class="guide-number">02</div>
+              <h3>對齊術語</h3>
+              <p>以數學語境常用譯法處理 theorem、derivative、eigenvalue 等術語。</p>
+              <div class="term-preview"><span>derivative</span><b>→</b><strong>導數</strong></div>
+            </article>
+            <article class="guide-card">
+              <div class="guide-number">03</div>
+              <h3>方便帶走</h3>
+              <p>翻譯完成後可直接複製純文字，或下載為 Markdown 文件繼續編輯。</p>
+              <div class="export-preview"><span>MD</span><span>TXT</span><span>⌘ C</span></div>
+            </article>
+          </div>
+        </section>
+
+        <footer class="page-footer">
+          <span>MathLingo / 數學文件翻譯小工具</span>
+          <span>Built for clear proofs &amp; clean notation <b>∎</b></span>
+        </footer>
+      </main>
+    </div>
+
+    <input id="fileInput" type="file" accept=".txt,.md,.tex,.docx,.pdf,text/plain,text/markdown,application/x-tex,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf" hidden />
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
