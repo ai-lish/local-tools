@@ -173,10 +173,15 @@ const workflowGrade = document.querySelector("#workflowGrade");
 const workflowTopic = document.querySelector("#workflowTopic");
 const emiPracticePanel = document.querySelector("#emiPracticePanel");
 const emiPracticeCount = document.querySelector("#emiPracticeCount");
+const emiSelectedCard = document.querySelector("#emiSelectedCard");
+const emiSelectedCategory = document.querySelector("#emiSelectedCategory");
 const emiPracticePrompt = document.querySelector("#emiPracticePrompt");
 const emiPracticeAnswer = document.querySelector("#emiPracticeAnswer");
 const revealEmiAnswer = document.querySelector("#revealEmiAnswer");
 const nextEmiCard = document.querySelector("#nextEmiCard");
+const emiTableCount = document.querySelector("#emiTableCount");
+const emiTableBody = document.querySelector("#emiTableBody");
+const emiTableHint = document.querySelector("#emiTableHint");
 const otherUsePanel = document.querySelector("#otherUsePanel");
 const otherUseNote = document.querySelector("#otherUseNote");
 const saveOtherUse = document.querySelector("#saveOtherUse");
@@ -190,6 +195,7 @@ const resetExampleFilters = document.querySelector("#resetExampleFilters");
 const exampleCount = document.querySelector("#exampleCount");
 const exampleFilterNote = document.querySelector("#exampleFilterNote");
 const exampleList = document.querySelector("#exampleList");
+const examplesSection = document.querySelector("#examples");
 const examplesEmpty = document.querySelector("#examplesEmpty");
 const checkServicesButton = document.querySelector("#checkServices");
 const diagnosticsStatus = document.querySelector("#diagnosticsStatus");
@@ -201,6 +207,7 @@ let toastTimer;
 let activeWorkflow = "author";
 let emiPracticeIndex = 0;
 let emiPracticeRevealed = false;
+let emiSelectedId = "";
 let otherUseNoteValue = "";
 let backendState = {
   openai: { configured: false, model: "gpt-5.6-luna", apiStyle: "responses" },
@@ -612,6 +619,7 @@ function renderExampleLibrary() {
     return exampleMatches(entry, query, kind, category, level);
   });
   exampleList.innerHTML = filtered.map(renderExampleCard).join("");
+  if (examplesSection) examplesSection.hidden = activeWorkflow === "emi";
   if (exampleCount) exampleCount.textContent = filtered.length.toLocaleString("zh-Hant-TW");
   if (exampleFilterNote) {
     exampleFilterNote.textContent = filtered.length === exampleEntries.length
@@ -624,9 +632,41 @@ function renderExampleLibrary() {
 
 function getEmiEntries() {
   const category = exampleCategory ? exampleCategory.value : "all";
+  const query = (exampleSearch ? exampleSearch.value : "").trim().toLocaleLowerCase("zh-Hant");
+  const level = exampleLevel ? exampleLevel.value : "all";
   return exampleEntries.filter(function (entry) {
-    return entry.kind === "課堂用語" && (category === "all" || entry.category === category);
+    return entry.kind === "課堂用語" && exampleMatches(entry, query, "課堂用語", category, level);
   });
+}
+
+function emiPair(entry) {
+  return entry.sourceLanguage === "en"
+    ? { english: entry.sourceText, chinese: entry.targetText }
+    : { english: entry.targetText, chinese: entry.sourceText };
+}
+
+function renderEmiTable(entries) {
+  if (!emiTableBody) return;
+  if (emiTableCount) emiTableCount.textContent = entries.length + " 句";
+  if (emiTableHint) {
+    emiTableHint.textContent = entries.length
+      ? "按分類查看全部句子；按「使用這句」後，句子會在上方放大顯示。"
+      : "目前的搜尋／年級／分類沒有相符句子。";
+  }
+  emiTableBody.innerHTML = entries.map(function (entry, index) {
+    const pair = emiPair(entry);
+    const selected = entry.id === emiSelectedId;
+    const tags = (entry.tags || []).slice(0, 3).join(" · ") || entry.note || "—";
+    return [
+      '<tr class="emi-table-row' + (selected ? ' selected' : '') + '" data-emi-row-id="' + escapeHtml(entry.id) + '" aria-selected="' + (selected ? "true" : "false") + '">',
+      '<td class="emi-table-number">' + (index + 1) + "</td>",
+      '<td class="emi-table-english">' + renderMathAwareText(pair.english) + "</td>",
+      '<td class="emi-table-chinese">' + renderMathAwareText(pair.chinese) + "</td>",
+      '<td class="emi-table-note" title="' + escapeHtml(entry.note || "") + '">' + escapeHtml(tags) + "</td>",
+      '<td><button class="emi-use-button" type="button" data-emi-select-id="' + escapeHtml(entry.id) + '">使用這句</button></td>',
+      "</tr>"
+    ].join("");
+  }).join("");
 }
 
 function renderWorkflowCategoryChips() {
@@ -657,8 +697,11 @@ function renderEmiPractice() {
   const entries = getEmiEntries();
   if (!entries.length) {
     emiPracticeIndex = 0;
+    emiSelectedId = "";
     emiPracticeRevealed = false;
+    if (emiSelectedCard) emiSelectedCard.classList.remove("has-selection");
     if (emiPracticeCount) emiPracticeCount.textContent = "0 / 0";
+    if (emiSelectedCategory) emiSelectedCategory.textContent = "EMI";
     if (emiPracticePrompt) emiPracticePrompt.textContent = "這個分類暫時沒有課堂用語。";
     if (emiPracticeAnswer) {
       emiPracticeAnswer.hidden = true;
@@ -666,13 +709,21 @@ function renderEmiPractice() {
     }
     if (revealEmiAnswer) revealEmiAnswer.disabled = true;
     if (nextEmiCard) nextEmiCard.disabled = true;
+    renderEmiTable(entries);
     return;
   }
-  emiPracticeIndex = emiPracticeIndex % entries.length;
+  const selectedIndex = entries.findIndex(function (entry) { return entry.id === emiSelectedId; });
+  emiPracticeIndex = selectedIndex >= 0
+    ? selectedIndex
+    : ((emiPracticeIndex % entries.length) + entries.length) % entries.length;
   const entry = entries[emiPracticeIndex];
-  const prompt = entry.sourceLanguage === "en" ? entry.sourceText : entry.targetText;
-  const answer = entry.sourceLanguage === "en" ? entry.targetText : entry.sourceText;
+  emiSelectedId = entry.id;
+  if (emiSelectedCard) emiSelectedCard.classList.add("has-selection");
+  const pair = emiPair(entry);
+  const prompt = pair.english;
+  const answer = pair.chinese;
   if (emiPracticeCount) emiPracticeCount.textContent = (emiPracticeIndex + 1) + " / " + entries.length;
+  if (emiSelectedCategory) emiSelectedCategory.textContent = entry.category || "EMI";
   if (emiPracticePrompt) emiPracticePrompt.innerHTML = renderMathAwareText(prompt);
   if (emiPracticeAnswer) {
     emiPracticeAnswer.innerHTML = '<span>Suggested meaning</span>' + renderMathAwareText(answer);
@@ -683,6 +734,7 @@ function renderEmiPractice() {
     revealEmiAnswer.textContent = emiPracticeRevealed ? "隱藏中文意思" : "顯示中文意思";
   }
   if (nextEmiCard) nextEmiCard.disabled = false;
+  renderEmiTable(entries);
 }
 
 function updateWorkflowStatus(count) {
@@ -748,7 +800,10 @@ function activateWorkflow(workflow, options) {
   if (settings.exampleId && activeWorkflow === "emi") {
     const entries = getEmiEntries();
     const index = entries.findIndex(function (entry) { return entry.id === settings.exampleId; });
-    if (index >= 0) emiPracticeIndex = index;
+    if (index >= 0) {
+      emiPracticeIndex = index;
+      emiSelectedId = settings.exampleId;
+    }
   }
   renderEmiPractice();
 }
@@ -757,7 +812,10 @@ function handleWorkflowCategory(event) {
   const button = event.target.closest("[data-workflow-category]");
   if (!button || !exampleCategory) return;
   exampleCategory.value = button.dataset.workflowCategory;
-  if (activeWorkflow === "emi") emiPracticeIndex = 0;
+  if (activeWorkflow === "emi") {
+    emiPracticeIndex = 0;
+    emiSelectedId = "";
+  }
   emiPracticeRevealed = false;
   renderWorkflowCategoryChips();
   renderExampleLibrary();
@@ -779,11 +837,29 @@ function handleWorkflowAction(event) {
   } else if (action === "reset-emi") {
     exampleCategory.value = "all";
     emiPracticeIndex = 0;
+    emiSelectedId = "";
     emiPracticeRevealed = false;
     renderWorkflowCategoryChips();
     renderExampleLibrary();
     renderEmiPractice();
   }
+}
+
+function selectEmiEntry(entryId) {
+  if (!entryId || activeWorkflow !== "emi") return;
+  const entries = getEmiEntries();
+  const index = entries.findIndex(function (entry) { return entry.id === entryId; });
+  if (index < 0) return;
+  emiPracticeIndex = index;
+  emiSelectedId = entryId;
+  emiPracticeRevealed = false;
+  renderEmiPractice();
+}
+
+function handleEmiTableClick(event) {
+  const row = event.target.closest("[data-emi-row-id]");
+  if (!row) return;
+  selectEmiEntry(row.dataset.emiRowId);
 }
 
 function saveOtherUseNote() {
@@ -1457,6 +1533,7 @@ if (workflowTopic) {
     if (exampleCategory) exampleCategory.value = workflowTopic.value;
     if (activeWorkflow === "emi") {
       emiPracticeIndex = 0;
+      emiSelectedId = "";
       emiPracticeRevealed = false;
     }
     renderWorkflowCategoryChips();
@@ -1473,9 +1550,13 @@ if (revealEmiAnswer) {
 if (nextEmiCard) {
   nextEmiCard.addEventListener("click", function () {
     emiPracticeIndex += 1;
+    emiSelectedId = "";
     emiPracticeRevealed = false;
     renderEmiPractice();
   });
+}
+if (emiTableBody) {
+  emiTableBody.addEventListener("click", handleEmiTableClick);
 }
 if (saveOtherUse) saveOtherUse.addEventListener("click", saveOtherUseNote);
 if (termSearch) termSearch.addEventListener("input", renderTermLibrary);
@@ -1499,6 +1580,7 @@ if (exampleKind) exampleKind.addEventListener("change", function () {
 if (exampleCategory) {
   exampleCategory.addEventListener("change", function () {
     emiPracticeIndex = 0;
+    emiSelectedId = "";
     emiPracticeRevealed = false;
     renderWorkflowCategoryChips();
     renderExampleLibrary();

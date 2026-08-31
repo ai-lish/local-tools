@@ -15,7 +15,7 @@ CloudSAMS server。學校來源資料、學生／教師真實資料、mapping �
 - 相機圖片合併工具
 - CloudSAMS SLP PDF 分割 HTML／CLI（`stable`）
 - CloudSAMS 班相改名 CLI（`wip` skeleton，尚未可正式使用）
-- MathLingo 數學文件翻譯工具（`beta`；通用詞庫、公開試／出版社題型、教案示例及本機文件匯入）
+- MathLingo 數學文件翻譯工具（`beta`；通用詞庫、公開試／出版社題型、教案示例、EMI 分類表格及本機文件匯入）
 
 CloudSAMS tools 只在本機執行；SLP PDF HTML 會在瀏覽器內處理，
 CLI 使用者需要自行安裝 Python 及依賴。請先閱讀各工具目錄內的 README，

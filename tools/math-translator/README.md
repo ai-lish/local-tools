@@ -9,7 +9,7 @@ MathLingo 是一個保護數學公式的文件翻譯及常見用詞工具，適�
 - 使用公開數學詞庫搜尋、複製及套用常見用詞
 - 使用示例庫測試公開試題型、出版社題型、課程文件、教案、學習目標、教學法及課堂教學用語
 - 單頁工作台：出題改寫、EMI 課堂、HKEAA 核對及其他用途在同一頁切換，不建立內部跳頁
-- 按年級／課題搜尋例子，直接送入「改寫成新題」；課堂用語可按分類進行 pair practice
+- 按年級／課題搜尋例子，直接送入「改寫成新題」；EMI 課堂用語可按分類以表格查看全部句子，點擊「使用這句」後在上方放大顯示
 - 保留 Markdown 結構、變數、符號及常見 LaTeX 公式
 - 使用離線詞庫、GPT-5.6 Luna、MiniMax、LocalAI 或其他本機 OpenAI-compatible LLM 翻譯
 - 按「檢查服務」讀取本機 provider 設定、測試 `/models` endpoint 和列出可用 model id；不顯示 API key
@@ -38,6 +38,8 @@ brew install poppler
 介面按 GPT-5.6 Sol 官方 model guidance 的工作流方向設計：先呈現使用者意圖，再用清晰的視覺層級和直接操作縮短流程。翻譯執行仍預設使用 GPT-5.6 Luna；需要時才在 `.env` 明確設定 Sol。參考[官方 GPT-5.6 model guidance](https://developers.openai.com/api/docs/guides/latest-model)。
 
 工作區的「工作任務」有：`翻譯文件`、`改寫成新題`、`整理教案`。示例卡片可直接把題型載入新題改寫任務，課堂用語可直接加入 EMI pair practice。
+
+EMI 課堂會把所選分類內的全部句子放在可獨立捲動的表格中；選取句子後，左側主卡片會放大顯示並標示目前列，方便教師與同學逐句練習。頁面保留原有工作區，切換 tab 或句子不會使用內部跳頁或強制向下捲動。
 
 ## GPT-5.6 Luna（OpenAI）
 
