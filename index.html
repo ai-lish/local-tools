@@ -3,68 +3,34 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>教學離線工具</title>
+  <meta name="description" content="AI-LISH Local Tools 公開工具入口。">
+  <title>Local Tools｜公開工具入口</title>
   <style>
-    :root { color-scheme: light; --ink:#162537; --muted:#667587; --gold:#d99b22; --line:#dce3e9; --canvas:#f4f6f8; }
-    * { box-sizing: border-box; }
-    body { margin:0; min-height:100vh; color:var(--ink); background:var(--canvas); font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif; line-height:1.6; }
-    main { width:min(860px, calc(100% - 32px)); margin:0 auto; padding:52px 0 72px; }
-    header { padding:26px 28px; color:white; background:linear-gradient(115deg,#0e2941,#1b4868); border-bottom:4px solid var(--gold); border-radius:16px 16px 0 0; }
-    header p { margin:0 0 4px; color:#bcd0df; font-size:12px; letter-spacing:.14em; }
-    h1 { margin:0; font-size:clamp(25px,5vw,38px); }
-    section { padding:28px; background:white; border:1px solid var(--line); border-top:0; border-radius:0 0 16px 16px; box-shadow:0 12px 32px rgba(16,42,67,.07); }
-    h2 { margin:0 0 8px; font-size:21px; }
-    .intro { margin:0 0 22px; color:var(--muted); }
-    .tool { display:block; padding:20px; margin:12px 0; color:var(--ink); text-decoration:none; background:#fbfcfd; border:1px solid var(--line); border-left:5px solid var(--gold); border-radius:12px; }
-    .tool:hover, .tool:focus-visible { background:#fffaf0; border-color:var(--gold); outline:3px solid rgba(217,155,34,.18); }
-    .tool strong { display:block; margin-bottom:4px; font-size:18px; }
-    .tool span { color:var(--muted); font-size:14px; }
-    footer { margin-top:22px; color:var(--muted); text-align:center; font-size:12px; }
+    :root { color-scheme: light; --ink:#162537; --muted:#68798a; --navy:#102a43; --blue:#2367a8; --blue-soft:#eaf3fb; --gold:#d99b22; --gold-soft:#fff7df; --green:#2b7a65; --green-soft:#eaf6f1; --purple:#6950a1; --purple-soft:#f1edfb; --line:#dce5eb; --canvas:#f4f7f9; --surface:#fff; --shadow:0 16px 42px rgba(16,42,67,.08); }
+    * { box-sizing:border-box; } html { scroll-behavior:smooth; }
+    body { margin:0; min-height:100vh; color:var(--ink); background:var(--canvas); font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif; line-height:1.55; } a { color:inherit; }
+    .page { width:min(1160px,calc(100% - 32px)); margin:0 auto; padding:24px 0 58px; } .hero { overflow:hidden; color:#fff; background:linear-gradient(125deg,#0d2942,#173e60 64%,#28678c); border:1px solid #163b5b; border-bottom:4px solid var(--gold); border-radius:22px; box-shadow:var(--shadow); }
+    .header-row { display:flex; align-items:center; gap:16px; padding:20px 25px; border-bottom:1px solid rgba(255,255,255,.12); } .brand { display:inline-flex; align-items:center; gap:11px; color:#fff; text-decoration:none; } .brand-mark { display:grid; place-items:center; width:42px; height:42px; color:var(--navy); background:var(--gold); border-radius:12px; font-size:14px; font-weight:900; } .brand small { display:block; color:#b9cddd; font-size:10px; font-weight:800; letter-spacing:.16em; } .brand strong { display:block; margin-top:1px; font-size:16px; } .header-actions { display:flex; gap:8px; margin-left:auto; } .header-actions a { padding:6px 10px; color:#e9f2f8; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); border-radius:999px; font-size:12px; text-decoration:none; white-space:nowrap; } .header-actions a:hover,.header-actions a:focus-visible { background:rgba(255,255,255,.18); outline:3px solid rgba(255,255,255,.16); outline-offset:2px; }
+    .hero-body { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr); gap:30px; padding:40px 42px 43px; } .eyebrow { margin:0 0 10px; color:#c7d9e8; font-size:12px; font-weight:800; letter-spacing:.14em; } h1 { margin:0; font-size:clamp(30px,5vw,51px); line-height:1.14; letter-spacing:-.025em; } h1 em { color:#ffe09a; font-style:normal; } .hero-body p { max-width:620px; margin:17px 0 0; color:#d2e1ec; font-size:16px; } .hero-actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:24px; } .button { display:inline-flex; align-items:center; gap:8px; min-height:42px; padding:9px 15px; border-radius:10px; font-size:14px; font-weight:800; text-decoration:none; } .button--primary { color:#18334b; background:var(--gold); } .button--secondary { color:#edf5fa; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.23); } .button:hover,.button:focus-visible { transform:translateY(-1px); outline:3px solid rgba(255,255,255,.2); outline-offset:2px; }
+    .hero-side { padding:20px; background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.16); border-radius:16px; } .hero-side h2 { margin:0 0 14px; color:#fff; font-size:16px; } .quick { display:grid; gap:11px; margin:0; padding:0; list-style:none; counter-reset:quick; } .quick li { display:grid; grid-template-columns:25px 1fr; gap:9px; color:#dce9f1; font-size:13px; } .quick li::before { counter-increment:quick; content:counter(quick); display:grid; place-items:center; width:24px; height:24px; color:#173e5d; background:#dcebf3; border-radius:8px; font-size:11px; font-weight:900; } .quick strong { display:block; color:#fff; } .quick span { display:block; margin-top:2px; color:#bed0dd; font-size:12px; }
+    main { padding-top:34px; } .section-heading { display:flex; align-items:end; justify-content:space-between; gap:18px; margin-bottom:13px; } h2 { margin:0; font-size:23px; } .section-heading p { margin:4px 0 0; color:var(--muted); font-size:13px; } .section-link { color:var(--blue); font-size:12px; font-weight:800; text-decoration:none; }
+    .tool-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:13px; } .tool { position:relative; display:flex; flex-direction:column; min-height:181px; padding:19px; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:0 6px 18px rgba(16,42,67,.04); text-decoration:none; } .tool:hover,.tool:focus-visible { border-color:#9abbd4; box-shadow:0 12px 26px rgba(16,42,67,.1); outline:3px solid rgba(35,103,168,.12); outline-offset:2px; transform:translateY(-2px); } .tool--primary { grid-column:span 2; min-height:194px; border-top:4px solid var(--blue); background:linear-gradient(135deg,#fff,#f0f7fc); } .tool--purple { border-top:4px solid var(--purple); } .tool--green { border-top:4px solid var(--green); } .tool-top { display:flex; align-items:start; gap:11px; } .icon { display:grid; place-items:center; flex:0 0 auto; width:38px; height:38px; color:var(--blue); background:var(--blue-soft); border-radius:10px; font-size:13px; font-weight:900; } .tool--purple .icon { color:var(--purple); background:var(--purple-soft); } .tool--green .icon { color:var(--green); background:var(--green-soft); } .tool h3 { margin:1px 0 0; font-size:17px; line-height:1.3; } .tool p { margin:13px 0 0; color:var(--muted); font-size:13px; } .meta { display:flex; flex-wrap:wrap; gap:6px; margin-top:auto; padding-top:17px; } .tag { padding:3px 7px; color:#506678; background:#f1f5f7; border-radius:6px; font-size:11px; font-weight:700; } .tag--ok { color:#27664f; background:var(--green-soft); } .tag--new { color:#8b6312; background:var(--gold-soft); } .arrow { position:absolute; right:17px; bottom:18px; color:var(--blue); font-size:19px; }
+    .note { margin-top:30px; padding:15px 17px; color:#526678; background:#fff; border:1px solid var(--line); border-left:4px solid var(--gold); border-radius:12px; font-size:13px; } footer { margin-top:28px; color:var(--muted); font-size:12px; text-align:center; }
+    @media(max-width:800px) { .hero-body { grid-template-columns:1fr; padding:30px 25px 32px; } .tool-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .tool--primary { grid-column:span 2; } } @media(max-width:560px) { .page { width:min(100% - 20px,1160px); padding-top:10px; } .header-row { align-items:flex-start; padding:15px; } .header-actions { flex-direction:column; gap:5px; } .hero-body { padding:27px 18px 25px; } h1 { font-size:31px; } .hero-body p { font-size:14px; } .tool-grid { grid-template-columns:1fr; } .tool--primary { grid-column:auto; } .section-heading { align-items:flex-start; flex-direction:column; gap:5px; } }
   </style>
 </head>
 <body>
-  <main>
-    <header>
-      <p>教學工具・公開入口</p>
-      <h1>教學與行政工作小工具</h1>
+  <div class="page">
+    <header class="hero">
+      <div class="header-row"><a class="brand" href="./index.html" aria-label="回到公開工具首頁"><span class="brand-mark">LT</span><span><small>LOCAL TOOLS</small><strong>AI-LISH 公開工具入口</strong></span></a><div class="header-actions"><a href="https://github.com/ai-lish/local-tools">GitHub ↗</a></div></div>
+      <div class="hero-body"><div><p class="eyebrow">AI-LISH・公開鏡像</p><h1>工作資料，<br><em>按用途直接開啟</em></h1><p>教師工作、活動分析、圖片及 CloudSAMS 工具集中在同一個入口。檔案只在你的瀏覽器或本機處理，不會自動上傳。</p><div class="hero-actions"><a class="button button--primary" href="#school-tools">開始使用 <span>↓</span></a><a class="button button--secondary" href="https://github.com/ai-lish/local-tools">查看 GitHub</a></div></div><aside class="hero-side"><h2>建議流程</h2><ol class="quick"><li><div><strong>先選工作類型</strong><span>校務、檔案或 CloudSAMS</span></div></li><li><div><strong>在本機處理</strong><span>不需上傳學校文件</span></div></li><li><div><strong>完成後回到首頁</strong><span>工具頁左上方可返回入口</span></div></li></ol></aside></div>
     </header>
-    <section>
-      <h2>目前工具</h2>
-      <p class="intro">瀏覽器工具在本機處理；CloudSAMS tools 的 PDF HTML 及 CLI 都只在本機處理，不會連接 CloudSAMS server。</p>
-      <a class="tool" href="teacher-workload/教師人力與行政架構工具_單檔離線版.html#workload">
-        <strong>課務與人力安排</strong>
-        <span>匯入課務資料，整理教師、班別及教擔資料。</span>
-      </a>
-      <a class="tool" href="teacher-workload/活動資料分析工具.html">
-        <strong>活動資料分析</strong>
-        <span>公開版分析工具不含學校或人名示例。</span>
-      </a>
-      <a class="tool" href="tools/image-upscaler/index.html">
-        <strong>圖片像素提升工具</strong>
-        <span>瀏覽器內處理圖片像素提升；檔案不會上傳。</span>
-      </a>
-      <a class="tool" href="tools/photo-merge/index.html">
-        <strong>相機圖片合併工具</strong>
-        <span>支援 grid、stack 及 compare 三種圖片組合方式。</span>
-      </a>
-      <a class="tool" href="tools/slp-split-pdf/index.html">
-        <strong>CloudSAMS SLP PDF 分割</strong>
-        <span>瀏覽器 HTML 或 Python CLI；將 SLP PDF 按頁或範圍分割。</span>
-      </a>
-      <a class="tool" href="tools/class-photo-rename/README.md">
-        <strong>CloudSAMS 班相改名</strong>
-        <span>本機 Python CLI 預覽；目前仍在開發，尚未可用於正式改名。</span>
-      </a>
-      <a class="tool" href="tools/math-translator/index.html">
-        <strong>MathLingo 數學文件翻譯</strong>
-        <span>單頁工作台保護 LaTeX 公式；附公開試／出版社題型、教案示例及 GPT-5.6 Luna、MiniMax、LocalAI 設定。</span>
-      </a>
-      <div class="tool">
-        <strong>PDF 工具箱（尚未公開）</strong>
-        <span>私有版本仍依賴外部資源；完成內置依賴後才會加入公開首頁。</span>
-      </div>
-    </section>
-    <footer>公開輸出由 private source allowlist 產生；未列入工具不會發布。</footer>
-  </main>
+    <main id="school-tools">
+      <section><div class="section-heading"><div><h2>校務與行政</h2><p>教師工作主工具、活動分析及數學文件翻譯。</p></div><span class="section-link">3 項工具</span></div><div class="tool-grid"><a class="tool tool--primary" href="teacher-workload/教師人力與行政架構工具_單檔離線版.html"><div class="tool-top"><span class="icon">師</span><div><h3>教師人力與行政架構工具</h3></div></div><p>整理課務、人力、行政組別、會議、校曆及學生／選修名單，支援 Google Sheet TSV 匯出。</p><div class="meta"><span class="tag">課務</span><span class="tag">活動</span><span class="tag">學生名單</span><span class="tag tag--ok">公開版</span></div><span class="arrow">↗</span></a><a class="tool tool--purple" href="teacher-workload/活動資料分析工具_公開版.html"><div class="tool-top"><span class="icon">活</span><div><h3>活動資料分析</h3></div></div><p>比對活動 PDF 與 EV TSV，檢查分組、地點、出席及支援安排。</p><div class="meta"><span class="tag">PDF</span><span class="tag">EV</span><span class="tag">TSV</span></div><span class="arrow">↗</span></a><a class="tool tool--purple" href="tools/math-translator/index.html"><div class="tool-top"><span class="icon">數</span><div><h3>MathLingo 數學文件翻譯</h3></div></div><p>保護 LaTeX 公式，按出版社用詞處理 English／繁體中文數學文件。</p><div class="meta"><span class="tag">數學文件</span><span class="tag">LaTeX</span><span class="tag">本機處理</span></div><span class="arrow">↗</span></a></div></section>
+      <section style="margin-top:34px"><div class="section-heading"><div><h2>檔案與 Bridge 工具</h2><p>適合快速處理圖片、相片及 CloudSAMS 文件。</p></div><span class="section-link">4 項工具</span></div><div class="tool-grid"><a class="tool" href="tools/image-upscaler/index.html"><div class="tool-top"><span class="icon">圖</span><div><h3>圖片像素提升工具</h3></div></div><p>瀏覽器內放大及調整圖片。</p><div class="meta"><span class="tag">圖片</span><span class="tag">瀏覽器</span></div><span class="arrow">↗</span></a><a class="tool" href="tools/photo-merge/index.html"><div class="tool-top"><span class="icon">照</span><div><h3>相機圖片合併工具</h3></div></div><p>製作拼貼、疊圖或並排比較。</p><div class="meta"><span class="tag">Grid</span><span class="tag">Compare</span></div><span class="arrow">↗</span></a><a class="tool tool--green" href="tools/slp-split-pdf/index.html"><div class="tool-top"><span class="icon">SLP</span><div><h3>CloudSAMS SLP PDF 分割</h3></div></div><p>瀏覽器 HTML 或 Python CLI 分割 SLP PDF。</p><div class="meta"><span class="tag">PDF</span><span class="tag">Python CLI</span><span class="tag tag--ok">可用</span></div><span class="arrow">↗</span></a><a class="tool tool--green" href="tools/class-photo-rename/README.md"><div class="tool-top"><span class="icon">相</span><div><h3>CloudSAMS 班相改名</h3></div></div><p>按班別及註冊編號整理相片檔名。</p><div class="meta"><span class="tag">Python CLI</span><span class="tag tag--new">開發中</span></div><span class="arrow">↗</span></a></div></section>
+      <div class="note"><strong>公開資料界線：</strong>這裡只會出現經審查的公開工具；私有 source、學校原始檔案及帳戶資料不會放入公開鏡像。</div>
+    </main>
+    <footer>AI-LISH Local Tools・公開鏡像・資料只在你的瀏覽器或本機處理・2026</footer>
+  </div>
 </body>
 </html>

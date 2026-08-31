@@ -34,6 +34,18 @@ header {
   border-bottom: 1px solid var(--border);
   padding: 16px 24px 0;
 }
+header .home-link {
+  display: inline-flex;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  color: var(--text-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  text-decoration: none;
+}
+header .home-link:hover, header .home-link:focus-visible { color: var(--accent); border-color: var(--accent); outline: 3px solid rgba(79,158,255,.2); outline-offset: 2px; }
 header h1 {
   margin: 0 0 12px;
   font-size: 18px;
@@ -312,6 +324,7 @@ input[type="file"] { display: none; }
 </head>
 <body>
 <header>
+  <a class="home-link" href="../../index.html">← 回到首頁</a>
   <h1>📷 相機圖片合併工具</h1>
   <nav class="tabs">
     <button class="tab active" data-mode="grid">🧩 拼貼</button>
