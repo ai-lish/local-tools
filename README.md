@@ -23,5 +23,5 @@ CLI 使用者需要自行安裝 Python 及依賴。請先閱讀各工具目錄�
 
 PDF 工具箱暫未列入這個 public deployment，因現有版本仍依賴外部資源。
 
-MathLingo 的公開版包含通用數學詞庫及短句示例，不是任何出版社的官方詞庫；完整本地 server、DOCX／PDF／Google Docs 匯入、GPT-5.6 Luna、MiniMax、LocalAI 及設定方式見
+MathLingo 的公開版包含通用數學詞庫、單頁工作台及短句示例，不是任何出版社的官方詞庫；完整本地 server、DOCX／PDF／Google Docs 匯入、GPT-5.6 Luna、MiniMax、LocalAI 及設定方式見
 [`tools/math-translator/README.md`](tools/math-translator/README.md)。

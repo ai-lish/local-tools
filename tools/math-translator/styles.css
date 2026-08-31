@@ -2154,6 +2154,387 @@ select:focus {
   font-size: 9px;
 }
 
+/* One-page workflow workbench */
+.nav-item {
+  width: 100%;
+  color: inherit;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  appearance: none;
+}
+
+.workflow-bar {
+  position: relative;
+  margin: 0 -1px;
+  padding: 17px 18px 16px;
+  background: rgba(246, 247, 242, 0.94);
+  border: 1px solid rgba(203, 216, 209, 0.78);
+  border-radius: 0 0 18px 18px;
+  box-shadow: 0 12px 30px rgba(24, 53, 45, 0.06);
+  backdrop-filter: blur(14px);
+}
+
+.workflow-bar-heading,
+.workflow-context,
+.emi-practice-heading,
+.other-use-row {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.workflow-bar-heading h2 {
+  margin: 6px 0 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -0.04em;
+}
+
+.workflow-bar-heading p {
+  max-width: 420px;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 10px;
+  line-height: 1.65;
+  text-align: right;
+}
+
+.workflow-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 15px;
+}
+
+.workflow-tab {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 11px;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 720;
+  text-align: left;
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.workflow-tab:hover {
+  color: var(--teal);
+  border-color: #a9cdb9;
+  transform: translateY(-1px);
+}
+
+.workflow-tab.active {
+  color: #f8fff9;
+  background: var(--teal);
+  border-color: var(--teal);
+  box-shadow: 0 7px 16px rgba(31, 107, 89, 0.16);
+}
+
+.workflow-tab-number {
+  color: var(--orange);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+}
+
+.workflow-tab.active .workflow-tab-number {
+  color: var(--mint);
+}
+
+.workflow-context {
+  align-items: end;
+  margin-top: 15px;
+  padding: 14px 15px;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid #e4ebe5;
+  border-radius: 13px;
+}
+
+.workflow-context h3,
+.emi-practice-heading h3,
+.other-use-panel h3 {
+  margin: 6px 0 0;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+
+.workflow-context p,
+.other-use-panel p {
+  max-width: 740px;
+  margin: 7px 0 0;
+  color: var(--ink-soft);
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.workflow-context-label,
+.emi-practice-label {
+  color: var(--mint-deep);
+  font-size: 8px;
+  font-weight: 780;
+  letter-spacing: 0.14em;
+}
+
+.workflow-context-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 7px;
+  align-items: center;
+}
+
+.workflow-action {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--teal);
+  background: var(--orange-soft);
+  border: 1px solid #f4c7b4;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.workflow-action:hover {
+  color: #9a4c38;
+  background: #ffe5da;
+}
+
+.workflow-category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 11px;
+}
+
+.workflow-category-chip {
+  min-height: 27px;
+  padding: 0 9px;
+  color: var(--ink-soft);
+  background: #edf3ee;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.workflow-category-chip:hover,
+.workflow-category-chip.active {
+  color: var(--teal);
+  background: var(--mint);
+  border-color: #94cdb1;
+}
+
+.emi-practice-panel,
+.other-use-panel {
+  margin-top: 12px;
+  padding: 15px;
+  background: #f0f8f2;
+  border: 1px solid #cfe7d7;
+  border-radius: 13px;
+}
+
+.emi-practice-heading {
+  align-items: start;
+}
+
+.emi-practice-heading > span {
+  color: var(--teal);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.emi-practice-card {
+  display: grid;
+  gap: 7px;
+  margin-top: 13px;
+  padding: 15px 17px;
+  background: #fff;
+  border: 1px solid #dbeadf;
+  border-radius: 11px;
+}
+
+.emi-practice-card strong {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.emi-practice-answer {
+  display: grid;
+  gap: 3px;
+  padding-top: 9px;
+  color: var(--teal);
+  border-top: 1px solid #edf1ed;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.emi-practice-answer span {
+  color: var(--ink-faint);
+  font-family: var(--sans);
+  font-size: 8px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.emi-practice-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.emi-practice-actions .button {
+  min-height: 34px;
+  font-size: 10px;
+}
+
+.other-use-panel {
+  background: #fff7f1;
+  border-color: #f2d6c5;
+}
+
+.other-use-row {
+  flex: 0 1 440px;
+  gap: 7px;
+}
+
+.other-use-row input {
+  min-width: 0;
+  width: 100%;
+  height: 35px;
+  padding: 0 10px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #e9d8cd;
+  border-radius: 8px;
+  font-size: 10px;
+  outline: none;
+}
+
+.other-use-row input:focus {
+  border-color: var(--orange);
+}
+
+.other-use-status {
+  display: block;
+  margin-top: 8px;
+  color: var(--ink-faint);
+  font-size: 9px;
+}
+
+.task-select {
+  margin-left: 0;
+}
+
+.example-card-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.example-card-actions button,
+.example-card-actions a {
+  margin-right: 7px;
+}
+
+.inline-action {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  margin-left: auto;
+  padding: 0;
+  color: var(--teal);
+  background: transparent;
+  border: 0;
+  font-size: 10px;
+  font-weight: 680;
+  white-space: nowrap;
+}
+
+.inline-action:hover {
+  color: var(--orange);
+}
+
+.inline-action span {
+  font-size: 15px;
+  font-weight: 400;
+}
+
+@media (max-width: 1120px) {
+  .workflow-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 870px) {
+  .workflow-bar-heading,
+  .workflow-context,
+  .other-use-row {
+    display: block;
+  }
+
+  .workflow-bar-heading p {
+    max-width: none;
+    margin-top: 6px;
+    text-align: left;
+  }
+
+  .workflow-context-actions {
+    margin-top: 12px;
+  }
+
+  .other-use-row {
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 620px) {
+  .workflow-bar {
+    margin-right: -1px;
+    margin-left: -1px;
+    padding: 14px 12px;
+  }
+
+  .workflow-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workflow-tab:last-child {
+    grid-column: span 2;
+  }
+
+  .workflow-context-actions,
+  .emi-practice-actions {
+    flex-wrap: wrap;
+  }
+
+  .workflow-action,
+  .emi-practice-actions .button {
+    min-height: 34px;
+  }
+
+  .other-use-row .button {
+    width: 100%;
+    margin-top: 7px;
+  }
+}
+
 @media (max-width: 1120px) {
   .example-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

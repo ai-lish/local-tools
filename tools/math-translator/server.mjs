@@ -137,7 +137,7 @@ function getProviderConfig(providerName) {
   }
   return {
     provider: "openai",
-    label: "GPT-5.6 Luna / OpenAI",
+    label: ["gpt-5.6-sol", "gpt-5.6"].includes(OPENAI_MODEL) ? "GPT-5.6 Sol / OpenAI" : "GPT-5.6 Luna / OpenAI",
     baseUrl: OPENAI_BASE_URL,
     endpoint: providerEndpoint(OPENAI_BASE_URL, "responses"),
     authToken: process.env.OPENAI_TOKEN || process.env[OPENAI_LEGACY_TOKEN_ENV] || "",
@@ -151,6 +151,11 @@ function getProviderConfig(providerName) {
 function requestedProvider(value) {
   if (["local", "localai", "minimax", "openai"].includes(value)) return value;
   return DEFAULT_PROVIDER;
+}
+
+function requestedTask(value) {
+  if (["question", "lesson-plan", "translate"].includes(value)) return value;
+  return "translate";
 }
 
 function safeEndpointLabel(value) {
@@ -639,18 +644,52 @@ function glossaryContext() {
   }));
 }
 
-function buildInstructions(sourceLanguage, targetLanguage) {
+function buildInstructions(sourceLanguage, targetLanguage, task, context) {
   const targetLabel = targetLanguage === "zh-Hant" ? "繁體中文（香港數學教材用語）" : "English";
+  const safeContext = context && typeof context === "object" ? context : {};
+  const grade = typeof safeContext.grade === "string" ? safeContext.grade.slice(0, 40) : "";
+  const topic = typeof safeContext.topic === "string" ? safeContext.topic.slice(0, 80) : "";
+  const workflow = typeof safeContext.workflow === "string" ? safeContext.workflow.slice(0, 40) : "";
+  const contextLines = [
+    grade ? "TARGET_GRADE: " + grade : "",
+    topic ? "TARGET_TOPIC: " + topic : "",
+    workflow ? "WORKFLOW: " + workflow : ""
+  ].filter(Boolean);
+  const hkeaaInstruction = workflow === "hkeaa"
+    ? "For question instructions, prefer wording consistent with HKEAA public examination examples and keep the requested answer format explicit."
+    : "";
+  const shared = [
+    "The source language is " + sourceLanguage + "; the target language is " + targetLabel + ".",
+    "Preserve Markdown headings, lists, line breaks, punctuation structure, variable names, units, and every token beginning with __MATH_BLOCK_ and ending with __. Never translate, delete, reorder, or reformat those math tokens.",
+    "Use the terminology glossary below as the first choice when the context matches. Prefer clear Hong Kong school mathematics wording. Do not invent a publisher citation or claim that a term is official unless the glossary says so.",
+    hkeaaInstruction,
+    contextLines.length ? "WORKFLOW CONTEXT:\n" + contextLines.join("\n") : "",
+    glossaryPromptLabel + " (short terminology pairs only):",
+    glossaryContext()
+  ].filter(Boolean);
+  if (task === "question") {
+    return [
+      "You are MathLingo, a careful mathematical question writer for Hong Kong secondary-school mathematics materials.",
+      "Use the reference supplied by the user as a conceptual and difficulty pattern, then write one original, ready-to-use mathematics question in the target language.",
+      "Change the wording, values, names, and context enough to make a genuinely new question while testing the same mathematical idea. Do not copy distinctive source wording. Prefer concise HKEAA-style question instructions when appropriate.",
+      "Return only the new question. Do not include a solution, answer, marking scheme, explanation, preface, quotation marks, or code fence.",
+      ...shared
+    ].join("\n\n");
+  }
+  if (task === "lesson-plan") {
+    return [
+      "You are MathLingo, a careful mathematics curriculum editor for Hong Kong secondary-school materials.",
+      "Turn the supplied material into a concise, usable lesson-plan draft in the target language. Preserve the mathematical meaning and all protected math tokens.",
+      "Use these headings when the information is available: Learning objectives, Prior knowledge, Key vocabulary, Teaching approach, Lesson sequence, Formative assessment, Differentiation, Homework.",
+      "Do not invent specific facts that are absent from the source. Mark reasonable assumptions briefly. Return only the lesson-plan draft, without a preface, commentary, quotation marks, or code fence.",
+      ...shared
+    ].join("\n\n");
+  }
   return [
     "You are MathLingo, a careful mathematical translator and terminology editor for Hong Kong secondary-school mathematics materials.",
     "Translate only the document supplied by the user; do not answer questions about it or add an explanation.",
-    "The source language is " + sourceLanguage + "; the target language is " + targetLabel + ".",
-    "Use the terminology glossary below as the first choice when the context matches. Prefer the listed traditional-Chinese term, while treating aliases as searchable variants rather than automatic replacements.",
-    "Preserve Markdown headings, lists, line breaks, punctuation structure, variable names, units, and every token beginning with __MATH_BLOCK_ and ending with __. Never translate, delete, reorder, or reformat those math tokens.",
-    "When a term is ambiguous, choose clear Hong Kong school mathematics wording and keep the meaning precise. Do not invent a publisher citation or claim that a term is official unless the glossary says so.",
-    "Return only the translated document, with no preface, commentary, quotation marks, or code fence.",
-    glossaryPromptLabel + " (short terminology pairs only):",
-    glossaryContext()
+    ...shared,
+    "Return only the translated document, with no preface, commentary, quotation marks, or code fence."
   ].join("\n\n");
 }
 
@@ -686,7 +725,7 @@ function stripMiniMaxThinking(value, provider) {
   return value.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }
 
-async function translateWithProvider(config, sourceText, sourceLanguage, targetLanguage) {
+async function translateWithProvider(config, sourceText, sourceLanguage, targetLanguage, task, context) {
   const protectedText = maskMath(sourceText);
   const input = [
     "SOURCE_LANGUAGE: " + sourceLanguage,
@@ -696,7 +735,7 @@ async function translateWithProvider(config, sourceText, sourceLanguage, targetL
     "DOCUMENT_END"
   ].join("\n");
 
-  const instructions = buildInstructions(sourceLanguage, targetLanguage);
+  const instructions = buildInstructions(sourceLanguage, targetLanguage, task, context);
   const requestBody = config.apiStyle === "chat"
     ? {
         model: config.model,
@@ -754,6 +793,7 @@ async function translateWithProvider(config, sourceText, sourceLanguage, targetL
   if (!restored.preserved) throw new Error("Math token preservation check failed");
   return {
     translation: restored.restored,
+    task,
     formulaCount: protectedText.formulas.length,
     formulaPreserved: restored.preserved,
     provider: config.provider,
@@ -783,6 +823,8 @@ async function handleTranslation(request, response) {
   const sourceText = typeof body.sourceText === "string" ? body.sourceText : "";
   const sourceLanguage = body.sourceLanguage === "zh-Hant" ? "zh-Hant" : body.sourceLanguage === "en" ? "en" : "";
   const targetLanguage = body.targetLanguage === "zh-Hant" ? "zh-Hant" : body.targetLanguage === "en" ? "en" : "";
+  const task = requestedTask(body.task);
+  const context = body.context && typeof body.context === "object" ? body.context : {};
   if (!sourceText.trim() || !sourceLanguage || !targetLanguage) {
     jsonResponse(response, 400, { error: "缺少原文或語言設定。" });
     return;
@@ -807,7 +849,7 @@ async function handleTranslation(request, response) {
   }
 
   try {
-    const result = await translateWithProvider(config, sourceText, sourceLanguage, targetLanguage);
+    const result = await translateWithProvider(config, sourceText, sourceLanguage, targetLanguage, task, context);
     jsonResponse(response, 200, {
       ...result,
       glossaryVersion: glossary.meta && glossary.meta.version ? glossary.meta.version : "unknown"

@@ -25,28 +25,28 @@
           </div>
         </div>
 
-        <nav class="side-nav">
-          <a class="nav-item active" href="#workspace" aria-current="page">
+        <nav class="side-nav" aria-label="工作流程">
+          <button class="nav-item active" type="button" data-workflow-target="translate" aria-current="page">
             <span class="nav-icon">↔</span>
             <span>文件翻譯</span>
             <span class="nav-dot"></span>
-          </a>
-          <a class="nav-item" href="#terms">
-            <span class="nav-icon">⌕</span>
-            <span>常見用詞</span>
-          </a>
-          <a class="nav-item" href="#examples">
+          </button>
+          <button class="nav-item" type="button" data-workflow-target="author">
             <span class="nav-icon">▤</span>
-            <span>翻譯示例</span>
-          </a>
-          <a class="nav-item" href="#services">
-            <span class="nav-icon">⚙</span>
-            <span>服務設定</span>
-          </a>
-          <a class="nav-item" href="#guide">
-            <span class="nav-icon">⌘</span>
-            <span>使用說明</span>
-          </a>
+            <span>出題改寫</span>
+          </button>
+          <button class="nav-item" type="button" data-workflow-target="emi">
+            <span class="nav-icon">◇</span>
+            <span>EMI 課堂</span>
+          </button>
+          <button class="nav-item" type="button" data-workflow-target="hkeaa">
+            <span class="nav-icon">✓</span>
+            <span>HKEAA 核對</span>
+          </button>
+          <button class="nav-item" type="button" data-workflow-target="other">
+            <span class="nav-icon">＋</span>
+            <span>其他用途</span>
+          </button>
         </nav>
 
         <div class="sidebar-footer">
@@ -67,6 +67,91 @@
           <div class="topbar-status"><span class="status-pulse"></span><span id="serviceStatus">離線可用</span></div>
         </header>
 
+        <section class="workflow-bar" id="workflowBar" aria-labelledby="workflow-title">
+          <div class="workflow-bar-heading">
+            <div>
+              <div class="section-label">ONE-PAGE WORKBENCH · SOL DESIGN <span>00</span></div>
+              <h2 id="workflow-title">今天要做什麼？</h2>
+            </div>
+            <p id="workflowStatus">在同一頁搜尋例子、改寫題目、練習 EMI 或核對公開試用字。</p>
+          </div>
+          <div class="workflow-tabs" role="tablist" aria-label="選擇工作流程">
+            <button class="workflow-tab active" type="button" role="tab" data-workflow-tab="translate" aria-selected="true">
+              <span class="workflow-tab-number">01</span><span>文件翻譯</span>
+            </button>
+            <button class="workflow-tab" type="button" role="tab" data-workflow-tab="author" aria-selected="false">
+              <span class="workflow-tab-number">02</span><span>出題改寫</span>
+            </button>
+            <button class="workflow-tab" type="button" role="tab" data-workflow-tab="emi" aria-selected="false">
+              <span class="workflow-tab-number">03</span><span>EMI 課堂</span>
+            </button>
+            <button class="workflow-tab" type="button" role="tab" data-workflow-tab="hkeaa" aria-selected="false">
+              <span class="workflow-tab-number">04</span><span>HKEAA 核對</span>
+            </button>
+            <button class="workflow-tab" type="button" role="tab" data-workflow-tab="other" aria-selected="false">
+              <span class="workflow-tab-number">05</span><span>其他用途</span>
+            </button>
+          </div>
+          <div class="workflow-context">
+            <div>
+              <span class="workflow-context-label" id="workflowContextLabel">QUESTION AUTHORING</span>
+              <h3 id="workflowContextTitle">按年級及課題找例子，直接改寫成新題</h3>
+              <p id="workflowContextDescription">先選年級和數學課題，再按例子上的「以例改寫出題」。你可以在工作區修改題目條件，最後用 GPT-5.6 Sol、MiniMax 或本機模型產生草稿。</p>
+            </div>
+            <div class="workflow-context-actions" id="workflowContextActions"></div>
+          </div>
+          <div class="workflow-category-chips" id="workflowCategoryChips" hidden></div>
+          <div class="workflow-search-row" id="workflowSearchRow" aria-label="快速搜尋例子">
+            <label class="term-search">
+              <span aria-hidden="true">⌕</span>
+              <span class="sr-only">快速搜尋例子</span>
+              <input id="workflowSearch" type="search" placeholder="搜尋年級、課題、題目指令或課堂用語…" autocomplete="off" />
+            </label>
+            <label class="select-wrap">
+              <span class="sr-only">快速選擇年級</span>
+              <select id="workflowGrade" aria-label="快速選擇年級">
+                <option value="all">所有年級</option>
+              </select>
+            </label>
+            <label class="select-wrap">
+              <span class="sr-only">快速選擇課題</span>
+              <select id="workflowTopic" aria-label="快速選擇課題">
+                <option value="all">所有課題／分類</option>
+              </select>
+            </label>
+          </div>
+          <div class="emi-practice-panel" id="emiPracticePanel" hidden>
+            <div class="emi-practice-heading">
+              <div>
+                <span class="workflow-context-label">PAIR PRACTICE</span>
+                <h3>和同學熟習 EMI 課堂用語</h3>
+              </div>
+              <span id="emiPracticeCount">0 / 0</span>
+            </div>
+            <div class="emi-practice-card" id="emiPracticeCard">
+              <span class="emi-practice-label">English prompt</span>
+              <strong id="emiPracticePrompt">選擇分類後開始練習。</strong>
+              <div class="emi-practice-answer" id="emiPracticeAnswer" hidden></div>
+            </div>
+            <div class="emi-practice-actions">
+              <button class="button button-primary" id="revealEmiAnswer" type="button">顯示中文意思</button>
+              <button class="button button-quiet" id="nextEmiCard" type="button">下一句</button>
+            </div>
+          </div>
+          <div class="other-use-panel" id="otherUsePanel" hidden>
+            <div>
+              <span class="workflow-context-label">OPEN SLOT</span>
+              <h3>未決定用途？先把想法留在工作台</h3>
+              <p>例如：整理同事共用詞庫、建立小測、準備家課或記下需要覆核的句型。這段備註只保留在目前頁面工作階段。</p>
+            </div>
+            <div class="other-use-row">
+              <input id="otherUseNote" type="text" placeholder="寫下下一個想試的用途…" autocomplete="off" />
+              <button class="button button-quiet" id="saveOtherUse" type="button">保存備註</button>
+            </div>
+            <span class="other-use-status" id="otherUseStatus">尚未保存備註</span>
+          </div>
+        </section>
+
         <section class="hero" aria-labelledby="page-title">
           <div class="hero-copy">
             <div class="eyebrow"><span></span> MATH-AWARE TRANSLATION</div>
@@ -81,8 +166,8 @@
               <button class="button button-quiet drive-sample-button" id="loadDriveSample" type="button">
                 <span class="drive-mark" aria-hidden="true">▣</span> <span id="driveSampleLabel">實例示範</span>
               </button>
-              <a class="button button-quiet" href="#terms">查找常見用詞 <span aria-hidden="true">↓</span></a>
-              <a class="button button-quiet" href="#examples">瀏覽翻譯示例 <span aria-hidden="true">↓</span></a>
+              <button class="button button-quiet" type="button" data-workflow-target="author">搜尋例子及出題 <span aria-hidden="true">↗</span></button>
+              <button class="button button-quiet" type="button" data-workflow-target="emi">開始 EMI 練習 <span aria-hidden="true">↗</span></button>
               <button class="button button-quiet" id="clearAll" type="button">清除內容</button>
             </div>
           </div>
@@ -119,9 +204,18 @@
                   <option value="en">English</option>
                 </select>
               </label>
+              <label class="mode-chip mode-select task-select">
+                <span class="mode-dot"></span>
+                <span class="sr-only">工作任務</span>
+                <select id="taskMode" aria-label="工作任務">
+                  <option value="translate">翻譯文件</option>
+                  <option value="question">改寫成新題</option>
+                  <option value="lesson-plan">整理教案</option>
+                </select>
+              </label>
               <label class="mode-chip mode-select">
                 <span class="mode-dot"></span>
-                <span class="sr-only">翻譯模式</span>
+                <span class="sr-only">模型模式</span>
                 <select id="translationMode" aria-label="翻譯模式">
                   <option value="offline">離線詞庫</option>
                   <option value="ai">GPT-5.6 Luna</option>
@@ -211,7 +305,7 @@
           <div class="workspace-note">
             <span class="note-symbol">i</span>
             <span id="workspaceNoteText">目前為離線示範模式：內建數學詞庫會翻譯常見術語，辨識到的數學公式與 LaTeX 指令保持原樣。</span>
-            <a href="#guide">了解處理方式 <span aria-hidden="true">↗</span></a>
+            <button class="inline-action" type="button" data-workflow-target="translate">了解處理方式 <span aria-hidden="true">↗</span></button>
           </div>
 
           <div class="service-diagnostics" id="services" aria-labelledby="services-title">
@@ -261,7 +355,7 @@
 
           <div class="terms-meta">
             <span id="termFilterNote">按分類、年級和信心標籤整理</span>
-            <a id="sourceFolderLink" href="#" target="_blank" rel="noreferrer" hidden>開啟示例來源 <span aria-hidden="true">↗</span></a>
+            <a id="sourceFolderLink" target="_blank" rel="noreferrer" hidden>開啟示例來源 <span aria-hidden="true">↗</span></a>
           </div>
 
           <div class="term-grid" id="termList"></div>
@@ -275,9 +369,9 @@
         <section class="examples-section" id="examples" aria-labelledby="examples-title">
           <div class="examples-heading">
             <div>
-              <div class="section-label">TRANSLATION EXAMPLES <span>02A</span></div>
-              <h2 id="examples-title">示例庫</h2>
-              <p id="examplesDescription">以公開試題型、出版社題型的短例，以及課程文件、教案、學習目標、教學法和課堂用語示範翻譯方向。</p>
+              <div class="section-label">EXAMPLE WORKBENCH <span>02A</span></div>
+              <h2 id="examples-title">例子工作台</h2>
+              <p id="examplesDescription">按年級、數學課題或教學分類找例子；直接送入出題改寫、EMI 練習或文件翻譯。</p>
             </div>
             <div class="terms-total"><strong id="exampleCount">0</strong><span>條示例</span></div>
           </div>
@@ -292,6 +386,12 @@
               <span class="sr-only">示例類型</span>
               <select id="exampleKind">
                 <option value="all">所有示例類型</option>
+              </select>
+            </label>
+            <label class="select-wrap">
+              <span class="sr-only">數學課題或教學分類</span>
+              <select id="exampleCategory">
+                <option value="all">所有課題／分類</option>
               </select>
             </label>
             <label class="select-wrap">

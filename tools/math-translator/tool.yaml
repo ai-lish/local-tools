@@ -1,6 +1,6 @@
 # tools/math-translator/tool.yaml
 name: math-translator
-summary: Translate mathematics and teaching documents with public examples and model diagnostics
+summary: One-page mathematics translation, question-authoring, EMI practice and model diagnostics
 status: beta
 runtime: node
 entry: server.mjs

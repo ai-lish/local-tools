@@ -10,7 +10,7 @@ const MATH_GLOSSARY = {
     updatedAt: "2026-08-31",
     uiLabel: "公開數學詞庫",
     promptLabel: "Public mathematics terminology glossary",
-    heroText: "以公開數學常見用語整理翻譯結果；需要更完整語境時，可切換 GPT-5.6 Luna、MiniMax 或本機模型，同時守住每一個公式、變數與 LaTeX 結構。",
+    heroText: "以公開數學常見用語整理翻譯結果；在同一頁搜尋例子、改寫題目、練習 EMI 或核對 HKEAA 用字，同時守住每一個公式、變數與 LaTeX 結構。",
     workspaceText: "目前為離線示範模式：內建公開數學詞庫會翻譯常見術語，辨識到的數學公式與 LaTeX 指令保持原樣。",
     termsTitle: "數學常見用詞",
     termsDescription: "搜尋英文、繁體中文或題目指令；按「套用」即可把詞條放回翻譯工作區。",

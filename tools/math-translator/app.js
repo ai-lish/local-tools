@@ -135,6 +135,7 @@ const outputStatus = document.querySelector("#outputStatus");
 const fileStatus = document.querySelector("#fileStatus");
 const sourceLanguage = document.querySelector("#sourceLanguage");
 const targetLanguage = document.querySelector("#targetLanguage");
+const taskMode = document.querySelector("#taskMode");
 const translationMode = document.querySelector("#translationMode");
 const translateButton = document.querySelector("#translateButton");
 const fileInput = document.querySelector("#fileInput");
@@ -160,9 +161,30 @@ const termsEmpty = document.querySelector("#termsEmpty");
 const heroDescription = document.querySelector("#heroDescription");
 const termsTitle = document.querySelector("#terms-title");
 const termsDescription = document.querySelector("#termsDescription");
+const workflowStatus = document.querySelector("#workflowStatus");
+const workflowTabs = Array.from(document.querySelectorAll("[data-workflow-tab]"));
+const workflowContextLabel = document.querySelector("#workflowContextLabel");
+const workflowContextTitle = document.querySelector("#workflowContextTitle");
+const workflowContextDescription = document.querySelector("#workflowContextDescription");
+const workflowContextActions = document.querySelector("#workflowContextActions");
+const workflowCategoryChips = document.querySelector("#workflowCategoryChips");
+const workflowSearch = document.querySelector("#workflowSearch");
+const workflowGrade = document.querySelector("#workflowGrade");
+const workflowTopic = document.querySelector("#workflowTopic");
+const emiPracticePanel = document.querySelector("#emiPracticePanel");
+const emiPracticeCount = document.querySelector("#emiPracticeCount");
+const emiPracticePrompt = document.querySelector("#emiPracticePrompt");
+const emiPracticeAnswer = document.querySelector("#emiPracticeAnswer");
+const revealEmiAnswer = document.querySelector("#revealEmiAnswer");
+const nextEmiCard = document.querySelector("#nextEmiCard");
+const otherUsePanel = document.querySelector("#otherUsePanel");
+const otherUseNote = document.querySelector("#otherUseNote");
+const saveOtherUse = document.querySelector("#saveOtherUse");
+const otherUseStatus = document.querySelector("#otherUseStatus");
 const examplesDescription = document.querySelector("#examplesDescription");
 const exampleSearch = document.querySelector("#exampleSearch");
 const exampleKind = document.querySelector("#exampleKind");
+const exampleCategory = document.querySelector("#exampleCategory");
 const exampleLevel = document.querySelector("#exampleLevel");
 const resetExampleFilters = document.querySelector("#resetExampleFilters");
 const exampleCount = document.querySelector("#exampleCount");
@@ -176,6 +198,10 @@ const diagnosticsList = document.querySelector("#diagnosticsList");
 let translatedValue = "";
 let activeFileName = "";
 let toastTimer;
+let activeWorkflow = "author";
+let emiPracticeIndex = 0;
+let emiPracticeRevealed = false;
+let otherUseNoteValue = "";
 let backendState = {
   openai: { configured: false, model: "gpt-5.6-luna", apiStyle: "responses" },
   minimax: { configured: false, model: "MiniMax-M3", apiStyle: "chat" },
@@ -397,7 +423,7 @@ function updateFileStatus(label, isLoaded) {
   fileStatus.innerHTML = "<span class=\"file-status-dot" + (isLoaded ? " accent-dot" : "") + "\"></span>" + escapeHtml(label);
 }
 
-function setSample(value, source, target, fileName, message) {
+function setSample(value, source, target, fileName, message, focusSource = true) {
   sourceLanguage.value = source;
   targetLanguage.value = target;
   sourceText.value = value;
@@ -405,7 +431,7 @@ function setSample(value, source, target, fileName, message) {
   updateSourceState();
   updateFileStatus(fileName, true);
   resetOutput();
-  sourceText.focus();
+  if (focusSource) sourceText.focus();
   showToast(message);
 }
 
@@ -445,25 +471,83 @@ function applyGlossaryPresentation() {
   }
 }
 
+const QUESTION_KINDS = new Set(["公開試題型", "出版社題型"]);
+const WORKFLOW_COPY = {
+  translate: {
+    label: "TRANSLATION",
+    title: "文件、詞庫和例子都在同一個工作區",
+    description: "直接貼上或匯入文件；需要時從例子工作台載入短句，並用詞庫核對數學用字。",
+    status: "先在上方工作區貼上文件；公式、變數和 LaTeX 會保持原樣。"
+  },
+  author: {
+    label: "QUESTION AUTHORING",
+    title: "按年級及課題找例子，直接改寫成新題",
+    description: "先選年級和數學課題，再按例子上的「以例改寫出題」。你可以在工作區修改題目條件，最後用 GPT-5.6 Luna、MiniMax 或本機模型產生草稿。",
+    status: "顯示公開試及出版社題型；可直接載入為新題參考。"
+  },
+  emi: {
+    label: "EMI CLASSROOM",
+    title: "按課堂分類，和同學練習數學英語",
+    description: "搜尋或點選課堂用語分類，再用上方雙語卡片輪流提問、回答和核對；不用離開這個頁面。",
+    status: "顯示課堂用語；可點選分類開始 pair practice。"
+  },
+  hkeaa: {
+    label: "HKEAA CHECK",
+    title: "以公開試題型核對題目用字",
+    description: "只顯示 HKEAA 公開試題型示例，逐張查看指令、答案格式和解題表達；需要正式來源時開啟 HKEAA 公開資源。",
+    status: "顯示公開試題型；卡片上的來源連結指向 HKEAA 公開資源。"
+  },
+  other: {
+    label: "OPEN SLOT",
+    title: "未確定用途？先把想法留在工作台",
+    description: "先用全庫搜尋、載入工作區或保存一段頁面備註，日後再決定是否建立新的流程。",
+    status: "顯示全庫示例；自訂備註只保留在目前頁面工作階段。"
+  }
+};
+
 function populateExampleFilters() {
-  if (!exampleKind || !exampleLevel) return;
+  if (!exampleKind || !exampleLevel || !exampleCategory) return;
   const kinds = Array.from(new Set(exampleEntries.map(function (entry) {
     return entry.kind;
   }).filter(Boolean)));
+  const categories = Array.from(new Set(exampleEntries.map(function (entry) {
+    return entry.category;
+  }).filter(Boolean))).sort(function (left, right) {
+    return left.localeCompare(right, "zh-Hant");
+  });
   const levels = Array.from(new Set(exampleEntries.flatMap(function (entry) {
     return entry.levels || [];
   }))).sort(function (left, right) {
     return left.localeCompare(right, "en", { numeric: true });
   });
-  exampleKind.innerHTML = '<option value="all">所有示例類型</option>' + kinds.map(function (kind) {
-    return '<option value="' + escapeHtml(kind) + '">' + escapeHtml(kind) + "</option>";
+  const categoryOptions = '<option value="all">所有課題／分類</option>' + categories.map(function (category) {
+    return '<option value="' + escapeHtml(category) + '">' + escapeHtml(category) + "</option>";
   }).join("");
-  exampleLevel.innerHTML = '<option value="all">所有年級</option>' + levels.map(function (level) {
+  const levelOptions = '<option value="all">所有年級</option>' + levels.map(function (level) {
     return '<option value="' + escapeHtml(level) + '">' + escapeHtml(level) + "</option>";
   }).join("");
+  exampleKind.innerHTML = '<option value="all">所有示例類型</option><option value="questions">題目類（公開試＋出版社）</option>' + kinds.map(function (kind) {
+    return '<option value="' + escapeHtml(kind) + '">' + escapeHtml(kind) + "</option>";
+  }).join("");
+  exampleCategory.innerHTML = categoryOptions;
+  exampleLevel.innerHTML = levelOptions;
+  if (workflowTopic) workflowTopic.innerHTML = categoryOptions;
+  if (workflowGrade) workflowGrade.innerHTML = levelOptions;
 }
 
-function exampleMatches(entry, query, kind, level) {
+function syncWorkflowSearch() {
+  if (workflowSearch && exampleSearch && workflowSearch.value !== exampleSearch.value) {
+    workflowSearch.value = exampleSearch.value;
+  }
+  if (workflowGrade && exampleLevel && workflowGrade.value !== exampleLevel.value) {
+    workflowGrade.value = exampleLevel.value;
+  }
+  if (workflowTopic && exampleCategory && workflowTopic.value !== exampleCategory.value) {
+    workflowTopic.value = exampleCategory.value;
+  }
+}
+
+function exampleMatches(entry, query, kind, category, level) {
   const haystack = [
     entry.kind,
     entry.category,
@@ -475,17 +559,30 @@ function exampleMatches(entry, query, kind, level) {
     ...(entry.levels || [])
   ].join(" ").toLocaleLowerCase("zh-Hant");
   const matchesQuery = !query || haystack.includes(query);
-  const matchesKind = kind === "all" || entry.kind === kind;
+  const matchesKind = kind === "all"
+    || (kind === "questions" && QUESTION_KINDS.has(entry.kind))
+    || entry.kind === kind;
+  const matchesCategory = category === "all" || entry.category === category;
   const matchesLevel = level === "all" || (entry.levels || []).includes(level);
-  return matchesQuery && matchesKind && matchesLevel;
+  return matchesQuery && matchesKind && matchesCategory && matchesLevel;
 }
 
 function renderExampleCard(entry) {
   const levelMarkup = (entry.levels || []).map(escapeHtml).join("／");
   const tags = (entry.tags || []).slice(0, 4).map(escapeHtml).join(" · ");
   const sourceLinkMarkup = entry.sourceUrl
-    ? '<a href="' + escapeHtml(entry.sourceUrl) + '" target="_blank" rel="noreferrer">來源 ↗</a>'
+    ? '<a href="' + escapeHtml(entry.sourceUrl) + '" target="_blank" rel="noreferrer">HKEAA 參考 ↗</a>'
     : '<span class="example-adapted">自製改寫</span>';
+  const isQuestion = QUESTION_KINDS.has(entry.kind);
+  const isClassroom = entry.kind === "課堂用語";
+  const primaryAction = isQuestion
+    ? '<button type="button" data-example-action="draft-question" data-example-id="' + escapeHtml(entry.id) + '">以例改寫出題</button>'
+    : isClassroom
+      ? '<button type="button" data-example-action="practice" data-example-id="' + escapeHtml(entry.id) + '">加入 EMI 練習</button>'
+      : '<button type="button" data-example-action="use" data-example-id="' + escapeHtml(entry.id) + '">載入工作區</button>';
+  const secondaryAction = isQuestion || isClassroom
+    ? '<button type="button" data-example-action="use" data-example-id="' + escapeHtml(entry.id) + '">載入工作區</button>'
+    : '';
   return [
     '<article class="example-card">',
     '<div class="example-card-top"><span class="example-kind">' + escapeHtml(entry.kind || "示例") + '</span><span class="example-category">' + escapeHtml(entry.category || "") + '</span></div>',
@@ -499,18 +596,20 @@ function renderExampleCard(entry) {
     '<p class="example-note">' + escapeHtml(entry.note || "按上下文核對 house style。") + '</p>',
     '<div class="example-card-meta"><span>' + escapeHtml(entry.sourceType || "通用示例") + '</span><span>' + levelMarkup + '</span></div>',
     '<div class="example-tags">' + tags + '</div>',
-    '<div class="example-card-actions"><button type="button" data-example-action="use" data-example-id="' + escapeHtml(entry.id) + '">載入工作區</button>' + sourceLinkMarkup + '</div>',
+    '<div class="example-card-actions">' + primaryAction + secondaryAction + sourceLinkMarkup + '</div>',
     '</article>'
   ].join("");
 }
 
 function renderExampleLibrary() {
   if (!exampleList) return;
+  syncWorkflowSearch();
   const query = (exampleSearch ? exampleSearch.value : "").trim().toLocaleLowerCase("zh-Hant");
   const kind = exampleKind ? exampleKind.value : "all";
+  const category = exampleCategory ? exampleCategory.value : "all";
   const level = exampleLevel ? exampleLevel.value : "all";
   const filtered = exampleEntries.filter(function (entry) {
-    return exampleMatches(entry, query, kind, level);
+    return exampleMatches(entry, query, kind, category, level);
   });
   exampleList.innerHTML = filtered.map(renderExampleCard).join("");
   if (exampleCount) exampleCount.textContent = filtered.length.toLocaleString("zh-Hant-TW");
@@ -520,6 +619,179 @@ function renderExampleLibrary() {
       : "目前顯示 " + filtered.length + " 條相符示例";
   }
   if (examplesEmpty) examplesEmpty.hidden = filtered.length > 0;
+  updateWorkflowStatus(filtered.length);
+}
+
+function getEmiEntries() {
+  const category = exampleCategory ? exampleCategory.value : "all";
+  return exampleEntries.filter(function (entry) {
+    return entry.kind === "課堂用語" && (category === "all" || entry.category === category);
+  });
+}
+
+function renderWorkflowCategoryChips() {
+  if (!workflowCategoryChips) return;
+  const entries = activeWorkflow === "author" || activeWorkflow === "hkeaa"
+    ? exampleEntries.filter(function (entry) {
+        return activeWorkflow === "hkeaa" ? entry.kind === "公開試題型" : QUESTION_KINDS.has(entry.kind);
+      })
+    : activeWorkflow === "emi"
+      ? exampleEntries.filter(function (entry) { return entry.kind === "課堂用語"; })
+      : [];
+  const categories = Array.from(new Set(entries.map(function (entry) {
+    return entry.category;
+  }).filter(Boolean))).sort(function (left, right) {
+    return left.localeCompare(right, "zh-Hant");
+  });
+  workflowCategoryChips.hidden = !categories.length;
+  workflowCategoryChips.innerHTML = categories.map(function (category) {
+    const active = exampleCategory && exampleCategory.value === category;
+    return '<button type="button" class="workflow-category-chip' + (active ? ' active' : '') + '" data-workflow-category="' + escapeHtml(category) + '">' + escapeHtml(category) + '</button>';
+  }).join("");
+}
+
+function renderEmiPractice() {
+  if (!emiPracticePanel) return;
+  emiPracticePanel.hidden = activeWorkflow !== "emi";
+  if (activeWorkflow !== "emi") return;
+  const entries = getEmiEntries();
+  if (!entries.length) {
+    emiPracticeIndex = 0;
+    emiPracticeRevealed = false;
+    if (emiPracticeCount) emiPracticeCount.textContent = "0 / 0";
+    if (emiPracticePrompt) emiPracticePrompt.textContent = "這個分類暫時沒有課堂用語。";
+    if (emiPracticeAnswer) {
+      emiPracticeAnswer.hidden = true;
+      emiPracticeAnswer.innerHTML = "";
+    }
+    if (revealEmiAnswer) revealEmiAnswer.disabled = true;
+    if (nextEmiCard) nextEmiCard.disabled = true;
+    return;
+  }
+  emiPracticeIndex = emiPracticeIndex % entries.length;
+  const entry = entries[emiPracticeIndex];
+  const prompt = entry.sourceLanguage === "en" ? entry.sourceText : entry.targetText;
+  const answer = entry.sourceLanguage === "en" ? entry.targetText : entry.sourceText;
+  if (emiPracticeCount) emiPracticeCount.textContent = (emiPracticeIndex + 1) + " / " + entries.length;
+  if (emiPracticePrompt) emiPracticePrompt.innerHTML = renderMathAwareText(prompt);
+  if (emiPracticeAnswer) {
+    emiPracticeAnswer.innerHTML = '<span>Suggested meaning</span>' + renderMathAwareText(answer);
+    emiPracticeAnswer.hidden = !emiPracticeRevealed;
+  }
+  if (revealEmiAnswer) {
+    revealEmiAnswer.disabled = false;
+    revealEmiAnswer.textContent = emiPracticeRevealed ? "隱藏中文意思" : "顯示中文意思";
+  }
+  if (nextEmiCard) nextEmiCard.disabled = false;
+}
+
+function updateWorkflowStatus(count) {
+  if (!workflowStatus) return;
+  const copy = WORKFLOW_COPY[activeWorkflow] || WORKFLOW_COPY.author;
+  const total = typeof count === "number" ? count : exampleEntries.length;
+  workflowStatus.textContent = copy.status + " · 目前顯示 " + total + " 條示例。";
+}
+
+function renderWorkflowContextActions() {
+  if (!workflowContextActions) return;
+  const actions = {
+    translate: '<button type="button" class="workflow-action" data-workflow-action="set-translate">回到翻譯任務</button>',
+    author: '<button type="button" class="workflow-action" data-workflow-action="set-question">把工作區設為「改寫成新題」</button>',
+    emi: '<button type="button" class="workflow-action" data-workflow-action="reset-emi">換一個 EMI 分類</button>',
+    hkeaa: '<a class="workflow-action" href="https://www.hkeaa.edu.hk/en/Resources/publications/list_of_publications/hkdse_erqp_pub/" target="_blank" rel="noreferrer">開啟 HKEAA 公開資源 ↗</a>',
+    other: '<button type="button" class="workflow-action" data-workflow-action="set-translate">把內容載入翻譯工作區</button>'
+  };
+  workflowContextActions.innerHTML = actions[activeWorkflow] || actions.other;
+}
+
+function activateWorkflow(workflow, options) {
+  const nextWorkflow = WORKFLOW_COPY[workflow] ? workflow : "author";
+  const settings = options || {};
+  activeWorkflow = nextWorkflow;
+  workflowTabs.forEach(function (tab) {
+    const active = tab.dataset.workflowTab === activeWorkflow;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  document.querySelectorAll("[data-workflow-target]").forEach(function (item) {
+    const active = item.dataset.workflowTarget === activeWorkflow;
+    item.classList.toggle("active", active);
+    if (item.classList.contains("nav-item")) {
+      if (active) item.setAttribute("aria-current", "page");
+      else item.removeAttribute("aria-current");
+    }
+  });
+  const copy = WORKFLOW_COPY[activeWorkflow];
+  if (workflowContextLabel) workflowContextLabel.textContent = copy.label;
+  if (workflowContextTitle) workflowContextTitle.textContent = copy.title;
+  if (workflowContextDescription) workflowContextDescription.textContent = copy.description;
+  renderWorkflowContextActions();
+  if (exampleSearch && !settings.preserveSearch) exampleSearch.value = "";
+  if (exampleLevel && !settings.preserveLevel) exampleLevel.value = "all";
+  if (exampleCategory && !settings.preserveCategory) exampleCategory.value = "all";
+  if (exampleKind) {
+    exampleKind.value = activeWorkflow === "author"
+      ? "questions"
+      : activeWorkflow === "emi"
+        ? "課堂用語"
+        : activeWorkflow === "hkeaa"
+          ? "公開試題型"
+          : "all";
+  }
+  if (otherUsePanel) otherUsePanel.hidden = activeWorkflow !== "other";
+  if (activeWorkflow === "other" && otherUseNote) {
+    otherUseNote.value = otherUseNoteValue;
+  }
+  if (emiPracticePanel) emiPracticePanel.hidden = activeWorkflow !== "emi";
+  renderWorkflowCategoryChips();
+  renderExampleLibrary();
+  if (settings.exampleId && activeWorkflow === "emi") {
+    const entries = getEmiEntries();
+    const index = entries.findIndex(function (entry) { return entry.id === settings.exampleId; });
+    if (index >= 0) emiPracticeIndex = index;
+  }
+  renderEmiPractice();
+}
+
+function handleWorkflowCategory(event) {
+  const button = event.target.closest("[data-workflow-category]");
+  if (!button || !exampleCategory) return;
+  exampleCategory.value = button.dataset.workflowCategory;
+  if (activeWorkflow === "emi") emiPracticeIndex = 0;
+  emiPracticeRevealed = false;
+  renderWorkflowCategoryChips();
+  renderExampleLibrary();
+  renderEmiPractice();
+}
+
+function handleWorkflowAction(event) {
+  const actionButton = event.target.closest("[data-workflow-action]");
+  if (!actionButton) return;
+  const action = actionButton.dataset.workflowAction;
+  if (action === "set-question" && taskMode) {
+    taskMode.value = "question";
+    updateTaskMode();
+    showToast("工作區已設為「改寫成新題」；請選擇模型後開始。 ");
+  } else if (action === "set-translate" && taskMode) {
+    taskMode.value = "translate";
+    updateTaskMode();
+    showToast("工作區已回到文件翻譯。 ");
+  } else if (action === "reset-emi") {
+    exampleCategory.value = "all";
+    emiPracticeIndex = 0;
+    emiPracticeRevealed = false;
+    renderWorkflowCategoryChips();
+    renderExampleLibrary();
+    renderEmiPractice();
+  }
+}
+
+function saveOtherUseNote() {
+  if (!otherUseNote || !otherUseStatus) return;
+  const value = otherUseNote.value.trim();
+  otherUseNoteValue = value;
+  otherUseStatus.textContent = value ? "已保存到目前頁面" : "尚未保存備註";
+  showToast(value ? "其他用途備註已保存。" : "已清除其他用途備註。 ");
 }
 
 function handleExampleAction(event) {
@@ -529,20 +801,66 @@ function handleExampleAction(event) {
     return item.id === actionButton.dataset.exampleId;
   });
   if (!example) return;
+  if (actionButton.dataset.exampleAction === "draft-question") {
+    if (taskMode) taskMode.value = "question";
+    setSample(
+      example.sourceText,
+      example.sourceLanguage,
+      example.sourceLanguage,
+      "question-reference-" + example.id + ".txt",
+      "已載入題型參考；工作區已準備改寫新題。",
+      false
+    );
+    updateTaskMode();
+    return;
+  }
+  if (actionButton.dataset.exampleAction === "practice") {
+    activateWorkflow("emi", { preserveSearch: true, preserveLevel: true, preserveCategory: true, exampleId: example.id });
+    showToast("已加入 EMI 練習；先由同學讀出 English prompt，再按顯示答案。 ");
+    return;
+  }
   setSample(
     example.sourceText,
     example.sourceLanguage,
     example.targetLanguage,
     "example-" + example.id + ".txt",
-    "已載入「" + (example.kind || "翻譯示例") + "」到工作區。"
+    "已載入「" + (example.kind || "翻譯示例") + "」到工作區。",
+    false
   );
-  document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function wait(milliseconds) {
   return new Promise(function (resolve) {
     window.setTimeout(resolve, milliseconds);
   });
+}
+
+function selectedTask() {
+  return taskMode ? taskMode.value : "translate";
+}
+
+function selectedTaskLabel() {
+  return {
+    translate: "翻譯",
+    question: "改寫新題",
+    "lesson-plan": "整理教案"
+  }[selectedTask()] || "翻譯";
+}
+
+function updateTaskMode() {
+  if (translateButton) {
+    const label = translateButton.querySelector(".translate-button-label");
+    if (label) label.textContent = selectedTaskLabel();
+  }
+  updateTranslationMode();
+}
+
+function requestContext() {
+  return {
+    workflow: activeWorkflow,
+    grade: exampleLevel && exampleLevel.value !== "all" ? exampleLevel.value : "",
+    topic: exampleCategory && exampleCategory.value !== "all" ? exampleCategory.value : ""
+  };
 }
 
 async function requestAiTranslation(value) {
@@ -555,10 +873,12 @@ async function requestAiTranslation(value) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       mode: "translation",
+      task: selectedTask(),
       provider: selectedProvider(),
       sourceText: value,
       sourceLanguage: sourceLanguage.value,
-      targetLanguage: targetLanguage.value
+      targetLanguage: targetLanguage.value,
+      context: requestContext()
     })
   });
   const data = await response.json().catch(function () {
@@ -592,7 +912,9 @@ function selectedModelLabel() {
     localai: "LocalAI",
     local: "Local LLM"
   };
-  const label = labels[provider] || "AI";
+  const label = provider === "openai" && ["gpt-5.6-sol", "gpt-5.6"].includes(backend.model)
+    ? "GPT-5.6 Sol"
+    : labels[provider] || "AI";
   if (backend.model) return label + " · " + backend.model;
   return label;
 }
@@ -600,6 +922,7 @@ function selectedModelLabel() {
 function updateTranslationMode() {
   if (!translationMode) return;
   const provider = selectedProvider();
+  const task = selectedTask();
   const isModelMode = translationMode.value !== "offline";
   const isCloudAi = isModelMode && provider === "openai";
   const isMiniMax = isModelMode && provider === "minimax";
@@ -607,15 +930,24 @@ function updateTranslationMode() {
   const isLocalAi = isModelMode && provider === "local";
   const selected = selectedBackend();
   if (workspaceNoteText) {
-    workspaceNoteText.textContent = isCloudAi
-      ? "GPT-5.6 Luna 模式：文字會送到本地伺服器，再由 OpenAI Responses API 處理；公式先保護，沒有服務時自動回到" + glossaryLabel + "。"
-      : isMiniMax
-        ? "MiniMax 模式：文字會由本地伺服器送到 MiniMax 的 OpenAI-compatible Chat Completions endpoint；公式先保護，服務不可用時回到" + glossaryLabel + "。"
-        : isLocalAI
-          ? "LocalAI 模式：文件只會送到你設定的本機 LocalAI endpoint，不會送到雲端；公式先保護，服務不可用時回到" + glossaryLabel + "。"
-          : isLocalAi
-            ? "Local LLM 模式：文件只會送到你設定的本機 OpenAI-compatible endpoint，不會送到 OpenAI；公式先保護，服務不可用時回到" + glossaryLabel + "。"
-            : "目前為離線示範模式：內建" + glossaryLabel + "會翻譯常見術語，辨識到的數學公式與 LaTeX 指令保持原樣。";
+    const taskNote = task === "question"
+      ? "目前為改寫新題任務：保留數學概念，產生可直接編輯的全新題目，不提供解答。"
+      : task === "lesson-plan"
+        ? "目前為整理教案任務：把內容整理成學習目標、教學法、課堂流程及評量草稿。"
+        : "";
+    workspaceNoteText.textContent = taskNote
+      ? (isModelMode
+        ? taskNote + " 由 " + selectedModelLabel() + " 處理；公式先保護。"
+        : taskNote + " 請選擇 GPT-5.6 Luna、MiniMax、LocalAI 或 Local LLM 後開始。")
+      : isCloudAi
+        ? "GPT-5.6 Luna 模式：文字會送到本地伺服器，再由 OpenAI Responses API 處理；公式先保護，沒有服務時自動回到" + glossaryLabel + "。"
+        : isMiniMax
+          ? "MiniMax 模式：文字會由本地伺服器送到 MiniMax 的 OpenAI-compatible Chat Completions endpoint；公式先保護，服務不可用時回到" + glossaryLabel + "。"
+          : isLocalAI
+            ? "LocalAI 模式：文件只會送到你設定的本機 LocalAI endpoint，不會送到雲端；公式先保護，服務不可用時回到" + glossaryLabel + "。"
+            : isLocalAi
+              ? "Local LLM 模式：文件只會送到你設定的本機 OpenAI-compatible endpoint，不會送到 OpenAI；公式先保護，服務不可用時回到" + glossaryLabel + "。"
+              : "目前為離線示範模式：內建" + glossaryLabel + "會翻譯常見術語，辨識到的數學公式與 LaTeX 指令保持原樣。";
   }
   if (serviceStatus && isModelMode) {
     serviceStatus.textContent = selected.configured
@@ -753,8 +1085,16 @@ async function runTranslation() {
 
   translateButton.disabled = true;
   translateButton.querySelector(".translate-button-label").textContent = "處理中";
+  const task = selectedTask();
   const useModel = translationMode && ["ai", "minimax", "localai", "local"].includes(translationMode.value);
   const modelLabel = selectedModelLabel();
+  if (task !== "translate" && !useModel) {
+    translateButton.disabled = false;
+    translateButton.querySelector(".translate-button-label").textContent = selectedTaskLabel();
+    outputStatus.textContent = selectedTaskLabel() + "需要模型模式";
+    showToast("「" + selectedTaskLabel() + "」需要選擇 GPT-5.6 Luna、MiniMax、LocalAI 或 Local LLM。 ");
+    return;
+  }
   outputStatus.textContent = useModel ? modelLabel + " 正在處理…" : "正在保護公式…";
 
   try {
@@ -764,9 +1104,14 @@ async function runTranslation() {
       try {
         translated = await requestAiTranslation(sourceText.value);
       } catch (error) {
+        if (task !== "translate") {
+          outputStatus.textContent = selectedTaskLabel() + "失敗 · 請覆核模型設定";
+          showToast(modelLabel + " 未完成「" + selectedTaskLabel() + "」；請按「檢查服務」或改用其他模型。 ");
+          return;
+        }
         translated = translateDocument(sourceText.value, targetLanguage.value);
         usedFallback = true;
-        showToast(modelLabel + " 未完成，已改用" + glossaryLabel + " fallback；請覆核或按翻譯重試。");
+        showToast(modelLabel + " 未完成，已改用" + glossaryLabel + " fallback；請覆核或按翻譯重試。 ");
       }
     } else {
       await wait(260);
@@ -776,14 +1121,14 @@ async function runTranslation() {
     outputStatus.textContent = usedFallback
       ? "AI 失敗 · " + glossaryLabel + " fallback（請覆核）"
       : useModel
-        ? "已完成 · " + modelLabel
+        ? "已完成 · " + selectedTaskLabel() + " · " + modelLabel
         : "已完成 · " + targetLanguage.options[targetLanguage.selectedIndex].text;
     if (!usedFallback) {
-      showToast(useModel ? modelLabel + " 翻譯完成，公式已保持原樣。" : "翻譯完成，公式已保持原樣。");
+      showToast(useModel ? modelLabel + " 已完成「" + selectedTaskLabel() + "」，公式已保持原樣。" : "翻譯完成，公式已保持原樣。");
     }
   } finally {
     translateButton.disabled = false;
-    translateButton.querySelector(".translate-button-label").textContent = "翻譯";
+    translateButton.querySelector(".translate-button-label").textContent = selectedTaskLabel();
   }
 }
 
@@ -1001,9 +1346,7 @@ function applyTermToWorkspace(entry) {
   updateSourceState();
   updateFileStatus("已套用詞條", true);
   resetOutput();
-  document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
-  sourceText.focus();
-  showToast("已套用：「" + term + "」到工作區。");
+  showToast("已套用：「" + term + "」到工作區；頁面位置不變。 ");
 }
 
 function handleTermAction(event) {
@@ -1082,6 +1425,59 @@ downloadOutput.addEventListener("click", downloadTranslatedText);
 if (translationMode) {
   translationMode.addEventListener("change", updateTranslationMode);
 }
+if (taskMode) {
+  taskMode.addEventListener("change", updateTaskMode);
+}
+workflowTabs.forEach(function (tab) {
+  tab.addEventListener("click", function () {
+    activateWorkflow(tab.dataset.workflowTab);
+  });
+});
+document.querySelectorAll("[data-workflow-target]").forEach(function (item) {
+  item.addEventListener("click", function () {
+    activateWorkflow(item.dataset.workflowTarget);
+  });
+});
+if (workflowCategoryChips) workflowCategoryChips.addEventListener("click", handleWorkflowCategory);
+if (workflowContextActions) workflowContextActions.addEventListener("click", handleWorkflowAction);
+if (workflowSearch) {
+  workflowSearch.addEventListener("input", function () {
+    if (exampleSearch) exampleSearch.value = workflowSearch.value;
+    renderExampleLibrary();
+  });
+}
+if (workflowGrade) {
+  workflowGrade.addEventListener("change", function () {
+    if (exampleLevel) exampleLevel.value = workflowGrade.value;
+    renderExampleLibrary();
+  });
+}
+if (workflowTopic) {
+  workflowTopic.addEventListener("change", function () {
+    if (exampleCategory) exampleCategory.value = workflowTopic.value;
+    if (activeWorkflow === "emi") {
+      emiPracticeIndex = 0;
+      emiPracticeRevealed = false;
+    }
+    renderWorkflowCategoryChips();
+    renderExampleLibrary();
+    renderEmiPractice();
+  });
+}
+if (revealEmiAnswer) {
+  revealEmiAnswer.addEventListener("click", function () {
+    emiPracticeRevealed = !emiPracticeRevealed;
+    renderEmiPractice();
+  });
+}
+if (nextEmiCard) {
+  nextEmiCard.addEventListener("click", function () {
+    emiPracticeIndex += 1;
+    emiPracticeRevealed = false;
+    renderEmiPractice();
+  });
+}
+if (saveOtherUse) saveOtherUse.addEventListener("click", saveOtherUseNote);
 if (termSearch) termSearch.addEventListener("input", renderTermLibrary);
 if (termCategory) termCategory.addEventListener("change", renderTermLibrary);
 if (termPublisher) termPublisher.addEventListener("change", renderTermLibrary);
@@ -1095,14 +1491,30 @@ if (resetTermFilters) {
 }
 if (termList) termList.addEventListener("click", handleTermAction);
 if (exampleSearch) exampleSearch.addEventListener("input", renderExampleLibrary);
-if (exampleKind) exampleKind.addEventListener("change", renderExampleLibrary);
+if (exampleKind) exampleKind.addEventListener("change", function () {
+  renderWorkflowCategoryChips();
+  renderExampleLibrary();
+  renderEmiPractice();
+});
+if (exampleCategory) {
+  exampleCategory.addEventListener("change", function () {
+    emiPracticeIndex = 0;
+    emiPracticeRevealed = false;
+    renderWorkflowCategoryChips();
+    renderExampleLibrary();
+    renderEmiPractice();
+  });
+}
 if (exampleLevel) exampleLevel.addEventListener("change", renderExampleLibrary);
 if (resetExampleFilters) {
   resetExampleFilters.addEventListener("click", function () {
     exampleSearch.value = "";
     exampleKind.value = "all";
+    exampleCategory.value = "all";
     exampleLevel.value = "all";
+    renderWorkflowCategoryChips();
     renderExampleLibrary();
+    renderEmiPractice();
   });
 }
 if (exampleList) exampleList.addEventListener("click", handleExampleAction);
@@ -1146,8 +1558,8 @@ applyGlossaryPresentation();
 populateTermFilters();
 renderTermLibrary();
 populateExampleFilters();
-renderExampleLibrary();
-updateTranslationMode();
+activateWorkflow("author", { preserveSearch: true, preserveLevel: true, preserveCategory: true });
+updateTaskMode();
 checkApiService();
 updateSourceState();
 updateOutputState();
