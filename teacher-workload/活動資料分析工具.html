@@ -9,6 +9,7 @@
     *{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--ink);background:var(--canvas);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.55}
     header{padding:28px max(18px,calc((100% - 980px)/2));color:#fff;background:linear-gradient(115deg,#173b42,#285a57);border-bottom:4px solid var(--gold)}
     header p{margin:0 0 4px;color:#c6dcda;font-size:12px;letter-spacing:.14em}h1{margin:0;font-size:clamp(25px,5vw,38px)}header small{display:block;margin-top:8px;color:#dcebea}
+    .home-link{display:inline-flex;margin-bottom:14px;padding:7px 11px;color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:999px;font-size:12px;font-weight:700;text-decoration:none}.home-link:hover,.home-link:focus-visible{background:rgba(255,255,255,.18);outline:3px solid rgba(255,255,255,.2);outline-offset:2px}
     main{width:min(980px,calc(100% - 28px));margin:0 auto;padding:24px 0 60px}.card{margin:16px 0;padding:20px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 22px rgba(23,51,59,.06)}
     h2{margin:0 0 10px;font-size:20px}h3{margin:20px 0 8px;font-size:16px}.muted{color:var(--muted);font-size:14px}.privacy{padding:11px 13px;color:#53676b;background:#edf6f4;border-left:4px solid var(--teal);border-radius:8px;font-size:13px}
     label{display:block;margin:14px 0 6px;font-weight:700;font-size:14px}textarea{display:block;width:100%;min-height:150px;padding:11px;border:1px solid var(--line);border-radius:9px;background:#fbfdfc;color:var(--ink);font:12px/1.55 var(--mono);resize:vertical}#sourceText{min-height:180px}
@@ -22,7 +23,7 @@
   </style>
 </head>
 <body>
-  <header><p>離線分析工具・公開版</p><h1>活動資料分析</h1><small>資料只在此瀏覽器處理，不會上傳。</small></header>
+  <header><a class="home-link" href="../index.html">← 回到首頁</a><p>離線分析工具・公開版</p><h1>活動資料分析</h1><small>資料只在此瀏覽器處理，不會上傳。</small></header>
   <main>
     <section class="card">
       <h2>1. 上載 PDF 文件</h2>
