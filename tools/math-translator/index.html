@@ -61,7 +61,7 @@
         </div>
       </aside>
 
-      <main class="main-content">
+      <main class="main-content" data-active-workflow="translate">
         <header class="topbar">
           <div class="breadcrumb"><span>工具</span><b>/</b><strong>文件翻譯</strong></div>
           <div class="topbar-status"><span class="status-pulse"></span><span id="serviceStatus">離線可用</span></div>
@@ -127,7 +127,7 @@
         <section class="workspace-section" id="workspace" aria-labelledby="workspace-title">
           <div class="workspace-heading">
             <div>
-              <div class="section-label">WORKSPACE <span>01</span></div>
+              <div class="section-label">主要工作區 <span>01</span></div>
               <h2 id="workspace-title">翻譯工作區</h2>
             </div>
             <div class="language-controls" aria-label="語言設定">
@@ -250,18 +250,27 @@
             <button class="inline-action" type="button" data-workflow-target="translate">了解處理方式 <span aria-hidden="true">↗</span></button>
           </div>
 
-          <div class="service-diagnostics" id="services" aria-labelledby="services-title">
-            <div class="diagnostics-heading">
+          <details class="service-diagnostics" id="services">
+            <summary class="diagnostics-summary">
               <div>
-                <div class="section-label">LOCAL SERVICES <span>01A</span></div>
-                <h3 id="services-title">檢查模型及本機服務</h3>
-                <p>只顯示是否已設定、連線狀態、模型名稱和可用模型；不會把 API key 回傳到瀏覽器。</p>
+                <div class="section-label">進階設定 · 本機服務 <span>01A</span></div>
+                <h3 id="services-title">本機模型服務（可選）</h3>
+                <p>離線詞庫不需要服務；只有使用 GPT-5.6 Luna、MiniMax、LocalAI 或 Local LLM 時才需要檢查連線。</p>
               </div>
-              <button class="button button-quiet" id="checkServices" type="button">檢查服務</button>
+              <span class="diagnostics-disclosure">展開設定 <b aria-hidden="true">＋</b></span>
+            </summary>
+            <div class="diagnostics-body">
+              <div class="diagnostics-heading">
+                <div>
+                  <div class="section-label">SERVICE CHECK</div>
+                  <p>只顯示是否已設定、連線狀態、模型名稱和可用模型；不會把 API key 回傳到瀏覽器。</p>
+                </div>
+                <button class="button button-quiet" id="checkServices" type="button">檢查服務</button>
+              </div>
+              <div class="diagnostics-status" id="diagnosticsStatus">尚未檢查；按「檢查服務」讀取本機設定。</div>
+              <div class="diagnostics-grid" id="diagnosticsList"></div>
             </div>
-            <div class="diagnostics-status" id="diagnosticsStatus">尚未檢查；按「檢查服務」讀取本機設定。</div>
-            <div class="diagnostics-grid" id="diagnosticsList"></div>
-          </div>
+          </details>
         </section>
 
         <section class="workflow-panel" id="workflowPanel" aria-label="工作流程設定">

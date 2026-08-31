@@ -162,6 +162,7 @@ const heroDescription = document.querySelector("#heroDescription");
 const termsTitle = document.querySelector("#terms-title");
 const termsDescription = document.querySelector("#termsDescription");
 const workflowStatus = document.querySelector("#workflowStatus");
+const mainContent = document.querySelector(".main-content");
 const workflowTabs = Array.from(document.querySelectorAll("[data-workflow-tab]"));
 const workflowContextLabel = document.querySelector("#workflowContextLabel");
 const workflowContextTitle = document.querySelector("#workflowContextTitle");
@@ -198,13 +199,14 @@ const exampleList = document.querySelector("#exampleList");
 const examplesSection = document.querySelector("#examples");
 const examplesEmpty = document.querySelector("#examplesEmpty");
 const checkServicesButton = document.querySelector("#checkServices");
+const servicesPanel = document.querySelector("#services");
 const diagnosticsStatus = document.querySelector("#diagnosticsStatus");
 const diagnosticsList = document.querySelector("#diagnosticsList");
 
 let translatedValue = "";
 let activeFileName = "";
 let toastTimer;
-let activeWorkflow = "author";
+let activeWorkflow = "translate";
 let emiPracticeIndex = 0;
 let emiPracticeRevealed = false;
 let emiSelectedId = "";
@@ -760,6 +762,7 @@ function activateWorkflow(workflow, options) {
   const nextWorkflow = WORKFLOW_COPY[workflow] ? workflow : "author";
   const settings = options || {};
   activeWorkflow = nextWorkflow;
+  if (mainContent) mainContent.dataset.activeWorkflow = activeWorkflow;
   workflowTabs.forEach(function (tab) {
     const active = tab.dataset.workflowTab === activeWorkflow;
     tab.classList.toggle("active", active);
@@ -1133,6 +1136,7 @@ async function checkServices() {
     checkServicesButton.disabled = true;
     checkServicesButton.textContent = "檢查中…";
   }
+  if (servicesPanel) servicesPanel.open = true;
   diagnosticsStatus.textContent = "正在讀取環境設定及測試 /models endpoint…";
   try {
     const response = await fetch("/api/diagnostics?probe=1", { cache: "no-store" });
@@ -1640,7 +1644,7 @@ applyGlossaryPresentation();
 populateTermFilters();
 renderTermLibrary();
 populateExampleFilters();
-activateWorkflow("author", { preserveSearch: true, preserveLevel: true, preserveCategory: true });
+activateWorkflow("translate", { preserveSearch: true, preserveLevel: true, preserveCategory: true });
 updateTaskMode();
 checkApiService();
 updateSourceState();
