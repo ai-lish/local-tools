@@ -1202,11 +1202,11 @@ footer p { margin: 0; }
 
           <section class="student-source-card">
             <h3>4. 課表對照（可選）</h3>
-            <p>匯入已有 12_上課時間表 TSV／CSV／Excel；選修長表會按班別及科目顯示日次、時間、教師及地點。</p>
+            <p>如已在「上課時間表」頁匯入 12_上課時間表，建立學生總表時會自動沿用；只有未有前頁資料時才需另選檔案。選檔後會優先使用該檔案。</p>
             <div class="student-file-row">
               <label class="button button--secondary" for="studentTimetableInput">選擇 12_上課時間表</label>
               <input id="studentTimetableInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv,.tsv,.html,.htm,text/csv,text/tab-separated-values,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-              <div id="studentTimetableFileList" class="student-file-list"><span>未選擇（仍可查看名單）</span></div>
+              <div id="studentTimetableFileList" class="student-file-list"><span>未選擇（會自動使用前頁課表，如有）</span></div>
             </div>
           </section>
 
@@ -1223,7 +1223,7 @@ footer p { margin: 0; }
             <button id="studentGroupPasteBtn" class="button button--ghost" type="button">加入貼上的分組表</button>
           </section>
         </div>
-        <div class="student-source-help">建議流程：先選學生主名單，再選分組及選修檔案，最後按「建立學生總表」。資料只留在目前瀏覽器分頁；完成後可把 14、15 及 19、22–24、92 分頁 TSV 貼入 Google Sheet。現有 GAS 的 16–18 分頁不要覆蓋。</div>
+        <div class="student-source-help">建議流程：先選學生主名單，再選分組及選修檔案，最後按「建立學生總表」。如已在上課時間表頁完成解析，不需再次選擇課表。資料只留在目前瀏覽器分頁；完成後可把 14、15 及 19、22–24、92 分頁 TSV 貼入 Google Sheet。現有 GAS 的 16–18 分頁不要覆蓋。</div>
         <div class="student-actions">
           <button id="buildStudentRosterBtn" class="button" style="color:white;background:#604493" type="button">建立學生總表</button>
           <button id="clearStudentRosterBtn" class="button button--ghost" type="button">清除本頁資料</button>
@@ -10257,6 +10257,19 @@ window.TimetableTool = {
     return output.sort((a, b) => dayNumber(a.日次) - dayNumber(b.日次) || timeMinutes(a.開始) - timeMinutes(b.開始));
   }
 
+  function existingTimetableSource() {
+    const data = window.TimetableTool?.getTimetableExportData?.();
+    const rows = Array.isArray(data?.rows)
+      ? data.rows.filter(row => Array.isArray(row) && row.some(value => normalize(value)))
+      : [];
+    if (!rows.length) return null;
+    const headers = Array.isArray(data.headers) && data.headers.length ? data.headers : TIMETABLE_HEADERS;
+    return {
+      fileName: data.sourceName || "12_上課時間表（前頁已匯入）",
+      sheets: [{ name: "12_上課時間表", rows: [headers, ...rows] }]
+    };
+  }
+
   function classTokens(value) {
     return [...String(value || "").toUpperCase().matchAll(/(?:S)?([1-6])\s*([A-D])/gu)].map(match => match[1] + match[2]);
   }
@@ -10610,7 +10623,7 @@ window.TimetableTool = {
 
   async function buildRoster() {
     if (!state.masterFiles.length && !state.groupFiles.length && !state.electiveFiles.length && !state.pastedGroups.length) {
-      setStatus("warning", "尚未選擇來源", "請至少選擇學生主名單，或貼上一份分組表。課表是可選資料。");
+      setStatus("warning", "尚未選擇來源", "請至少選擇學生主名單，或貼上一份分組表。課表可沿用上課時間表頁資料，不必重複匯入。");
       return;
     }
     state.checks = []; state.masterRows = []; state.groupRows = []; state.groupCatalogRows = []; state.electiveRows = []; state.timetableRows = []; state.overviewRows = []; state.crossRows = [];
@@ -10655,9 +10668,14 @@ window.TimetableTool = {
       }
 
       progress(70, "正在讀取課表對照…");
-      if (state.timetableFile) {
-        try { state.timetableRows = parseTimetableSource(await readSource(state.timetableFile)); }
-        catch (error) { state.checks.push(["課表", state.timetableFile.name, "", "SOURCE_READ_ERROR", error.message || "讀取失敗", "高"]); }
+      const timetableLabel = state.timetableFile?.name || "上課時間表頁的 12_上課時間表";
+      try {
+        const timetableSource = state.timetableFile
+          ? await readSource(state.timetableFile)
+          : existingTimetableSource();
+        if (timetableSource) state.timetableRows = parseTimetableSource(timetableSource);
+      } catch (error) {
+        state.checks.push(["課表", timetableLabel, "", "SOURCE_READ_ERROR", error.message || "讀取失敗", "高"]);
       }
       progress(84, "正在合併學生總表…");
       state.overviewRows = buildOverview();
@@ -10667,7 +10685,9 @@ window.TimetableTool = {
       render();
       const errors = state.checks.filter(item => item[5] === "高").length;
       const pending = state.checks.filter(item => item[5] !== "高").length;
-      const sourceNote = state.timetableRows.length ? "；課表已載入，可查看選修對照" : "；未載入課表，名單仍可使用";
+      const sourceNote = state.timetableRows.length
+        ? (state.timetableFile ? "；課表已載入，可查看選修對照" : "；已沿用上課時間表頁資料，可查看選修對照")
+        : "；未載入課表，名單仍可使用";
       setStatus(errors ? "warning" : "success", errors ? "學生總表建立完成，仍有來源待核對" : "學生總表建立完成", "學生 " + state.overviewRows.length + " 位；分組名單 " + state.groupRows.length + " 行；選修記錄 " + state.electiveRows.length + " 行；待核對 " + (errors + pending) + " 項" + sourceNote + "。");
       setTimeout(() => { dom.progress.hidden = true; }, 900);
     } catch (error) {
@@ -10702,7 +10722,7 @@ window.TimetableTool = {
     fileList(dom.masterInput, dom.masterFileList, "尚未選擇");
     fileList(dom.groupInput, dom.groupFileList, "尚未選擇");
     fileList(dom.electiveInput, dom.electiveFileList, "尚未選擇");
-    fileList(dom.timetableInput, dom.timetableFileList, "未選擇（仍可查看名單）");
+    fileList(dom.timetableInput, dom.timetableFileList, "未選擇（會自動使用前頁課表，如有）");
     dom.workspace.hidden = true; dom.progress.hidden = true; dom.status.innerHTML = "";
   }
 
