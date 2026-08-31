@@ -121,6 +121,12 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/math-translator/examples.js",
+      "destination": "tools/math-translator/examples.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/math-translator/styles.css",
       "destination": "tools/math-translator/styles.css",
       "publicMode": "cli-source",

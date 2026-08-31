@@ -10,7 +10,7 @@ const MATH_GLOSSARY = {
     updatedAt: "2026-08-31",
     uiLabel: "公開數學詞庫",
     promptLabel: "Public mathematics terminology glossary",
-    heroText: "以公開數學常見用語整理翻譯結果；需要更完整語境時，可切換 GPT-5.6-sol，同時守住每一個公式、變數與 LaTeX 結構。",
+    heroText: "以公開數學常見用語整理翻譯結果；需要更完整語境時，可切換 GPT-5.6 Luna、MiniMax 或本機模型，同時守住每一個公式、變數與 LaTeX 結構。",
     workspaceText: "目前為離線示範模式：內建公開數學詞庫會翻譯常見術語，辨識到的數學公式與 LaTeX 指令保持原樣。",
     termsTitle: "數學常見用詞",
     termsDescription: "搜尋英文、繁體中文或題目指令；按「套用」即可把詞條放回翻譯工作區。",
@@ -461,6 +461,32 @@ const MATH_GLOSSARY = {
     }
   ]
 };
+
+MATH_GLOSSARY.entries.push(
+  { id: "learning-objective", category: "課程與教學", sourceTerm: "learning objective", preferred: "學習目標", aliases: ["learning objectives"], note: "教案中描述學生在課堂後能夠展示的知識、技能或理解。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "success-criteria", category: "課程與教學", sourceTerm: "success criteria", preferred: "成功準則", aliases: ["success criterion"], note: "用來判斷學生是否達到學習目標的可觀察準則。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "中" },
+  { id: "prior-knowledge", category: "課程與教學", sourceTerm: "prior knowledge", preferred: "先備知識", aliases: ["已有知識"], note: "開始新課題前預期學生已掌握的知識或技能。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "key-vocabulary", category: "課程與教學", sourceTerm: "key vocabulary", preferred: "關鍵詞彙", aliases: ["key words"], note: "課堂或單元需要學生理解及使用的詞語。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "common-misconception", category: "課程與教學", sourceTerm: "common misconception", preferred: "常見誤解", aliases: ["common misconceptions"], note: "學生常見而且需要透過教學澄清的錯誤理解。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "scheme-of-work", category: "課程與教學", sourceTerm: "scheme of work", preferred: "教學進度表", aliases: ["scheme of learning"], note: "按學期或單元編排課堂內容、時間及評量的文件。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "lesson-sequence", category: "課程與教學", sourceTerm: "lesson sequence", preferred: "課堂流程", aliases: ["lesson structure"], note: "課堂活動的先後次序，例如熱身、示範、練習及總結。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "starter-activity", category: "課程與教學", sourceTerm: "starter activity", preferred: "熱身活動", aliases: ["starter"], note: "課堂開始時用來引入課題或提取已有知識的活動。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "中" },
+  { id: "plenary", category: "課程與教學", sourceTerm: "plenary", preferred: "總結活動", aliases: ["lesson plenary"], note: "課堂結束時整理重點、檢查理解或引出下一步的活動。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "中" },
+  { id: "worked-example", category: "課程與教學", sourceTerm: "worked example", preferred: "示範例題", aliases: ["worked examples"], note: "展示完整解題步驟並說明每一步原因的例題。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "guided-practice", category: "課程與教學", sourceTerm: "guided practice", preferred: "引導練習", aliases: ["guided practise"], note: "教師提供提示或共同示範，學生逐步完成的練習。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "independent-practice", category: "課程與教學", sourceTerm: "independent practice", preferred: "獨立練習", aliases: ["independent practise"], note: "學生在較少提示下自行應用所學的練習。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "retrieval-practice", category: "課程與教學", sourceTerm: "retrieval practice", preferred: "提取練習", aliases: ["retrieval activity"], note: "透過回想而非重新閱讀，提取已有知識的活動。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "中" },
+  { id: "formative-assessment", category: "課程與教學", sourceTerm: "formative assessment", preferred: "形成性評估", aliases: ["assessment for learning"], note: "利用學習證據即時調整教學及支援學生進步的評估。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "diagnostic-questioning", category: "課程與教學", sourceTerm: "diagnostic questioning", preferred: "診斷式提問", aliases: ["diagnostic questions"], note: "用問題找出學生的理解、策略或誤解。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "中" },
+  { id: "scaffolding", category: "課程與教學", sourceTerm: "scaffolding", preferred: "鷹架", aliases: ["scaffold", "scaffolded practice"], note: "為學生提供暫時支援，並隨能力提升逐步撤去。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "中" },
+  { id: "teaching-differentiation", category: "課程與教學", sourceTerm: "differentiation", preferred: "分層教學", aliases: ["differentiated instruction"], note: "按學生不同需要、能力或準備程度調整內容、支援或任務；數學微分需按上下文區分。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "中" },
+  { id: "extension-task", category: "課程與教學", sourceTerm: "extension task", preferred: "延伸任務", aliases: ["extension activity"], note: "在核心任務以外要求學生深化、推廣或連結概念的任務。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "peer-assessment", category: "課程與教學", sourceTerm: "peer assessment", preferred: "同儕評估", aliases: ["peer review"], note: "學生根據準則互相檢視及回饋學習成果。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "self-assessment", category: "課程與教學", sourceTerm: "self-assessment", preferred: "自我評估", aliases: ["self assessment"], note: "學生根據準則檢視自己的理解或表現。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" },
+  { id: "exit-ticket", category: "課程與教學", sourceTerm: "exit ticket", preferred: "課末小測", aliases: ["exit slip"], note: "離開課堂前完成的短題或反思，用來收集理解證據。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "中" },
+  { id: "think-pair-share", category: "課程與教學", sourceTerm: "think–pair–share", preferred: "思考－二人討論－分享", aliases: ["think-pair-share"], note: "先個人思考，再與同伴討論，最後向全班分享的活動流程。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5"], confidence: "中" },
+  { id: "mathematical-reasoning", category: "課程與教學", sourceTerm: "mathematical reasoning", preferred: "數學推理", aliases: ["reasoning"], note: "利用定義、性質、證據及邏輯建立或解釋結論。", publishers: ["通用教學用語"], levels: ["S1", "S2", "S3", "S4", "S5", "S6"], confidence: "高" }
+);
 
 if (typeof window !== "undefined") {
   window.MATH_GLOSSARY = MATH_GLOSSARY;

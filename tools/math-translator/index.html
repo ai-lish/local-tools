@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="styles.css" />
     <script src="publisher-glossary.js" defer></script>
     <script src="drive-sample.js" defer></script>
+    <script src="examples.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
@@ -33,6 +34,14 @@
           <a class="nav-item" href="#terms">
             <span class="nav-icon">⌕</span>
             <span>常見用詞</span>
+          </a>
+          <a class="nav-item" href="#examples">
+            <span class="nav-icon">▤</span>
+            <span>翻譯示例</span>
+          </a>
+          <a class="nav-item" href="#services">
+            <span class="nav-icon">⚙</span>
+            <span>服務設定</span>
           </a>
           <a class="nav-item" href="#guide">
             <span class="nav-icon">⌘</span>
@@ -63,7 +72,7 @@
             <div class="eyebrow"><span></span> MATH-AWARE TRANSLATION</div>
             <h1 id="page-title">翻譯數學，<br /><em>不翻譯公式。</em></h1>
             <p id="heroDescription">
-              以數學常見用語整理翻譯結果；需要更完整語境時，可切換 GPT-5.6-sol，同時守住每一個公式、變數與 LaTeX 結構。
+              以數學常見用語和教學語境整理翻譯結果；可切換 GPT-5.6 Luna、MiniMax 或本機模型，同時守住每一個公式、變數與 LaTeX 結構。
             </p>
             <div class="hero-actions">
               <button class="button button-primary" id="loadSample" type="button">
@@ -73,6 +82,7 @@
                 <span class="drive-mark" aria-hidden="true">▣</span> <span id="driveSampleLabel">實例示範</span>
               </button>
               <a class="button button-quiet" href="#terms">查找常見用詞 <span aria-hidden="true">↓</span></a>
+              <a class="button button-quiet" href="#examples">瀏覽翻譯示例 <span aria-hidden="true">↓</span></a>
               <button class="button button-quiet" id="clearAll" type="button">清除內容</button>
             </div>
           </div>
@@ -114,8 +124,10 @@
                 <span class="sr-only">翻譯模式</span>
                 <select id="translationMode" aria-label="翻譯模式">
                   <option value="offline">離線詞庫</option>
-                  <option value="ai">GPT-5.6-sol</option>
-                  <option value="local">Local LLM</option>
+                  <option value="ai">GPT-5.6 Luna</option>
+                  <option value="minimax">MiniMax</option>
+                  <option value="localai">LocalAI</option>
+                  <option value="local">Local LLM（OpenAI-compatible）</option>
                 </select>
               </label>
             </div>
@@ -201,6 +213,19 @@
             <span id="workspaceNoteText">目前為離線示範模式：內建數學詞庫會翻譯常見術語，辨識到的數學公式與 LaTeX 指令保持原樣。</span>
             <a href="#guide">了解處理方式 <span aria-hidden="true">↗</span></a>
           </div>
+
+          <div class="service-diagnostics" id="services" aria-labelledby="services-title">
+            <div class="diagnostics-heading">
+              <div>
+                <div class="section-label">LOCAL SERVICES <span>01A</span></div>
+                <h3 id="services-title">檢查模型及本機服務</h3>
+                <p>只顯示是否已設定、連線狀態、模型名稱和可用模型；不會把 API key 回傳到瀏覽器。</p>
+              </div>
+              <button class="button button-quiet" id="checkServices" type="button">檢查服務</button>
+            </div>
+            <div class="diagnostics-status" id="diagnosticsStatus">尚未檢查；按「檢查服務」讀取本機設定。</div>
+            <div class="diagnostics-grid" id="diagnosticsList"></div>
+          </div>
         </section>
 
         <section class="terms-section" id="terms" aria-labelledby="terms-title">
@@ -244,6 +269,50 @@
             <span class="empty-glyph">∅</span>
             <strong>找不到相符詞條</strong>
             <span>試試英文術語、繁體中文或另一個分類。</span>
+          </div>
+        </section>
+
+        <section class="examples-section" id="examples" aria-labelledby="examples-title">
+          <div class="examples-heading">
+            <div>
+              <div class="section-label">TRANSLATION EXAMPLES <span>02A</span></div>
+              <h2 id="examples-title">示例庫</h2>
+              <p id="examplesDescription">以公開試題型、出版社題型的短例，以及課程文件、教案、學習目標、教學法和課堂用語示範翻譯方向。</p>
+            </div>
+            <div class="terms-total"><strong id="exampleCount">0</strong><span>條示例</span></div>
+          </div>
+
+          <div class="examples-tools" aria-label="示例篩選器">
+            <label class="term-search">
+              <span aria-hidden="true">⌕</span>
+              <span class="sr-only">搜尋示例</span>
+              <input id="exampleSearch" type="search" placeholder="搜尋題目、學習目標、教學法或課堂用語…" autocomplete="off" />
+            </label>
+            <label class="select-wrap">
+              <span class="sr-only">示例類型</span>
+              <select id="exampleKind">
+                <option value="all">所有示例類型</option>
+              </select>
+            </label>
+            <label class="select-wrap">
+              <span class="sr-only">示例年級</span>
+              <select id="exampleLevel">
+                <option value="all">所有年級</option>
+              </select>
+            </label>
+            <button class="button button-quiet term-reset" id="resetExampleFilters" type="button">重設</button>
+          </div>
+
+          <div class="terms-meta">
+            <span id="exampleFilterNote">題目及教學語境均以短句、自製改寫或通用句型示範。</span>
+            <a href="https://www.hkeaa.edu.hk/en/Resources/publications/list_of_publications/hkdse_erqp_pub/" target="_blank" rel="noreferrer">HKEAA 公開資源 ↗</a>
+          </div>
+
+          <div class="example-grid" id="exampleList"></div>
+          <div class="terms-empty" id="examplesEmpty" hidden>
+            <span class="empty-glyph">∅</span>
+            <strong>找不到相符示例</strong>
+            <span>試試題目指令、learning objective、教學法或年級。</span>
           </div>
         </section>
 

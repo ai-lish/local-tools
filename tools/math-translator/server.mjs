@@ -36,9 +36,20 @@ loadDotEnv();
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
-const DEFAULT_PROVIDER = process.env.LLM_PROVIDER === "local" ? "local" : "openai";
+const configuredDefaultProvider = process.env.LLM_PROVIDER || "openai";
+const DEFAULT_PROVIDER = ["openai", "minimax", "localai", "local"].includes(configuredDefaultProvider)
+  ? configuredDefaultProvider
+  : "openai";
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.6-sol";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.6-luna";
+const MINIMAX_BASE_URL = process.env.MINIMAX_BASE_URL || "https://api.minimax.io/v1";
+const MINIMAX_MODEL = process.env.MINIMAX_MODEL || "MiniMax-M3";
+const MINIMAX_TOKEN = process.env.MINIMAX_TOKEN || process.env.MINIMAX_API_KEY || "";
+const MINIMAX_API_STYLE = "chat";
+const LOCALAI_BASE_URL = process.env.LOCALAI_BASE_URL || "http://127.0.0.1:8080/v1";
+const LOCALAI_MODEL = process.env.LOCALAI_MODEL || "";
+const LOCALAI_TOKEN = process.env.LOCALAI_TOKEN || process.env.LOCALAI_API_KEY || "local-ai";
+const LOCALAI_API_STYLE = process.env.LOCALAI_API_STYLE === "responses" ? "responses" : "chat";
 const LOCAL_LLM_BASE_URL = process.env.LOCAL_LLM_BASE_URL || "";
 const LOCAL_LLM_MODEL = process.env.LOCAL_LLM_MODEL || "";
 const OPENAI_LEGACY_TOKEN_ENV = ["OPENAI", "API", "KEY"].join("_");
@@ -46,6 +57,7 @@ const LOCAL_LLM_LEGACY_TOKEN_ENV = ["LOCAL", "LLM", "API", "KEY"].join("_");
 const LOCAL_LLM_TOKEN = process.env.LOCAL_LLM_TOKEN || process.env[LOCAL_LLM_LEGACY_TOKEN_ENV] || "local";
 const LOCAL_LLM_API_STYLE = process.env.LOCAL_LLM_API_STYLE === "responses" ? "responses" : "chat";
 const REASONING_EFFORT = process.env.OPENAI_REASONING_EFFORT || "medium";
+const DIAGNOSTIC_TIMEOUT_MS = 7000;
 const configuredTimeout = Number(process.env.LLM_TIMEOUT_MS || 90000);
 const MODEL_TIMEOUT_MS = Number.isFinite(configuredTimeout)
   ? Math.max(5000, Math.min(configuredTimeout, 300000))
@@ -83,32 +95,183 @@ function providerApiStyle(baseUrl, fallback) {
 }
 
 function getProviderConfig(providerName) {
+  if (providerName === "minimax") {
+    return {
+      provider: "minimax",
+      label: "MiniMax",
+      baseUrl: MINIMAX_BASE_URL,
+      endpoint: providerEndpoint(MINIMAX_BASE_URL, MINIMAX_API_STYLE),
+      authToken: MINIMAX_TOKEN,
+      model: MINIMAX_MODEL,
+      apiStyle: MINIMAX_API_STYLE,
+      configured: Boolean(MINIMAX_BASE_URL && MINIMAX_MODEL && MINIMAX_TOKEN),
+      environmentKeys: ["MINIMAX_API_KEY", "MINIMAX_TOKEN", "MINIMAX_BASE_URL", "MINIMAX_MODEL"]
+    };
+  }
+  if (providerName === "localai") {
+    return {
+      provider: "localai",
+      label: "LocalAI",
+      baseUrl: LOCALAI_BASE_URL,
+      endpoint: providerEndpoint(LOCALAI_BASE_URL, LOCALAI_API_STYLE),
+      authToken: LOCALAI_TOKEN,
+      model: LOCALAI_MODEL,
+      apiStyle: providerApiStyle(LOCALAI_BASE_URL, LOCALAI_API_STYLE),
+      configured: Boolean(LOCALAI_BASE_URL && LOCALAI_MODEL),
+      environmentKeys: ["LOCALAI_BASE_URL", "LOCALAI_MODEL", "LOCALAI_API_KEY", "LOCALAI_API_STYLE"]
+    };
+  }
   if (providerName === "local") {
     const apiStyle = providerApiStyle(LOCAL_LLM_BASE_URL, LOCAL_LLM_API_STYLE);
     return {
       provider: "local",
+      label: "Local LLM",
       baseUrl: LOCAL_LLM_BASE_URL,
       endpoint: providerEndpoint(LOCAL_LLM_BASE_URL, apiStyle),
       authToken: LOCAL_LLM_TOKEN,
       model: LOCAL_LLM_MODEL,
       apiStyle,
-      configured: Boolean(LOCAL_LLM_BASE_URL && LOCAL_LLM_MODEL)
+      configured: Boolean(LOCAL_LLM_BASE_URL && LOCAL_LLM_MODEL),
+      environmentKeys: ["LOCAL_LLM_BASE_URL", "LOCAL_LLM_MODEL", "LOCAL_LLM_TOKEN", "LOCAL_LLM_API_STYLE"]
     };
   }
   return {
     provider: "openai",
+    label: "GPT-5.6 Luna / OpenAI",
     baseUrl: OPENAI_BASE_URL,
     endpoint: providerEndpoint(OPENAI_BASE_URL, "responses"),
     authToken: process.env.OPENAI_TOKEN || process.env[OPENAI_LEGACY_TOKEN_ENV] || "",
     model: OPENAI_MODEL,
     apiStyle: "responses",
-    configured: Boolean(process.env.OPENAI_TOKEN || process.env[OPENAI_LEGACY_TOKEN_ENV])
+    configured: Boolean(process.env.OPENAI_TOKEN || process.env[OPENAI_LEGACY_TOKEN_ENV]),
+    environmentKeys: ["OPENAI_API_KEY", "OPENAI_TOKEN", "OPENAI_BASE_URL", "OPENAI_MODEL"]
   };
 }
 
 function requestedProvider(value) {
-  if (value === "local" || value === "openai") return value;
+  if (["local", "localai", "minimax", "openai"].includes(value)) return value;
   return DEFAULT_PROVIDER;
+}
+
+function safeEndpointLabel(value) {
+  try {
+    const parsed = new URL(value);
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return "未設定或格式無效";
+  }
+}
+
+function modelsEndpoint(config) {
+  const base = trimTrailingSlashes(config.baseUrl)
+    .replace(/\/(?:chat\/completions|responses)$/, "");
+  return base + "/models";
+}
+
+function extractModelIds(payload) {
+  const candidates = Array.isArray(payload?.data)
+    ? payload.data
+    : Array.isArray(payload?.models)
+      ? payload.models
+      : [];
+  return candidates.map(function (model) {
+    return typeof model === "string" ? model : model && (model.id || model.name);
+  }).filter(function (model, index, all) {
+    return typeof model === "string" && model && all.indexOf(model) === index;
+  }).slice(0, 30);
+}
+
+async function probeProvider(config) {
+  const requiresCredential = ["openai", "minimax"].includes(config.provider);
+  if (!config.baseUrl || (requiresCredential && !config.authToken)) {
+    return { status: "not_configured", models: [] };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(function () {
+    controller.abort();
+  }, DIAGNOSTIC_TIMEOUT_MS);
+  try {
+    const headers = { Accept: "application/json" };
+    if (config.authToken) headers.Authorization = "Bearer " + config.authToken;
+    const response = await fetch(modelsEndpoint(config), {
+      method: "GET",
+      headers,
+      signal: controller.signal
+    });
+    const payload = await response.json().catch(function () {
+      return {};
+    });
+    return {
+      status: response.ok ? "reachable" : "error",
+      httpStatus: response.status,
+      models: extractModelIds(payload),
+      error: response.ok ? "" : "服務回傳 HTTP " + response.status
+    };
+  } catch (error) {
+    return {
+      status: error && error.name === "AbortError" ? "timeout" : "unreachable",
+      models: [],
+      error: error && error.name === "AbortError" ? "連線逾時" : "無法連線"
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function describeProvider(config, probe) {
+  const credentialKeys = config.provider === "localai" || config.provider === "local"
+    ? config.environmentKeys.filter(function (key) {
+        return /(?:API_KEY|TOKEN)$/.test(key);
+      })
+    : config.environmentKeys.filter(function (key) {
+        return /(?:API_KEY|TOKEN)$/.test(key);
+      });
+  return {
+    provider: config.provider,
+    label: config.label,
+    configured: config.configured,
+    credentialConfigured: Boolean(config.authToken && !["local", "localai"].includes(config.provider)),
+    endpoint: safeEndpointLabel(config.baseUrl),
+    model: config.model,
+    apiStyle: config.apiStyle,
+    environment: config.environmentKeys.map(function (key) {
+      return { key, set: Boolean(process.env[key]) };
+    }),
+    credentialKeys,
+    probe
+  };
+}
+
+async function handleDiagnostics(request, response) {
+  const requestUrl = new URL(request.url || "/api/diagnostics", "http://" + HOST);
+  const shouldProbe = requestUrl.searchParams.get("probe") === "1";
+  const configs = [
+    getProviderConfig("openai"),
+    getProviderConfig("minimax"),
+    getProviderConfig("localai"),
+    getProviderConfig("local")
+  ];
+  const probes = shouldProbe
+    ? await Promise.all(configs.map(probeProvider))
+    : configs.map(function () { return { status: "not_checked", models: [] }; });
+  jsonResponse(response, 200, {
+    checkedAt: new Date().toISOString(),
+    probed: shouldProbe,
+    defaultProvider: DEFAULT_PROVIDER,
+    runtime: {
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      pythonExecutable: PYTHON_EXECUTABLE,
+      extraction: { docx: true, pdf: true, googleDocs: true }
+    },
+    providers: configs.map(function (config, index) {
+      return describeProvider(config, probes[index]);
+    })
+  });
 }
 
 function loadGlossary() {
@@ -518,6 +681,11 @@ function extractOutputText(payload, apiStyle) {
   return parts.join("\n").trim();
 }
 
+function stripMiniMaxThinking(value, provider) {
+  if (provider !== "minimax") return value.trim();
+  return value.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+}
+
 async function translateWithProvider(config, sourceText, sourceLanguage, targetLanguage) {
   const protectedText = maskMath(sourceText);
   const input = [
@@ -536,8 +704,10 @@ async function translateWithProvider(config, sourceText, sourceLanguage, targetL
           { role: "system", content: instructions },
           { role: "user", content: input }
         ],
-        ...(config.provider === "openai" ? { temperature: 0.1 } : {}),
-        max_tokens: MAX_OUTPUT_TOKENS
+        ...(config.provider === "openai" || config.provider === "minimax" ? { temperature: 0.1 } : {}),
+        ...(config.provider === "minimax"
+          ? { thinking: { type: "adaptive" }, reasoning_split: true, max_completion_tokens: MAX_OUTPUT_TOKENS }
+          : { max_tokens: MAX_OUTPUT_TOKENS })
       }
     : {
         model: config.model,
@@ -577,7 +747,7 @@ async function translateWithProvider(config, sourceText, sourceLanguage, targetL
     throw new Error(config.provider + " API " + upstream.status + ": " + errorMessage);
   }
 
-  const output = extractOutputText(payload, config.apiStyle);
+  const output = stripMiniMaxThinking(extractOutputText(payload, config.apiStyle), config.provider);
   if (!output) throw new Error(config.provider + " API returned no output");
   if (output.length > MAX_OUTPUT_CHARS) throw new Error(config.provider + " API output exceeded the limit");
   const restored = restoreMath(output, protectedText.formulas);
@@ -624,8 +794,14 @@ async function handleTranslation(request, response) {
   const provider = requestedProvider(body.provider);
   const config = getProviderConfig(provider);
   if (!config.configured) {
+    const messages = {
+      openai: "後端尚未設定 OpenAI API key。",
+      minimax: "後端尚未設定 MINIMAX_API_KEY（或 MINIMAX_TOKEN）。",
+      localai: "後端尚未設定 LOCALAI_MODEL；可先按「檢查服務」查看可用模型。",
+      local: "後端尚未設定 LOCAL_LLM_BASE_URL 或 LOCAL_LLM_MODEL。"
+    };
     jsonResponse(response, 503, {
-      error: provider === "local" ? "後端尚未設定 LOCAL_LLM_BASE_URL 或 LOCAL_LLM_MODEL。" : "後端尚未設定雲端模型認證。"
+      error: messages[provider] || "後端尚未完成模型設定。"
     });
     return;
   }
@@ -742,8 +918,10 @@ const server = http.createServer(async function (request, response) {
   const requestUrl = new URL(request.url || "/", "http://" + HOST);
   if (request.method === "GET" && requestUrl.pathname === "/api/health") {
     const openai = getProviderConfig("openai");
+    const minimax = getProviderConfig("minimax");
+    const localai = getProviderConfig("localai");
     const local = getProviderConfig("local");
-    const active = DEFAULT_PROVIDER === "local" ? local : openai;
+    const active = getProviderConfig(DEFAULT_PROVIDER);
     jsonResponse(response, 200, {
       provider: DEFAULT_PROVIDER,
       configured: active.configured,
@@ -754,6 +932,16 @@ const server = http.createServer(async function (request, response) {
         configured: openai.configured,
         model: openai.model,
         apiStyle: openai.apiStyle
+      },
+      minimax: {
+        configured: minimax.configured,
+        model: minimax.model,
+        apiStyle: minimax.apiStyle
+      },
+      localai: {
+        configured: localai.configured,
+        model: localai.model,
+        apiStyle: localai.apiStyle
       },
       local: {
         configured: local.configured,
@@ -768,6 +956,10 @@ const server = http.createServer(async function (request, response) {
       },
       glossaryVersion: glossary.meta && glossary.meta.version ? glossary.meta.version : "unknown"
     });
+    return;
+  }
+  if (request.method === "GET" && requestUrl.pathname === "/api/diagnostics") {
+    await handleDiagnostics(request, response);
     return;
   }
   if (request.method === "POST" && requestUrl.pathname === "/api/extract") {

@@ -123,6 +123,9 @@ const glossaryMeta = glossary.meta || {};
 const glossaryLabel = glossaryMeta.uiLabel || "出版社詞庫";
 const driveSample = window.MATH_DRIVE_SAMPLE || null;
 const glossaryEntries = Array.isArray(glossary.entries) ? glossary.entries : [];
+const examplesLibrary = window.MATH_EXAMPLES || { meta: {}, entries: [] };
+const examplesMeta = examplesLibrary.meta || {};
+const exampleEntries = Array.isArray(examplesLibrary.entries) ? examplesLibrary.entries : [];
 
 const sourceText = document.querySelector("#sourceText");
 const outputText = document.querySelector("#outputText");
@@ -157,13 +160,27 @@ const termsEmpty = document.querySelector("#termsEmpty");
 const heroDescription = document.querySelector("#heroDescription");
 const termsTitle = document.querySelector("#terms-title");
 const termsDescription = document.querySelector("#termsDescription");
+const examplesDescription = document.querySelector("#examplesDescription");
+const exampleSearch = document.querySelector("#exampleSearch");
+const exampleKind = document.querySelector("#exampleKind");
+const exampleLevel = document.querySelector("#exampleLevel");
+const resetExampleFilters = document.querySelector("#resetExampleFilters");
+const exampleCount = document.querySelector("#exampleCount");
+const exampleFilterNote = document.querySelector("#exampleFilterNote");
+const exampleList = document.querySelector("#exampleList");
+const examplesEmpty = document.querySelector("#examplesEmpty");
+const checkServicesButton = document.querySelector("#checkServices");
+const diagnosticsStatus = document.querySelector("#diagnosticsStatus");
+const diagnosticsList = document.querySelector("#diagnosticsList");
 
 let translatedValue = "";
 let activeFileName = "";
 let toastTimer;
 let backendState = {
-  openai: { configured: false, model: "gpt-5.6-sol" },
-  local: { configured: false, model: "" }
+  openai: { configured: false, model: "gpt-5.6-luna", apiStyle: "responses" },
+  minimax: { configured: false, model: "MiniMax-M3", apiStyle: "chat" },
+  localai: { configured: false, model: "", apiStyle: "chat" },
+  local: { configured: false, model: "", apiStyle: "chat" }
 };
 
 function countCharacters(value) {
@@ -409,6 +426,8 @@ function applyGlossaryPresentation() {
   if (termsTitle && glossaryMeta.termsTitle) termsTitle.textContent = glossaryMeta.termsTitle;
   if (termsDescription && glossaryMeta.termsDescription) termsDescription.textContent = glossaryMeta.termsDescription;
   if (termFilterNote && glossaryMeta.filterNote) termFilterNote.textContent = glossaryMeta.filterNote;
+  if (examplesDescription && examplesMeta.description) examplesDescription.textContent = examplesMeta.description;
+  if (exampleFilterNote && examplesMeta.filterNote) exampleFilterNote.textContent = examplesMeta.filterNote;
 
   if (driveSampleButton) {
     driveSampleButton.hidden = !driveSample || typeof driveSample.text !== "string";
@@ -424,6 +443,100 @@ function applyGlossaryPresentation() {
       sourceFolderLink.removeAttribute("href");
     }
   }
+}
+
+function populateExampleFilters() {
+  if (!exampleKind || !exampleLevel) return;
+  const kinds = Array.from(new Set(exampleEntries.map(function (entry) {
+    return entry.kind;
+  }).filter(Boolean)));
+  const levels = Array.from(new Set(exampleEntries.flatMap(function (entry) {
+    return entry.levels || [];
+  }))).sort(function (left, right) {
+    return left.localeCompare(right, "en", { numeric: true });
+  });
+  exampleKind.innerHTML = '<option value="all">所有示例類型</option>' + kinds.map(function (kind) {
+    return '<option value="' + escapeHtml(kind) + '">' + escapeHtml(kind) + "</option>";
+  }).join("");
+  exampleLevel.innerHTML = '<option value="all">所有年級</option>' + levels.map(function (level) {
+    return '<option value="' + escapeHtml(level) + '">' + escapeHtml(level) + "</option>";
+  }).join("");
+}
+
+function exampleMatches(entry, query, kind, level) {
+  const haystack = [
+    entry.kind,
+    entry.category,
+    entry.sourceText,
+    entry.targetText,
+    entry.note,
+    entry.sourceType,
+    ...(entry.tags || []),
+    ...(entry.levels || [])
+  ].join(" ").toLocaleLowerCase("zh-Hant");
+  const matchesQuery = !query || haystack.includes(query);
+  const matchesKind = kind === "all" || entry.kind === kind;
+  const matchesLevel = level === "all" || (entry.levels || []).includes(level);
+  return matchesQuery && matchesKind && matchesLevel;
+}
+
+function renderExampleCard(entry) {
+  const levelMarkup = (entry.levels || []).map(escapeHtml).join("／");
+  const tags = (entry.tags || []).slice(0, 4).map(escapeHtml).join(" · ");
+  const sourceLinkMarkup = entry.sourceUrl
+    ? '<a href="' + escapeHtml(entry.sourceUrl) + '" target="_blank" rel="noreferrer">來源 ↗</a>'
+    : '<span class="example-adapted">自製改寫</span>';
+  return [
+    '<article class="example-card">',
+    '<div class="example-card-top"><span class="example-kind">' + escapeHtml(entry.kind || "示例") + '</span><span class="example-category">' + escapeHtml(entry.category || "") + '</span></div>',
+    '<div class="example-pair">',
+    '<div class="example-language">' + escapeHtml(entry.sourceLanguage === "zh-Hant" ? "繁體中文原文" : "English source") + '</div>',
+    '<div class="example-source">' + renderMathAwareText(entry.sourceText || "") + '</div>',
+    '<div class="example-arrow" aria-hidden="true">↓</div>',
+    '<div class="example-language">' + escapeHtml(entry.targetLanguage === "zh-Hant" ? "香港繁體中文譯法" : "English translation") + '</div>',
+    '<div class="example-target">' + renderMathAwareText(entry.targetText || "") + '</div>',
+    '</div>',
+    '<p class="example-note">' + escapeHtml(entry.note || "按上下文核對 house style。") + '</p>',
+    '<div class="example-card-meta"><span>' + escapeHtml(entry.sourceType || "通用示例") + '</span><span>' + levelMarkup + '</span></div>',
+    '<div class="example-tags">' + tags + '</div>',
+    '<div class="example-card-actions"><button type="button" data-example-action="use" data-example-id="' + escapeHtml(entry.id) + '">載入工作區</button>' + sourceLinkMarkup + '</div>',
+    '</article>'
+  ].join("");
+}
+
+function renderExampleLibrary() {
+  if (!exampleList) return;
+  const query = (exampleSearch ? exampleSearch.value : "").trim().toLocaleLowerCase("zh-Hant");
+  const kind = exampleKind ? exampleKind.value : "all";
+  const level = exampleLevel ? exampleLevel.value : "all";
+  const filtered = exampleEntries.filter(function (entry) {
+    return exampleMatches(entry, query, kind, level);
+  });
+  exampleList.innerHTML = filtered.map(renderExampleCard).join("");
+  if (exampleCount) exampleCount.textContent = filtered.length.toLocaleString("zh-Hant-TW");
+  if (exampleFilterNote) {
+    exampleFilterNote.textContent = filtered.length === exampleEntries.length
+      ? (examplesMeta.filterNote || "題目及教學語境均以短句、自製改寫或通用句型示範。")
+      : "目前顯示 " + filtered.length + " 條相符示例";
+  }
+  if (examplesEmpty) examplesEmpty.hidden = filtered.length > 0;
+}
+
+function handleExampleAction(event) {
+  const actionButton = event.target.closest("button[data-example-action]");
+  if (!actionButton) return;
+  const example = exampleEntries.find(function (item) {
+    return item.id === actionButton.dataset.exampleId;
+  });
+  if (!example) return;
+  setSample(
+    example.sourceText,
+    example.sourceLanguage,
+    example.targetLanguage,
+    "example-" + example.id + ".txt",
+    "已載入「" + (example.kind || "翻譯示例") + "」到工作區。"
+  );
+  document.querySelector("#workspace").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function wait(milliseconds) {
@@ -442,7 +555,7 @@ async function requestAiTranslation(value) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       mode: "translation",
-      provider: translationMode && translationMode.value === "local" ? "local" : "openai",
+      provider: selectedProvider(),
       sourceText: value,
       sourceLanguage: sourceLanguage.value,
       targetLanguage: targetLanguage.value
@@ -460,28 +573,52 @@ async function requestAiTranslation(value) {
   return data.translation;
 }
 
+function selectedProvider() {
+  if (!translationMode) return "openai";
+  if (["minimax", "localai", "local"].includes(translationMode.value)) return translationMode.value;
+  return "openai";
+}
+
+function selectedBackend() {
+  return backendState[selectedProvider()] || backendState.openai;
+}
+
 function selectedModelLabel() {
-  if (translationMode && translationMode.value === "local") {
-    return backendState.local.model ? "Local LLM · " + backendState.local.model : "Local LLM";
-  }
-  return backendState.openai.model || "gpt-5.6-sol";
+  const provider = selectedProvider();
+  const backend = selectedBackend();
+  const labels = {
+    openai: "GPT-5.6 Luna",
+    minimax: "MiniMax",
+    localai: "LocalAI",
+    local: "Local LLM"
+  };
+  const label = labels[provider] || "AI";
+  if (backend.model) return label + " · " + backend.model;
+  return label;
 }
 
 function updateTranslationMode() {
   if (!translationMode) return;
-  const isCloudAi = translationMode.value === "ai";
-  const isLocalAi = translationMode.value === "local";
-  const isModelMode = isCloudAi || isLocalAi;
-  const selectedBackend = isLocalAi ? backendState.local : backendState.openai;
+  const provider = selectedProvider();
+  const isModelMode = translationMode.value !== "offline";
+  const isCloudAi = isModelMode && provider === "openai";
+  const isMiniMax = isModelMode && provider === "minimax";
+  const isLocalAI = isModelMode && provider === "localai";
+  const isLocalAi = isModelMode && provider === "local";
+  const selected = selectedBackend();
   if (workspaceNoteText) {
     workspaceNoteText.textContent = isCloudAi
-      ? "GPT-5.6-sol 模式：文字會送到本地伺服器，再由 Responses API 處理；公式先保護，沒有服務時自動回到" + glossaryLabel + "。"
-      : isLocalAi
-        ? "Local LLM 模式：文件只會送到你設定的本機 OpenAI-compatible endpoint，不會送到 OpenAI；公式先保護，服務不可用時回到" + glossaryLabel + "。"
-        : "目前為離線示範模式：內建" + glossaryLabel + "會翻譯常見術語，辨識到的數學公式與 LaTeX 指令保持原樣。";
+      ? "GPT-5.6 Luna 模式：文字會送到本地伺服器，再由 OpenAI Responses API 處理；公式先保護，沒有服務時自動回到" + glossaryLabel + "。"
+      : isMiniMax
+        ? "MiniMax 模式：文字會由本地伺服器送到 MiniMax 的 OpenAI-compatible Chat Completions endpoint；公式先保護，服務不可用時回到" + glossaryLabel + "。"
+        : isLocalAI
+          ? "LocalAI 模式：文件只會送到你設定的本機 LocalAI endpoint，不會送到雲端；公式先保護，服務不可用時回到" + glossaryLabel + "。"
+          : isLocalAi
+            ? "Local LLM 模式：文件只會送到你設定的本機 OpenAI-compatible endpoint，不會送到 OpenAI；公式先保護，服務不可用時回到" + glossaryLabel + "。"
+            : "目前為離線示範模式：內建" + glossaryLabel + "會翻譯常見術語，辨識到的數學公式與 LaTeX 指令保持原樣。";
   }
   if (serviceStatus && isModelMode) {
-    serviceStatus.textContent = selectedBackend.configured
+    serviceStatus.textContent = selected.configured
       ? selectedModelLabel() + " 已設定"
       : selectedModelLabel() + " 待設定";
   } else if (serviceStatus) {
@@ -497,20 +634,113 @@ async function checkApiService() {
     backendState = {
       openai: {
         configured: Boolean(response.ok && data.openai && data.openai.configured),
-        model: data.openai && data.openai.model ? data.openai.model : "gpt-5.6-sol"
+        model: data.openai && data.openai.model ? data.openai.model : "gpt-5.6-luna",
+        apiStyle: data.openai && data.openai.apiStyle ? data.openai.apiStyle : "responses"
+      },
+      minimax: {
+        configured: Boolean(response.ok && data.minimax && data.minimax.configured),
+        model: data.minimax && data.minimax.model ? data.minimax.model : "MiniMax-M3",
+        apiStyle: data.minimax && data.minimax.apiStyle ? data.minimax.apiStyle : "chat"
+      },
+      localai: {
+        configured: Boolean(response.ok && data.localai && data.localai.configured),
+        model: data.localai && data.localai.model ? data.localai.model : "",
+        apiStyle: data.localai && data.localai.apiStyle ? data.localai.apiStyle : "chat"
       },
       local: {
         configured: Boolean(response.ok && data.local && data.local.configured),
-        model: data.local && data.local.model ? data.local.model : ""
+        model: data.local && data.local.model ? data.local.model : "",
+        apiStyle: data.local && data.local.apiStyle ? data.local.apiStyle : "chat"
       }
     };
   } catch {
     backendState = {
-      openai: { configured: false, model: "gpt-5.6-sol" },
-      local: { configured: false, model: "" }
+      openai: { configured: false, model: "gpt-5.6-luna", apiStyle: "responses" },
+      minimax: { configured: false, model: "MiniMax-M3", apiStyle: "chat" },
+      localai: { configured: false, model: "", apiStyle: "chat" },
+      local: { configured: false, model: "", apiStyle: "chat" }
     };
   }
   updateTranslationMode();
+}
+
+function diagnosticStatusLabel(status) {
+  return {
+    reachable: "可連線",
+    error: "服務回應錯誤",
+    timeout: "連線逾時",
+    unreachable: "無法連線",
+    not_configured: "未完成設定",
+    not_checked: "未檢查"
+  }[status] || status || "未知";
+}
+
+function diagnosticStatusClass(status) {
+  return status === "reachable" ? "diagnostic-ok"
+    : ["error", "timeout", "unreachable"].includes(status) ? "diagnostic-error"
+      : "diagnostic-pending";
+}
+
+function renderDiagnosticCard(provider) {
+  const probe = provider.probe || {};
+  const models = Array.isArray(probe.models) && probe.models.length
+    ? probe.models.join(" · ")
+    : provider.model || "尚未指定 model id";
+  const setKeys = (provider.environment || []).filter(function (item) {
+    return item.set;
+  }).map(function (item) {
+    return item.key;
+  });
+  const status = probe.status || "not_checked";
+  return [
+    '<article class="diagnostic-card">',
+    '<div class="diagnostic-card-top"><strong>' + escapeHtml(provider.label || provider.provider) + '</strong><span class="diagnostic-state ' + diagnosticStatusClass(status) + '">' + escapeHtml(diagnosticStatusLabel(status)) + '</span></div>',
+    '<div class="diagnostic-row"><span>Endpoint</span><code>' + escapeHtml(provider.endpoint || "未設定") + '</code></div>',
+    '<div class="diagnostic-row"><span>Model</span><code>' + escapeHtml(models) + '</code></div>',
+    '<div class="diagnostic-row"><span>API</span><span>' + escapeHtml(provider.apiStyle || "chat") + '</span></div>',
+    '<div class="diagnostic-row"><span>設定項目</span><span>' + escapeHtml(setKeys.length ? setKeys.join("、") : "未偵測到環境變數") + '</span></div>',
+    (probe.error ? '<p class="diagnostic-error-note">' + escapeHtml(probe.error) + '</p>' : ''),
+    '</article>'
+  ].join("");
+}
+
+function renderDiagnostics(data) {
+  if (!diagnosticsList) return;
+  const providers = Array.isArray(data.providers) ? data.providers : [];
+  diagnosticsList.innerHTML = providers.map(renderDiagnosticCard).join("");
+  if (diagnosticsStatus) {
+    const checkedAt = data.checkedAt ? new Date(data.checkedAt).toLocaleString("zh-Hant-HK") : "剛才";
+    const runtime = data.runtime || {};
+    diagnosticsStatus.textContent = "檢查時間：" + checkedAt + " · " + (runtime.node || "Node.js") + " · " + (runtime.platform || "本機");
+  }
+}
+
+async function checkServices() {
+  if (!diagnosticsStatus || !diagnosticsList) return;
+  if (window.location.protocol === "file:") {
+    diagnosticsStatus.textContent = "請先以 npm start 啟動本地伺服器，才可檢查 MiniMax、LocalAI 及本機設定。";
+    return;
+  }
+  if (checkServicesButton) {
+    checkServicesButton.disabled = true;
+    checkServicesButton.textContent = "檢查中…";
+  }
+  diagnosticsStatus.textContent = "正在讀取環境設定及測試 /models endpoint…";
+  try {
+    const response = await fetch("/api/diagnostics?probe=1", { cache: "no-store" });
+    const data = await response.json().catch(function () { return {}; });
+    if (!response.ok) throw new Error(data.error || "診斷服務暫時不可用。");
+    renderDiagnostics(data);
+    await checkApiService();
+  } catch (error) {
+    diagnosticsStatus.textContent = error.message || "診斷服務暫時不可用。";
+    diagnosticsList.innerHTML = "";
+  } finally {
+    if (checkServicesButton) {
+      checkServicesButton.disabled = false;
+      checkServicesButton.textContent = "重新檢查";
+    }
+  }
 }
 
 async function runTranslation() {
@@ -523,7 +753,7 @@ async function runTranslation() {
 
   translateButton.disabled = true;
   translateButton.querySelector(".translate-button-label").textContent = "處理中";
-  const useModel = translationMode && ["ai", "local"].includes(translationMode.value);
+  const useModel = translationMode && ["ai", "minimax", "localai", "local"].includes(translationMode.value);
   const modelLabel = selectedModelLabel();
   outputStatus.textContent = useModel ? modelLabel + " 正在處理…" : "正在保護公式…";
 
@@ -864,6 +1094,19 @@ if (resetTermFilters) {
   });
 }
 if (termList) termList.addEventListener("click", handleTermAction);
+if (exampleSearch) exampleSearch.addEventListener("input", renderExampleLibrary);
+if (exampleKind) exampleKind.addEventListener("change", renderExampleLibrary);
+if (exampleLevel) exampleLevel.addEventListener("change", renderExampleLibrary);
+if (resetExampleFilters) {
+  resetExampleFilters.addEventListener("click", function () {
+    exampleSearch.value = "";
+    exampleKind.value = "all";
+    exampleLevel.value = "all";
+    renderExampleLibrary();
+  });
+}
+if (exampleList) exampleList.addEventListener("click", handleExampleAction);
+if (checkServicesButton) checkServicesButton.addEventListener("click", checkServices);
 
 sourceText.addEventListener("input", function () {
   if (activeFileName) {
@@ -902,6 +1145,8 @@ document.addEventListener("keydown", function (event) {
 applyGlossaryPresentation();
 populateTermFilters();
 renderTermLibrary();
+populateExampleFilters();
+renderExampleLibrary();
 updateTranslationMode();
 checkApiService();
 updateSourceState();

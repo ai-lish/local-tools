@@ -1856,3 +1856,359 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.examples-section {
+  padding: 80px 0 30px;
+  border-top: 1px solid var(--line);
+}
+
+.examples-heading,
+.diagnostics-heading {
+  display: flex;
+  gap: 30px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.examples-heading h2 {
+  margin: 8px 0 0;
+  font-family: var(--serif);
+  font-size: 31px;
+  font-weight: 400;
+  letter-spacing: -0.05em;
+}
+
+.examples-heading p,
+.diagnostics-heading p {
+  max-width: 690px;
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.examples-tools {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin-top: 25px;
+}
+
+.examples-tools .term-search {
+  flex: 1 1 350px;
+}
+
+.examples-tools .select-wrap select {
+  min-width: 145px;
+}
+
+.example-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 13px;
+  margin-top: 17px;
+}
+
+.example-card {
+  display: flex;
+  min-width: 0;
+  min-height: 360px;
+  padding: 16px;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 12px 34px rgba(24, 53, 45, 0.035);
+}
+
+.example-card-top,
+.diagnostic-card-top,
+.example-card-meta,
+.example-card-actions,
+.diagnostic-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.example-kind,
+.example-category,
+.example-language,
+.example-card-meta,
+.example-tags,
+.example-adapted {
+  font-size: 8px;
+  font-weight: 760;
+  letter-spacing: 0.05em;
+}
+
+.example-kind {
+  color: var(--mint-deep);
+}
+
+.example-category {
+  color: var(--ink-faint);
+  text-align: right;
+}
+
+.example-pair {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 12px 0;
+  border-top: 1px solid #edf1ed;
+  border-bottom: 1px solid #edf1ed;
+}
+
+.example-language {
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+.example-source,
+.example-target {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.example-source {
+  color: var(--ink-soft);
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.example-target {
+  color: var(--teal);
+  font-family: var(--serif);
+  font-size: 15px;
+}
+
+.example-arrow {
+  color: var(--orange);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.example-note {
+  min-height: 51px;
+  margin: 11px 0 8px;
+  color: var(--ink-soft);
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.example-card-meta {
+  min-height: 26px;
+  margin-top: auto;
+  color: var(--ink-faint);
+  line-height: 1.45;
+}
+
+.example-card-meta span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.example-card-meta span:last-child {
+  flex: 0 0 auto;
+  color: var(--teal);
+}
+
+.example-tags {
+  min-height: 17px;
+  overflow: hidden;
+  color: #a77a63;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.example-card-actions {
+  padding-top: 9px;
+  border-top: 1px solid #edf1ed;
+}
+
+.example-card-actions button,
+.example-card-actions a {
+  padding: 0;
+  color: var(--teal);
+  background: transparent;
+  border: 0;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.example-card-actions button:hover,
+.example-card-actions a:hover {
+  color: var(--orange);
+}
+
+.example-card-actions a,
+.example-adapted {
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+
+.service-diagnostics {
+  margin-top: 24px;
+  padding: 21px 22px 22px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.diagnostics-heading {
+  align-items: start;
+}
+
+.diagnostics-heading h3 {
+  margin: 8px 0 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -0.04em;
+}
+
+.diagnostics-heading .button {
+  flex: 0 0 auto;
+}
+
+.diagnostics-status {
+  margin-top: 16px;
+  color: var(--ink-soft);
+  font-size: 10px;
+}
+
+.diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.diagnostic-card {
+  min-width: 0;
+  padding: 13px;
+  background: var(--card);
+  border: 1px solid #e8eee9;
+  border-radius: 13px;
+}
+
+.diagnostic-card-top strong {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.diagnostic-state {
+  padding: 4px 6px;
+  border-radius: 7px;
+  font-size: 8px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.diagnostic-ok {
+  color: #327655;
+  background: #e4f3e9;
+}
+
+.diagnostic-error {
+  color: #a35b4b;
+  background: #fff0e9;
+}
+
+.diagnostic-pending {
+  color: #8c766a;
+  background: #f5eee8;
+}
+
+.diagnostic-row {
+  gap: 5px;
+  align-items: start;
+  margin-top: 9px;
+  color: var(--ink-faint);
+  font-size: 8px;
+}
+
+.diagnostic-row span:last-child,
+.diagnostic-row code {
+  max-width: 70%;
+  overflow-wrap: anywhere;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 8px;
+  text-align: right;
+}
+
+.diagnostic-row code {
+  color: var(--teal);
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.diagnostic-error-note {
+  margin: 10px 0 0;
+  color: #a35b4b;
+  font-size: 9px;
+}
+
+@media (max-width: 1120px) {
+  .example-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .diagnostics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 870px) {
+  .examples-tools {
+    flex-wrap: wrap;
+  }
+
+  .examples-tools .term-search {
+    flex-basis: 100%;
+  }
+
+  .diagnostics-heading {
+    align-items: start;
+  }
+}
+
+@media (max-width: 620px) {
+  .examples-section {
+    padding-top: 49px;
+  }
+
+  .examples-heading {
+    display: block;
+  }
+
+  .examples-tools .select-wrap,
+  .examples-tools .select-wrap select,
+  .examples-tools .term-reset {
+    width: 100%;
+  }
+
+  .examples-tools .select-wrap select,
+  .examples-tools .term-reset {
+    min-width: 0;
+  }
+
+  .example-grid,
+  .diagnostics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .diagnostics-heading {
+    display: block;
+  }
+
+  .diagnostics-heading .button {
+    width: 100%;
+    margin-top: 15px;
+  }
+}

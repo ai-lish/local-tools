@@ -1,6 +1,6 @@
 # tools/math-translator/tool.yaml
 name: math-translator
-summary: Translate mathematics documents with a public terminology seed
+summary: Translate mathematics and teaching documents with public examples and model diagnostics
 status: beta
 runtime: node
 entry: server.mjs
