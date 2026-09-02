@@ -43,6 +43,18 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/html-lab/index.html",
+      "destination": "tools/html-lab/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/html-lab/README.md",
+      "destination": "tools/html-lab/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/slp-split-pdf/README.md",
       "destination": "tools/slp-split-pdf/README.md",
       "publicMode": "cli-documentation",
