@@ -27,6 +27,9 @@
 - `Code.gs` → Apps Script 的 `Code.gs`
 - `Index.html` → Apps Script 的 `Index.html`
 - `appsscript.json` → Apps Script manifest（如 Bridge 支援 manifest 同步）
+- `README.txt` → Bridge 的本次更新摘要；請保留 `## 本次更新` 標題並更新其下項目
+
+`README.md` 是 GitHub／本機閱讀版，不需要推送到 Apps Script；`README.txt` 是 Bridge 讀取的維護說明，通常會保留在 Drive 資料夾內。
 
 推送後，先在 Apps Script 編輯器檢查檔案是否齊全，再用現有部署作業測試 `doGet()`。本專案沒有需要由 Bridge 傳送的模型權重、真人媒體、學校資料或 API key；不要把這些檔案加入同步來源。部署 ID、Script ID 及 Drive 目標請保留在 Bridge 的本機設定，不要寫入 GitHub README。
 
