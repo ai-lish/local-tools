@@ -31,6 +31,18 @@
 
 `README.md` 是 GitHub／本機閱讀版，不需要推送到 Apps Script；`README.txt` 是 Bridge 讀取的維護說明，通常會保留在 Drive 資料夾內。
 
+### 接手現有 Apps Script 專案
+
+如果 Bridge 顯示 Drive 資料夾內沒有任何 `.gs`／`.html`，但目標是已有程式碼的 Apps Script，請先在 Bridge 選取正確專案，確認「發佈中為最新版本」，再按「檢查資料夾」及「同步到資料夾」。同步完成並確認檔案已回到資料夾後，才把本工作台的介面合併進現有專案；不要直接對空資料夾按「推送到 Apps Script」。
+
+接手時的建議順序：
+
+1. Bridge：選取目標專案 → 檢查資料夾 → 同步到資料夾。
+2. 本機：先備份同步回來的 `.gs`／`.html`／`appsscript.json`，再合併本資料夾的功能。
+3. Bridge：重新檢查檔案 → 推送到 Apps Script → 檢查上線。
+
+若同步提示覆蓋或移動雲端檔案，先停止並核對專案名稱、Drive 資料夾、Script ID 及部署 ID；不要以空資料夾作為現有專案的推送來源。
+
 推送後，先在 Apps Script 編輯器檢查檔案是否齊全，再用現有部署作業測試 `doGet()`。本專案沒有需要由 Bridge 傳送的模型權重、真人媒體、學校資料或 API key；不要把這些檔案加入同步來源。部署 ID、Script ID 及 Drive 目標請保留在 Bridge 的本機設定，不要寫入 GitHub README。
 
 ## 隱私與安全範圍
