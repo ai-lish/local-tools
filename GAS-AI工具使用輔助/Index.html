@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>GAS × Local AI 使用輔助</title>
+  <style>
+    :root { --ink:#172033; --muted:#63708a; --line:#dfe6f0; --paper:#f7f9fc; --panel:#fff; --navy:#1b2a49; --blue:#4b70e8; --blue-soft:#edf2ff; --mint:#0c9b86; --mint-soft:#e9faf6; --amber:#a66b00; --amber-soft:#fff6dd; --rose:#b44361; --rose-soft:#fff0f4; --shadow:0 18px 45px rgba(27,42,73,.08); --radius:20px; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.65 "Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif; }
+    button,input,select,textarea { font:inherit; }
+    button { cursor:pointer; }
+    a { color:var(--blue); }
+    code,pre { font-family:"Cascadia Code","SFMono-Regular",Consolas,monospace; }
+    .app-shell { min-height:100vh; display:flex; }
+    .sidebar { width:270px; flex:0 0 270px; background:var(--navy); color:#eef3ff; padding:24px 18px; position:sticky; top:0; height:100vh; overflow-y:auto; }
+    .brand { display:flex; align-items:center; gap:11px; padding:0 10px 26px; }
+    .brand-mark { width:42px; height:42px; border-radius:14px; display:grid; place-items:center; background:linear-gradient(135deg,#72a4ff,#6de1c3); color:#14213b; font-weight:900; }
+    .brand strong { display:block; font-size:16px; }
+    .brand span { display:block; color:#aebbd8; font-size:12px; margin-top:2px; }
+    .nav-label { color:#8291b3; font-size:11px; letter-spacing:.13em; margin:11px 10px 7px; }
+    .nav-button { width:100%; border:0; background:transparent; color:#cbd5eb; display:flex; align-items:center; gap:11px; text-align:left; border-radius:13px; padding:11px 12px; margin:3px 0; transition:.2s ease; }
+    .nav-button:hover { background:rgba(255,255,255,.08); color:#fff; }
+    .nav-button.active { background:#fff; color:var(--navy); box-shadow:0 9px 20px rgba(0,0,0,.12); }
+    .nav-icon { width:24px; text-align:center; font-size:17px; }
+    .sidebar-foot { margin:28px 6px 0; border:1px solid rgba(255,255,255,.14); border-radius:15px; padding:13px; color:#bac8e4; font-size:12px; }
+    .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#71e0c5; margin-right:6px; }
+    .main { flex:1; min-width:0; }
+    .topbar { height:70px; padding:0 38px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); background:rgba(247,249,252,.92); backdrop-filter:blur(12px); position:sticky; top:0; z-index:10; }
+    .crumb { color:var(--muted); font-size:13px; }
+    .top-actions { display:flex; align-items:center; gap:9px; }
+    .pill { border:1px solid var(--line); color:var(--muted); background:#fff; border-radius:999px; padding:6px 12px; font-size:12px; }
+    .content { max-width:1450px; margin:0 auto; padding:34px 38px 70px; }
+    .notice { display:flex; gap:12px; align-items:flex-start; background:var(--mint-soft); border:1px solid #bdece2; color:#176458; border-radius:16px; padding:13px 16px; margin-bottom:27px; }
+    .notice strong { display:block; margin-bottom:2px; }
+    .notice p { margin:0; font-size:13px; }
+    .notice-icon { font-size:20px; line-height:1.2; }
+    .page { display:none; animation:rise .25s ease; }
+    .page.active { display:block; }
+    @keyframes rise { from { opacity:.2; transform:translateY(5px); } to { opacity:1; transform:none; } }
+    .hero { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(290px,.9fr); gap:22px; }
+    .hero-copy,.hero-aside { background:var(--panel); border:1px solid var(--line); border-radius:24px; box-shadow:var(--shadow); }
+    .hero-copy { padding:36px; background:radial-gradient(circle at 90% 10%,#e9eeff 0,#fff 40%),#fff; }
+    .eyebrow { color:var(--blue); font-size:12px; letter-spacing:.14em; font-weight:800; text-transform:uppercase; }
+    h1,h2,h3,h4 { margin:0; line-height:1.25; letter-spacing:-.025em; }
+    h1 { font-size:clamp(32px,4.3vw,60px); max-width:770px; margin:12px 0 16px; }
+    h2 { font-size:28px; margin-bottom:9px; }
+    h3 { font-size:18px; margin-bottom:8px; }
+    h4 { font-size:15px; margin-bottom:5px; }
+    .lead { color:#4c5d79; font-size:17px; max-width:720px; margin:0; }
+    .hero-tags { display:flex; gap:8px; flex-wrap:wrap; margin-top:24px; }
+    .tag { display:inline-flex; align-items:center; border-radius:999px; padding:5px 10px; font-size:12px; font-weight:700; background:var(--blue-soft); color:#395ac3; }
+    .tag.mint { background:var(--mint-soft); color:#087e6e; }
+    .tag.amber { background:var(--amber-soft); color:#8a5a00; }
+    .hero-aside { padding:25px; display:flex; flex-direction:column; justify-content:space-between; }
+    .metric { display:flex; justify-content:space-between; gap:14px; padding:13px 0; border-bottom:1px solid var(--line); }
+    .metric:last-child { border-bottom:0; }
+    .metric-label { color:var(--muted); font-size:13px; }
+    .metric-value { font-weight:800; text-align:right; }
+    .section-head { display:flex; align-items:end; justify-content:space-between; gap:18px; margin:36px 0 16px; }
+    .section-head p { color:var(--muted); margin:0; font-size:13px; }
+    .grid { display:grid; gap:17px; }
+    .grid.two { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .grid.three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:22px; box-shadow:0 8px 26px rgba(27,42,73,.04); }
+    .card p { color:var(--muted); margin:7px 0 0; }
+    .card.blue { border-top:4px solid var(--blue); }
+    .card.mint { border-top:4px solid var(--mint); }
+    .card.amber { border-top:4px solid #e9ab32; }
+    .card.rose { border-top:4px solid var(--rose); }
+    .number-row { display:flex; gap:12px; align-items:flex-start; }
+    .number { flex:0 0 29px; height:29px; border-radius:10px; display:grid; place-items:center; background:var(--blue-soft); color:var(--blue); font-weight:900; font-size:13px; }
+    .number.mint { background:var(--mint-soft); color:var(--mint); }
+    .number.amber { background:var(--amber-soft); color:var(--amber); }
+    .checklist { list-style:none; padding:0; margin:15px 0 0; }
+    .checklist li { position:relative; padding:8px 0 8px 26px; border-top:1px dashed var(--line); color:#43526d; }
+    .checklist li::before { content:"✓"; position:absolute; left:0; top:8px; color:var(--mint); font-weight:900; }
+    .callout { padding:15px 17px; border-radius:15px; background:var(--amber-soft); border:1px solid #f0d38c; color:#74501a; margin-top:17px; }
+    .callout strong { display:block; margin-bottom:3px; }
+    .callout p { margin:0; color:inherit; font-size:13px; }
+    .callout.danger { background:var(--rose-soft); border-color:#f4c2ce; color:#81384c; }
+    .code-wrap { position:relative; margin-top:14px; }
+    pre.code { white-space:pre-wrap; overflow-wrap:anywhere; background:#111a2e; color:#dbe7ff; border-radius:14px; padding:16px 17px; margin:0; font-size:12px; line-height:1.65; }
+    .copy-floating { position:absolute; top:9px; right:9px; }
+    .button { border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:10px; padding:8px 12px; font-weight:700; font-size:13px; transition:.18s ease; }
+    .button:hover { border-color:#aab7d1; transform:translateY(-1px); }
+    .button.primary { border-color:var(--blue); color:#fff; background:var(--blue); }
+    .button.primary:hover { background:#3c5ed0; }
+    .button.small { padding:5px 9px; font-size:12px; }
+    .button.ghost { background:transparent; }
+    .button-row { display:flex; flex-wrap:wrap; gap:9px; margin-top:16px; }
+    .mode-table { width:100%; border-collapse:collapse; margin-top:13px; font-size:13px; }
+    .mode-table th,.mode-table td { padding:10px 9px; border-bottom:1px solid var(--line); vertical-align:top; text-align:left; }
+    .mode-table th { color:var(--muted); font-weight:800; background:#fafbfe; }
+    .mode-table td:first-child { white-space:nowrap; font-weight:800; color:var(--navy); }
+    .hint { padding:11px 13px; border-radius:12px; background:var(--blue-soft); color:#3e5698; font-size:12px; margin-top:13px; }
+    .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; }
+    .field { display:flex; flex-direction:column; gap:5px; }
+    .field.full { grid-column:1 / -1; }
+    .field label { color:#42516d; font-size:12px; font-weight:800; }
+    .field input,.field select,.field textarea { width:100%; border:1px solid #cfd8e7; background:#fbfcff; color:var(--ink); border-radius:10px; padding:9px 10px; outline:none; transition:.18s ease; }
+    .field textarea { min-height:92px; resize:vertical; }
+    .field input:focus,.field select:focus,.field textarea:focus { border-color:var(--blue); box-shadow:0 0 0 3px rgba(75,112,232,.13); }
+    .composer { display:grid; grid-template-columns:minmax(270px,.8fr) minmax(0,1.2fr); gap:17px; }
+    .composer-controls { align-self:start; }
+    .composer-output { min-width:0; }
+    .prompt-line { color:#364762; font-family:"Cascadia Code",Consolas,monospace; font-size:12px; background:#f7f9fc; border-radius:10px; padding:10px; }
+    .deck-card { display:flex; flex-direction:column; gap:12px; min-height:175px; }
+    .deck-foot { margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .example-card { padding:0; overflow:hidden; }
+    .example-art { height:164px; position:relative; overflow:hidden; background:#dfe8ff; }
+    .example-art::after { content:"示意縮圖"; position:absolute; top:11px; right:11px; background:rgba(17,26,46,.68); color:white; border-radius:999px; padding:3px 8px; font-size:10px; }
+    .art-library { background:linear-gradient(135deg,#ffc887 0 38%,#6f9acb 39% 64%,#233b65 65%); }
+    .art-library::before { content:"☼"; position:absolute; font-size:108px; line-height:1; color:rgba(255,255,255,.7); left:24px; top:29px; }
+    .art-library .art-object { position:absolute; left:47%; bottom:17px; width:122px; height:64px; border-radius:11px 11px 5px 5px; background:#fbf3df; box-shadow:12px 12px 0 rgba(39,58,90,.25); }
+    .art-library .art-object::before { content:""; position:absolute; width:66px; height:28px; left:28px; top:18px; background:#94c5a0; transform:rotate(-8deg); border-radius:3px; }
+    .art-lantern { background:linear-gradient(145deg,#213f63,#e69a6a 52%,#f6d99a 53% 100%); }
+    .art-lantern::before { content:"✦"; position:absolute; top:18px; left:36px; font-size:90px; color:rgba(255,247,218,.9); }
+    .art-lantern .art-object { position:absolute; right:24%; bottom:15px; width:68px; height:95px; border-radius:44% 44% 16% 16%; background:#f8ba5a; box-shadow:0 0 45px 16px rgba(255,235,172,.6); }
+    .art-lantern .art-object::before { content:""; position:absolute; width:4px; height:36px; background:#684c38; top:-34px; left:32px; }
+    .art-corridor { background:linear-gradient(110deg,#92b9bf,#f5e2bb 49%,#587ca3 50%); }
+    .art-corridor::before { content:"➜"; position:absolute; left:43%; top:38px; color:rgba(255,255,255,.82); font-size:66px; transform:rotate(8deg); }
+    .art-corridor .art-object { position:absolute; left:14%; bottom:16px; width:72%; height:29px; background:rgba(40,69,104,.74); transform:perspective(70px) rotateX(19deg); }
+    .example-body { padding:18px 19px 20px; }
+    .example-body p { font-size:13px; }
+    .example-meta { display:flex; gap:7px; flex-wrap:wrap; margin:12px 0 0; }
+    .meta { padding:4px 8px; background:#f3f6fb; color:#53627d; border-radius:7px; font-size:11px; }
+    .result-form { display:grid; grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr); gap:17px; }
+    .preview-zone { min-height:195px; border:1px dashed #b7c4da; background:#fbfcff; border-radius:15px; display:grid; place-items:center; padding:16px; text-align:center; color:var(--muted); }
+    .preview-zone.has-media { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); align-items:start; text-align:left; }
+    .preview-item { overflow:hidden; border:1px solid var(--line); border-radius:12px; background:#fff; }
+    .preview-item img,.preview-item video { width:100%; height:130px; display:block; object-fit:cover; background:#edf1f7; }
+    .preview-item p { padding:7px 9px; margin:0; color:var(--muted); font-size:11px; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+    .privacy-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:15px; }
+    .privacy-item { display:flex; gap:9px; align-items:flex-start; padding:11px; border:1px solid var(--line); border-radius:12px; background:#fff; color:#45536d; font-size:13px; }
+    .privacy-item input { accent-color:var(--mint); margin-top:4px; }
+    .source-list { display:grid; gap:8px; margin-top:13px; }
+    .source-link { display:flex; justify-content:space-between; gap:12px; align-items:center; border:1px solid var(--line); padding:11px 12px; border-radius:12px; color:var(--ink); text-decoration:none; background:#fff; }
+    .source-link:hover { border-color:#aebce0; background:#fbfcff; }
+    .source-link span:last-child { color:var(--blue); }
+    .mini-label { font-size:11px; letter-spacing:.09em; color:var(--muted); text-transform:uppercase; font-weight:800; }
+    .footer-note { color:var(--muted); text-align:center; font-size:12px; margin:38px 0 0; }
+    .toast { position:fixed; right:24px; bottom:24px; z-index:30; background:#15233e; color:white; padding:11px 15px; border-radius:11px; box-shadow:var(--shadow); opacity:0; transform:translateY(10px); pointer-events:none; transition:.2s ease; font-size:13px; }
+    .toast.show { opacity:1; transform:none; }
+    .hide { display:none !important; }
+    @media (max-width:1000px) { .sidebar { width:220px; flex-basis:220px; } .content { padding-left:24px; padding-right:24px; } .hero,.composer,.result-form { grid-template-columns:1fr; } .grid.three { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width:720px) { .app-shell { display:block; } .sidebar { position:static; width:100%; height:auto; padding:13px 13px 11px; } .brand { padding:0 7px 12px; } .nav-label,.sidebar-foot { display:none; } .nav { display:flex; gap:6px; overflow-x:auto; padding-bottom:3px; } .nav-button { width:auto; flex:0 0 auto; padding:8px 10px; margin:0; white-space:nowrap; } .nav-button span:last-child { display:none; } .topbar { padding:0 16px; } .content { padding:22px 16px 50px; } .hero-copy { padding:26px 22px; } h1 { font-size:36px; } .grid.two,.grid.three,.field-grid,.privacy-grid { grid-template-columns:1fr; } .field.full { grid-column:auto; } .section-head { display:block; } .section-head p { margin-top:5px; } .mode-table { display:block; overflow-x:auto; } }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">AI</div><div><strong>本機 AI 工作台</strong><span>GAS × MiniMax H3</span></div></div>
+      <div class="nav-label">WORKSPACE</div>
+      <nav class="nav" aria-label="主要導覽">
+        <button class="nav-button active" data-page="home"><span class="nav-icon">⌂</span><span>總覽</span></button>
+        <button class="nav-button" data-page="stable"><span class="nav-icon">✦</span><span>Stable Diffusion</span></button>
+        <button class="nav-button" data-page="h3"><span class="nav-icon">◈</span><span>MiniMax H3</span></button>
+        <button class="nav-button" data-page="composer"><span class="nav-icon">✎</span><span>提示語工作台</span></button>
+        <button class="nav-button" data-page="examples"><span class="nav-icon">▧</span><span>示例成果</span></button>
+        <button class="nav-button" data-page="record"><span class="nav-icon">◎</span><span>成果紀錄</span></button>
+        <button class="nav-button" data-page="safety"><span class="nav-icon">◉</span><span>安全與授權</span></button>
+      </nav>
+      <div class="sidebar-foot"><span class="status-dot"></span><strong>離線設計</strong><br>此頁不呼叫 API、不上傳檔案，提示語與預覽只在目前瀏覽器分頁處理。</div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div class="crumb">GAS Project / Local AI 使用輔助</div><div class="top-actions"><span class="pill">v0.1 · 2026-09</span><span class="pill">HK / zh-Hant</span></div></header>
+      <div class="content">
+        <div class="notice"><div class="notice-icon">🔒</div><div><strong>本機優先，資料不出頁面</strong><p>這個 GAS 專案只提供教學、提示語模板和成果紀錄，不會啟動 Stable Diffusion／H3 推理，也不會上傳提示語、圖片、影片或校務資料。請把真實人物及文件留在你的本機推理環境。</p></div></div>
+        <section id="home" class="page active">
+          <div class="hero"><div class="hero-copy"><div class="eyebrow">Local AI / Prompting / Review</div><h1>把本機生成流程，整理成一套可教、可記錄的工作台。</h1><p class="lead">以 MiniMax H3 官方公開的多模態提示語結構為主軸，加上 Stable Diffusion 的圖像參數思維；所有示例都使用虛構、安全情境，讓你可以先練習，再接到自己的本機環境。</p><div class="hero-tags"><span class="tag">Stable Diffusion</span><span class="tag mint">MiniMax H3</span><span class="tag amber">Prompt library</span><span class="tag">Local-only</span></div><div class="button-row"><button class="button primary" data-go="composer">開始組合提示語</button><button class="button" data-go="stable">先看部署流程</button></div></div><div class="hero-aside"><div><div class="mini-label">PROJECT SNAPSHOT</div><h3 style="margin-top:7px">目前工作範圍</h3></div><div class="metric"><span class="metric-label">本機教學路線</span><span class="metric-value">2 條</span></div><div class="metric"><span class="metric-label">H3 模式</span><span class="metric-value">5 種</span></div><div class="metric"><span class="metric-label">示例素材</span><span class="metric-value">安全合成</span></div><div class="metric"><span class="metric-label">外部 API</span><span class="metric-value" style="color:var(--mint)">未使用</span></div></div></div>
+          <div class="section-head"><div><h2>三步工作流</h2><p>先確認環境，再寫提示語，最後才把成果帶回本機檢查。</p></div></div>
+          <div class="grid three"><article class="card blue"><div class="number-row"><div class="number">01</div><div><h3>選擇本機引擎</h3><p>靜態圖片先用 ComfyUI／A1111；影音與原生聲音才進入 H3-Base。模型檔案與權重留在本機。</p></div></div></article><article class="card mint"><div class="number-row"><div class="number mint">02</div><div><h3>把意圖寫成結構</h3><p>圖片聚焦主體、姿勢、鏡頭和參數；H3 另外明確寫出鏡頭時間、環境聲和配樂。</p></div></div></article><article class="card amber"><div class="number-row"><div class="number amber">03</div><div><h3>記錄和人工檢查</h3><p>保存 model、seed、steps、尺寸、輸出用途與授權狀態；公開前再做身份、版權及安全檢查。</p></div></div></article></div>
+          <div class="section-head"><div><h2>快速入口</h2><p>這些卡片是本專案目前最常用的內容。</p></div></div>
+          <div class="grid two"><article class="card"><h3>Stable Diffusion：參考測試組</h3><p>一組適合用來比較 prompt 與 seed 的起始記錄：Animagine XL V4、30 steps、DPM++ 2M、1024×768、CFG 7。這只是參考文章中的示範組，實際要以模型授權與硬體為準。</p><div class="button-row"><button class="button small" data-go="stable">查看參數與流程 →</button></div></article><article class="card"><h3>MiniMax H3：本機邊界</h3><p>官方開源的是 H3-Base 的本機驗證路線；Context-IR 與 Regenerate-2K 不在開源釋出內。嚴格離線時，先把 768p 音畫輸出跑通，再評估硬體與部署框架。</p><div class="button-row"><button class="button small" data-go="h3">查看 H3 模式 →</button></div></article></div>
+        </section>
+        <section id="stable" class="page">
+          <div class="section-head"><div><div class="eyebrow">PATH 01 / IMAGE</div><h2>Stable Diffusion 本機入門</h2><p>把「動作詞」放進可控的圖片工作流，而不是只追求一個漂亮關鍵字。</p></div><span class="tag">ComfyUI 優先</span></div>
+          <div class="grid two"><article class="card blue"><h3>建議路線：ComfyUI</h3><p>適合想保留節點、模型、VAE、LoRA 和輸出參數的人。先用 Desktop／Portable 或手動安裝其中一條路線，避免同時混裝多套 Python 環境。</p><ul class="checklist"><li>先確認 GPU 驅動、VRAM、磁碟空間與 PyTorch 對應版本。</li><li>將 checkpoint／safetensors 放入對應的 <code>models/checkpoints</code> 資料夾。</li><li>先用官方或可信來源的簡單 workflow 做 smoke test。</li><li>每次只改一項：prompt、seed、sampler、steps 或 CFG。</li></ul></article><article class="card"><h3>替代路線：AUTOMATIC1111</h3><p>適合想用較直觀的 txt2img／img2img 介面。Windows 使用者要依官方說明選擇相容的 Python、Git 與 GPU 路線，版本更新前先備份 workflow 和參數紀錄。</p><div class="callout"><strong>部署提醒</strong><p>下載模型前先閱讀模型卡與授權。不要把真實學校相片、學生資料或行政文件拖進任何不清楚來源的擴充節點。</p></div></article></div>
+          <div class="section-head"><div><h2>一次生成的可重現紀錄</h2><p>提示語只是輸入的一部分；沒有 seed 和參數，成果很難比較。</p></div></div>
+          <div class="grid two"><article class="card"><div class="mini-label">REFERENCE PRESET</div><h3 style="margin-top:6px">參考文章示範組</h3><table class="mode-table"><tbody><tr><td>Checkpoint</td><td>Animagine XL V4</td></tr><tr><td>Steps</td><td>30</td></tr><tr><td>Sampler</td><td>DPM++ 2M</td></tr><tr><td>尺寸</td><td>1024 × 768（4:3）</td></tr><tr><td>CFG</td><td>7</td></tr><tr><td>提示語</td><td>品質詞 + 動作／情境詞；不要把此組當成所有模型的固定標準。</td></tr></tbody></table></article><article class="card"><div class="mini-label">SAFE STARTER</div><h3 style="margin-top:6px">合成校園閱讀角</h3><p>用虛構的公共空間測試構圖和姿勢，避免使用真實人物作為參考。</p><div class="code-wrap"><pre class="code" id="sdStarter">positive: editorial illustration, a fictional student reading quietly at a sunlit library corner, seated at a wooden desk, three-quarter view, warm morning light, bookshelves, potted plant, clean composition, soft colors, detailed hands, no readable text
+negative: blurry, low resolution, distorted hands, extra fingers, duplicate person, cropped head, watermark, signature, logo, unreadable text</pre><button class="button small copy-floating" data-copy-target="sdStarter">複製</button></div></article></div>
+          <div class="section-head"><div><h2>動作詞庫（安全精選）</h2><p>動作詞要寫清楚「身體正在做甚麼」及「鏡頭看見甚麼」。</p></div><button class="button small" data-go="composer">在工作台組合 →</button></div>
+          <div id="actionDeck" class="grid three"></div>
+        </section>
+        <section id="h3" class="page">
+          <div class="section-head"><div><div class="eyebrow">PATH 02 / AUDIO-VISUAL</div><h2>MiniMax H3 本機入門</h2><p>H3 的重點不是把圖片 prompt 拉長，而是把整段影音時間線、聲音和參考關係寫清楚。</p></div><span class="tag mint">H3-Base / local 768p</span></div>
+          <div class="grid two"><article class="card mint"><h3>先分清楚兩個 checkpoint</h3><table class="mode-table"><thead><tr><th>Checkpoint</th><th>適合任務</th><th>輸入</th></tr></thead><tbody><tr><td>FL2VA</td><td>T2VA、I2VA、FL2VA、L2VA</td><td>文字；可選 0／1／2 張 keyframe</td></tr><tr><td>Ref2VA</td><td>多模態 reference-to-audio-video</td><td>文字＋圖片／影片／音訊參考</td></tr></tbody></table><p class="hint">實際輸入數量、解析度、BF16 及框架支援會隨官方版本更新；部署前以模型卡為準。</p></article><article class="card"><h3>本機流程的正確期待</h3><ol class="checklist"><li>先下載需要的 task family，不要為了試驗把整個大模型倉庫無差別複製。</li><li>用本機 H3-Base 跑一個 4–8 秒、單一鏡頭的安全合成案例。</li><li>確認音畫同步、鏡頭時間、VRAM 峰值、輸出資料夾及授權紀錄。</li><li>把結果的 prompt／參數匯入本頁「成果紀錄」，不要把素材上傳到 GAS。</li></ol></article></div>
+          <div class="callout danger"><strong>離線邊界要寫在 SOP 裡</strong><p>官方完整系統還包括 H3-Context-IR 及 H3-Regenerate-2K；它們不是這個 GAS 專案的本機模組。嚴格離線時，本頁只協助本機 H3-Base／768p 的提示語和驗證。不要在程式內偷偷加入 API token、外部 URL、Base64 上傳或背景同步。</p></div>
+          <div class="section-head"><div><h2>H3 模式速查</h2><p>模式、參考圖位置和鏡頭策略要互相對齊。</p></div></div>
+          <div class="card"><table class="mode-table"><thead><tr><th>模式</th><th>何時使用</th><th>提示語寫法</th></tr></thead><tbody><tr><td>T2VA</td><td>純文字生成影音</td><td>從 <code>[Shot 1]</code> 開始建立完整畫面與聲音時間線。</td></tr><tr><td>I2VA</td><td>第一幀向前發展</td><td>第一行標明 <code>&lt;Picture 1&gt;</code> 在 0.00 秒；接著寫連續動作。</td></tr><tr><td>FL2VA</td><td>第一幀走到最後一幀</td><td>標示兩張圖片對應的時間；用單一連續鏡頭描述中間路徑。</td></tr><tr><td>L2VA</td><td>從合理前狀態收束到最後一幀</td><td>把 <code>&lt;Picture 1&gt;</code> 放在有效影片時長的最後一刻。</td></tr><tr><td>Ref2VA</td><td>人物／場景／動作／聲音有多個參考</td><td>依序使用六個官方欄位：subject_definitions、summary、retention_analysis、detailed_description、overall_soundscape、non_diegetic_music。</td></tr></tbody></table></div>
+          <div class="section-head"><div><h2>本機啟動參考</h2><p>以下只展示命令形狀；由使用者在自己的本機環境執行，不由 GAS 代為執行。</p></div></div>
+          <div class="grid two"><article class="card"><div class="mini-label">DOWNLOAD / SCOPE THE CHECKPOINT</div><h3 style="margin-top:6px">Hugging Face 下載示例</h3><div class="code-wrap"><pre class="code" id="h3Download"># 只下載需要的 task family；路徑請改成本機資料夾
+hf download MiniMaxAI/MiniMax-H3 --include "model_index.json" "FL2VA/*" --local-dir MiniMax-H3</pre><button class="button small copy-floating" data-copy-target="h3Download">複製</button></div><p>官方 repo 同時提供 FL2VA／Ref2VA；若要做多模態 reference，再按需要下載 <code>Ref2VA/*</code>。</p></article><article class="card"><div class="mini-label">SGLANG / EXAMPLE SHAPE</div><h3 style="margin-top:6px">本機服務參考</h3><div class="code-wrap"><pre class="code" id="h3Serve"># 官方示例使用多 GPU；請按你的版本及硬體重新確認
+sglang serve --model-path MiniMaxAI/MiniMax-H3 --num-gpus 4 --ulysses-degree 4 --performance-mode speed --host 127.0.0.1 --port 30010 --model-variant fl2va</pre><button class="button small copy-floating" data-copy-target="h3Serve">複製</button></div><p>這裡的 <code>127.0.0.1</code> 只代表本機綁定示意；不要為了方便把含敏感素材的服務暴露到公網。</p></article></div>
+        </section>
+        <section id="composer" class="page">
+          <div class="section-head"><div><div class="eyebrow">PROMPT BUILDER</div><h2>提示語工作台</h2><p>欄位會在瀏覽器內組合，不會呼叫語言模型；適合先把意圖整理好，再貼到本機 UI。</p></div><span class="tag amber">沒有自動上傳</span></div>
+          <div class="composer"><article class="card composer-controls"><div class="field-grid"><div class="field"><label for="composerTool">本機工具</label><select id="composerTool"><option value="sd">Stable Diffusion 圖像</option><option value="h3">MiniMax H3 影音</option></select></div><div class="field" id="h3ModeField"><label for="composerMode">H3 模式</label><select id="composerMode"><option value="T2VA">T2VA · 純文字</option><option value="I2VA">I2VA · 第一幀向前</option><option value="FL2VA">FL2VA · 首尾幀</option><option value="L2VA">L2VA · 收束到最後一幀</option><option value="Ref2VA">Ref2VA · 多模態參考</option></select></div><div class="field"><label for="fieldSubject">主體</label><input id="fieldSubject" value="a fictional student reading quietly" autocomplete="off"></div><div class="field"><label for="fieldPlace">場景</label><input id="fieldPlace" value="a sunlit library corner" autocomplete="off"></div><div class="field"><label for="fieldAction">動作／變化</label><input id="fieldAction" value="turns one page and looks toward the window" autocomplete="off"></div><div class="field"><label for="fieldStyle">風格</label><input id="fieldStyle" value="warm editorial illustration" autocomplete="off"></div><div class="field"><label for="fieldCamera">鏡頭</label><input id="fieldCamera" value="slow push-in, medium-wide shot" autocomplete="off"></div><div class="field"><label for="fieldDuration">時長（H3）</label><input id="fieldDuration" value="6" inputmode="decimal" autocomplete="off"></div><div class="field"><label for="fieldRatio">比例</label><select id="fieldRatio"><option>16:9</option><option>9:16</option><option>1:1</option><option>4:3</option></select></div><div class="field full"><label for="fieldAudio">環境聲／配樂（H3）</label><textarea id="fieldAudio">soft page turns and a low library room tone; sparse acoustic guitar, slow tempo</textarea></div><div class="field full"><label for="fieldNegative">負向提示語（Stable Diffusion）</label><textarea id="fieldNegative">blurry, low resolution, distorted hands, extra fingers, duplicate person, cropped head, watermark, signature, logo, readable text</textarea></div></div><div class="hint">小技巧：先只改主體、動作和鏡頭。一次改太多參數，會很難判斷究竟是哪個改動造成結果變化。</div><div class="button-row"><button id="refreshPrompt" class="button primary">更新提示語</button><button id="resetPrompt" class="button">還原安全示例</button></div></article><article class="card composer-output"><div class="section-head" style="margin:0 0 12px"><div><div class="mini-label">OUTPUT PREVIEW</div><h3 style="margin-top:5px">可貼到本機工具的文字</h3></div><button id="copyPrompt" class="button small">複製全部</button></div><pre id="promptOutput" class="code" style="min-height:390px"></pre><div class="callout" style="margin-top:14px"><strong>人工檢查點</strong><p>確認主體是虛構或已獲同意的素材；不要把校務真實資料、私密照片或未公開文件填入參考欄位。</p></div></article></div>
+        </section>
+        <section id="examples" class="page">
+          <div class="section-head"><div><div class="eyebrow">SAFE EXAMPLES</div><h2>示例成果</h2><p>這些卡片把「提示語 → 參數 → 人工檢查」放在一起，方便教學與比較；圖像是介面示意，不是從外部下載的模型輸出。</p></div><span class="tag mint">synthetic only</span></div>
+          <div id="exampleGrid" class="grid three"></div>
+          <div class="section-head"><div><h2>成果評估三問</h2><p>不要只問「好不好看」，要問輸出是否可重現及可負責。</p></div></div>
+          <div class="grid three"><article class="card"><div class="number">01</div><h4 style="margin-top:12px">符合意圖嗎？</h4><p>主體、動作、鏡頭與聲音是否真的出現。</p></article><article class="card"><div class="number mint">02</div><h4 style="margin-top:12px">可重現嗎？</h4><p>model、seed、steps、尺寸、版本是否齊全。</p></article><article class="card"><div class="number amber">03</div><h4 style="margin-top:12px">可公開嗎？</h4><p>人物同意、版權、商標和誤導風險是否清楚。</p></article></div>
+        </section>
+        <section id="record" class="page">
+          <div class="section-head"><div><div class="eyebrow">LOCAL RECORD</div><h2>本機成果紀錄</h2><p>只在目前分頁暫存表單狀態；選取媒體只作本機預覽，不會傳到 GAS。</p></div><span class="tag">no localStorage</span></div>
+          <div class="result-form"><article class="card"><div class="field-grid"><div class="field"><label for="recordTitle">成果名稱</label><input id="recordTitle" placeholder="例如：閱讀角晨光 v01"></div><div class="field"><label for="recordTool">工具／模型</label><input id="recordTool" placeholder="例如：ComfyUI / SDXL 或 H3 FL2VA"></div><div class="field"><label for="recordSeed">Seed</label><input id="recordSeed" placeholder="例如：123456789" inputmode="numeric"></div><div class="field"><label for="recordParams">主要參數</label><input id="recordParams" placeholder="例如：30 steps · CFG 7 · 1024×768"></div><div class="field full"><label for="recordPrompt">使用的提示語</label><textarea id="recordPrompt" placeholder="貼上這次實際使用的 prompt"></textarea></div><div class="field full"><label for="recordNotes">成果與檢查備註</label><textarea id="recordNotes" placeholder="記錄成功／失敗原因、人工修正、授權狀態、公開限制等"></textarea></div></div><div class="button-row"><button id="useCurrentPrompt" class="button">帶入工作台提示語</button><button id="downloadRecord" class="button primary">下載 JSON 紀錄</button><button id="clearRecord" class="button ghost">清空表單</button></div></article><article class="card"><h3>本機預覽（可選）</h3><p>選取一或多個圖片／影片，瀏覽器只建立暫時預覽網址；離開分頁後即失效。</p><div class="field" style="margin-top:13px"><label for="mediaInput">選擇檔案</label><input id="mediaInput" type="file" accept="image/*,video/*" multiple></div><div id="previewZone" class="preview-zone" style="margin-top:13px">尚未選取檔案<br><small>請勿選取含有真實個人資料的檔案作示範。</small></div><div class="callout" style="margin-top:14px"><strong>下載前提醒</strong><p>JSON 會包含你填入的提示語與備註。請把它當作可能含敏感內容的工作紀錄，存放於適當的本機位置。</p></div></article></div>
+        </section>
+        <section id="safety" class="page">
+          <div class="section-head"><div><div class="eyebrow">SAFETY / LICENSE / CONSENT</div><h2>安全與授權</h2><p>本機「沒有平台審查」是部署特性，不是責任豁免。先審素材，再按生成。</p></div><span class="tag amber">必讀</span></div>
+          <div class="grid two"><article class="card rose"><h3>禁止放進本機工作流的素材</h3><ul class="checklist"><li>未經同意的真人肖像、聲音、換臉或身份冒充。</li><li>任何未成年人性內容、露骨性內容或以性化方式呈現未成年人。</li><li>校務 Excel／PDF、學生／教職員名單、聯絡資料、醫療或紀律紀錄。</li><li>用於現實傷害、犯罪操作、仇恨煽動或欺騙他人的生成指令。</li><li>未核對授權的角色、商標、藝術作品、音樂或訓練素材。</li></ul></article><article class="card"><h3>每次輸出前的五格檢查</h3><div class="privacy-grid" style="grid-template-columns:1fr"><label class="privacy-item"><input type="checkbox">素材是虛構、公開授權，或已有明確同意。</label><label class="privacy-item"><input type="checkbox">提示語未含真實校務資料、私密資料或可識別身份。</label><label class="privacy-item"><input type="checkbox">已閱讀所用 checkpoint、LoRA、VAE 及音訊素材的授權。</label><label class="privacy-item"><input type="checkbox">已做內容安全、身份誤導、版權與商標檢查。</label><label class="privacy-item"><input type="checkbox">若要公開，已加上 AI 生成／合成標示及必要的人工審核。</label></div></article></div>
+          <div class="section-head"><div><h2>分層責任</h2><p>把責任邊界寫清楚，才能安全地讓本機工具服務教學與創作。</p></div></div>
+          <div class="grid three"><article class="card blue"><h3>GAS 專案</h3><p>提供靜態教學、提示語欄位、參數紀錄及本機預覽；不保存、不推理、不代為上傳。</p></article><article class="card mint"><h3>本機推理環境</h3><p>由使用者自行管理模型權重、輸入素材、輸出檔案、硬體權限及作業系統安全。</p></article><article class="card amber"><h3>發布／使用者</h3><p>負責內容、授權、同意、標示、後製與公開前人工審核；有疑問時先停下來確認。</p></article></div>
+          <div class="card" style="margin-top:17px"><h3>參考來源</h3><div class="source-list"><a class="source-link" href="https://github.com/MiniMax-AI/MiniMax-H3" target="_blank" rel="noopener"><span>MiniMax H3 官方 GitHub</span><span>↗</span></a><a class="source-link" href="https://github.com/Comfy-Org/ComfyUI" target="_blank" rel="noopener"><span>ComfyUI 官方 GitHub</span><span>↗</span></a><a class="source-link" href="https://github.com/AUTOMATIC1111/stable-diffusion-webui" target="_blank" rel="noopener"><span>AUTOMATIC1111 WebUI</span><span>↗</span></a><a class="source-link" href="https://mnya.tw/cc/word/2418.html" target="_blank" rel="noopener"><span>使用者提供的 Stable Diffusion 動作提詞參考頁</span><span>↗</span></a></div></div>
+        </section>
+        <p class="footer-note">GAS × Local AI 使用輔助 · 靜態前端 · 不含模型權重 · 不含外部 API · 請按你所在地的法律、授權及學校政策使用。</p>
+      </div>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script>
+    (function () {
+      'use strict';
+      var actions = [
+        { title:'翻頁閱讀', prompt:'turning a page carefully, eyes following the line', note:'測試手部、桌面和視線方向。' },
+        { title:'迎光前行', prompt:'walking toward a pool of morning light, coat moving gently', note:'測試動勢、光線和前後景。' },
+        { title:'靠牆觀察', prompt:'leaning against a wall, arms relaxed, looking toward the doorway', note:'測試人物與背景的空間關係。' },
+        { title:'伸展休息', prompt:'stretching both arms after a long study session, relaxed posture', note:'測試對稱動作和上半身構圖。' },
+        { title:'指向地圖', prompt:'pointing at a paper map on the table, explaining a route', note:'測試視線、手勢和道具。' },
+        { title:'雨後跳步', prompt:'stepping over a shallow puddle, umbrella tilted slightly, lively motion', note:'測試腳部動作和反射光。' },
+        { title:'揮手招呼', prompt:'waving hello with one hand, friendly posture, open expression', note:'測試清楚、單一的手勢。' },
+        { title:'整理背包', prompt:'adjusting a backpack strap before leaving, three-quarter view', note:'測試肩帶、手臂和身體方向。' },
+        { title:'提燈前行', prompt:'holding a small paper lantern while walking through a quiet lane', note:'測試發光道具和夜景層次。' }
+      ];
+      var examples = [
+        { art:'art-library', title:'SD · 晨光閱讀角', copy:'用單一虛構人物和公共空間測試姿勢、光線及構圖；不使用真實學生照片。', meta:['SDXL 類模型','30 steps','1024×768','seed 18402'], prompt:'editorial illustration, a fictional student reading quietly at a sunlit library corner, seated at a wooden desk, three-quarter view, warm morning light, bookshelves, potted plant, clean composition, soft colors, detailed hands, no readable text' },
+        { art:'art-lantern', title:'SD · 夜行紙燈', copy:'用紙燈和空街道測試局部光源、景深與顏色，不放入商標或特定店舖。', meta:['ComfyUI','DPM++ 2M','CFG 7','seed 73016'], prompt:'cinematic still life, a handmade paper lantern glowing beside a quiet fictional alley after rain, warm practical light, cool blue shadows, shallow depth of field, centered composition, textured paper, no logo, no readable sign' },
+        { art:'art-corridor', title:'H3 · 雨後走廊', copy:'以無人公共走廊示範鏡頭由固定到慢速推進，聲音只用雨聲、腳步和低音樂。', meta:['H3-Base FL2VA','6 sec','16:9','24 FPS'], prompt:'integrated_multimodal_description: [Shot 1] Live-action, a quiet fictional school corridor after rain. A blue umbrella rests near the doorway while reflected daylight trembles on the polished floor. The camera holds a static medium-wide shot for the opening, then pushes in slowly toward the umbrella as a few drops fall from its edge. [Shot 2] At 00:04.500, the camera cuts to a close view of the reflection settling and holds until the end.\noverall_soundscape: Soft rain taps the covered windows while water drips from the umbrella and distant footsteps pass briefly.\nnon_diegetic_music: Sparse marimba notes at a slow tempo with a gentle fade at the end.' }
+      ];
+      var defaults = { subject:'a fictional student reading quietly', place:'a sunlit library corner', action:'turns one page and looks toward the window', style:'warm editorial illustration', camera:'slow push-in, medium-wide shot', duration:'6', ratio:'16:9', audio:'soft page turns and a low library room tone; sparse acoustic guitar, slow tempo', negative:'blurry, low resolution, distorted hands, extra fingers, duplicate person, cropped head, watermark, signature, logo, readable text' };
+      function $(id) { return document.getElementById(id); }
+      function all(selector) { return Array.prototype.slice.call(document.querySelectorAll(selector)); }
+      var toastTimer;
+      function showToast(message) { var toast=$('toast'); toast.textContent=message; toast.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(function(){ toast.classList.remove('show'); },2200); }
+      function goToPage(pageId) { all('.page').forEach(function(page){ page.classList.toggle('active',page.id===pageId); }); all('.nav-button').forEach(function(button){ button.classList.toggle('active',button.dataset.page===pageId); }); window.scrollTo({top:0,behavior:'smooth'}); }
+      function copyText(text) { if (!text) return Promise.reject(new Error('empty')); if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text); var area=document.createElement('textarea'); area.value=text; area.style.position='fixed'; area.style.opacity='0'; document.body.appendChild(area); area.select(); try { document.execCommand('copy'); } finally { document.body.removeChild(area); } return Promise.resolve(); }
+      function renderActions() { $('actionDeck').innerHTML=actions.map(function(item){ return '<article class="card deck-card"><div><h3>'+item.title+'</h3><p>'+item.note+'</p></div><div class="prompt-line">'+item.prompt+'</div><div class="deck-foot"><span class="tag">action</span><button class="button small" data-copy-text="'+encodeURIComponent(item.prompt)+'">複製</button></div></article>'; }).join(''); }
+      function renderExamples() { $('exampleGrid').innerHTML=examples.map(function(item,index){ return '<article class="card example-card"><div class="example-art '+item.art+'"><div class="art-object"></div></div><div class="example-body"><h3>'+item.title+'</h3><p>'+item.copy+'</p><div class="example-meta">'+item.meta.map(function(meta){ return '<span class="meta">'+meta+'</span>'; }).join('')+'</div><div class="button-row"><button class="button small" data-example-index="'+index+'">查看提示語</button><button class="button small" data-fill-prompt="'+index+'">帶入工作台</button></div></div></article>'; }).join(''); }
+      function val(id) { return $(id).value.trim(); }
+      function buildPrompt() {
+        var tool=$('composerTool').value, mode=$('composerMode').value;
+        var subject=val('fieldSubject')||defaults.subject, place=val('fieldPlace')||defaults.place, action=val('fieldAction')||defaults.action, style=val('fieldStyle')||defaults.style, camera=val('fieldCamera')||defaults.camera, duration=val('fieldDuration')||defaults.duration, ratio=val('fieldRatio')||defaults.ratio, audio=val('fieldAudio')||defaults.audio, negative=val('fieldNegative')||defaults.negative;
+        if (tool==='sd') return 'positive: '+style+', '+subject+', '+action+', in '+place+', '+camera+', balanced composition, natural lighting, clear subject separation, high detail, no readable text\nnegative: '+negative+'\n\nrecord: aspect ratio '+ratio+'; record checkpoint, VAE, seed, sampler, steps, CFG and output filename in the result log.';
+        var shot='[Shot 1] '+style+', '+camera+'. The scene shows '+subject+' in '+place+'. The subject '+action+'.', core='integrated_multimodal_description: '+shot, sound='overall_soundscape: '+audio+'.', music='non_diegetic_music: Sparse acoustic guitar at a slow tempo, with a gentle fade at the end.';
+        if (mode==='T2VA') return core+'\n'+sound+'\n'+music+'\n\nrecord: duration '+duration+' seconds; aspect ratio '+ratio+'; keep the total timeline within 4–15 seconds.';
+        if (mode==='I2VA') return 'For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\n'+core+' Preserve the first-frame subject, clothing, spatial layout and lighting before the action develops.\n'+sound+'\n'+music;
+        if (mode==='FL2VA') return 'How the reference pictures align with the target video — Picture 1 (from Shot 1) aligns with the 0.00-second mark; Picture 2 (from Shot 1) aligns with the '+Number(duration).toFixed(2)+'-second mark.\n\n'+core+' Describe one continuous path from the first-frame state to the last-frame state; make the final pose and composition land on Picture 2.\n'+sound+'\n'+music;
+        if (mode==='L2VA') return 'How the reference pictures align with the target video — <Picture 1> (from [Shot 1]) aligns with the '+Number(duration).toFixed(2)+'-second mark.\n\n'+core+' Begin from a plausible earlier state and gradually converge to the exact subject position, lighting and composition of Picture 1 at the end.\n'+sound+'\n'+music;
+        return 'subject_definitions: <Subject 1> is '+subject+' in <Picture 1>; <Subject 2> is the environment and lighting of '+place+'.\nsummary: [reference generation] The target video uses the referenced subject and environment while developing the requested action.\nretention_analysis: <Subject 1> fully_preserved; <Subject 2> partially_preserved with the requested motion and camera change.\ndetailed_description: [Shot 1] '+style+', '+camera+'. '+subject+' appears in '+place+' and '+action+'. Keep reference labels consistent across the full timeline.\noverall_soundscape: '+audio+'.\nnon_diegetic_music: Sparse acoustic guitar at a slow tempo, with a gentle fade at the end.\n\nrecord: duration '+duration+' seconds; aspect ratio '+ratio+'; keep all reference files local and confirm consent/licensing.';
+      }
+      function updatePrompt() { $('promptOutput').textContent=buildPrompt(); }
+      function updateToolFields() { var isH3=$('composerTool').value==='h3'; $('h3ModeField').classList.toggle('hide',!isH3); $('fieldNegative').closest('.field').classList.toggle('hide',isH3); updatePrompt(); }
+      function resetPrompt() { $('fieldSubject').value=defaults.subject; $('fieldPlace').value=defaults.place; $('fieldAction').value=defaults.action; $('fieldStyle').value=defaults.style; $('fieldCamera').value=defaults.camera; $('fieldDuration').value=defaults.duration; $('fieldRatio').value=defaults.ratio; $('fieldAudio').value=defaults.audio; $('fieldNegative').value=defaults.negative; $('composerTool').value='sd'; updateToolFields(); showToast('已還原安全示例'); }
+      function useExample(index) { var item=examples[index]; if (!item) return; $('recordPrompt').value=item.prompt; $('recordTitle').value=item.title; $('recordTool').value=item.meta[0]; $('recordParams').value=item.meta.slice(1).join(' · '); goToPage('record'); showToast('已把示例提示語帶入紀錄表'); }
+      function fillComposer(index) { var item=examples[index]; if (!item) return; $('composerTool').value=item.title.indexOf('H3')===0?'h3':'sd'; $('composerMode').value='T2VA'; if (item.title.indexOf('H3')===0) { $('fieldSubject').value='a blue umbrella in a quiet fictional school corridor'; $('fieldPlace').value='a rain-washed covered corridor with polished floors'; $('fieldAction').value='a few drops fall from its edge while the floor reflection slowly settles'; $('fieldStyle').value='live-action, quiet cinematic observation'; $('fieldCamera').value='static medium-wide shot, then a slow push-in'; $('fieldDuration').value='6'; $('fieldAudio').value='soft rain on covered windows, water drops and distant footsteps'; } else { $('fieldSubject').value=item.title.indexOf('閱讀')>=0?'a fictional student reading quietly':'a handmade paper lantern'; $('fieldPlace').value=item.title.indexOf('閱讀')>=0?'a sunlit library corner':'a quiet fictional alley after rain'; $('fieldAction').value=item.title.indexOf('閱讀')>=0?'turns one page and looks toward the window':'glows beside a shallow puddle'; $('fieldStyle').value=item.title.indexOf('閱讀')>=0?'warm editorial illustration':'cinematic still life'; $('fieldCamera').value='three-quarter view, shallow depth of field'; } updateToolFields(); goToPage('composer'); showToast('已把示例情境帶入工作台'); }
+      function showExample(index) { var item=examples[index]; if (!item) return; $('composerTool').value=item.title.indexOf('H3')===0?'h3':'sd'; updateToolFields(); $('promptOutput').textContent=item.prompt; goToPage('composer'); showToast('已顯示示例提示語'); }
+      function previewFiles(files) { var zone=$('previewZone'); zone.innerHTML=''; zone.classList.toggle('has-media',files.length>0); if (!files.length) { zone.innerHTML='尚未選取檔案<br><small>請勿選取含有真實個人資料的檔案作示範。</small>'; zone.classList.remove('has-media'); return; } Array.prototype.forEach.call(files,function(file){ var item=document.createElement('div'), url=URL.createObjectURL(file), media=file.type.indexOf('video/')===0?document.createElement('video'):document.createElement('img'); item.className='preview-item'; media.src=url; if (media.tagName==='VIDEO') { media.controls=true; media.muted=true; } media.onload=media.onloadeddata=function(){ URL.revokeObjectURL(url); }; var label=document.createElement('p'); label.textContent=file.name; item.appendChild(media); item.appendChild(label); zone.appendChild(item); }); }
+      function payload() { return { schema:'gas-local-ai-record/v1', exportedAt:new Date().toISOString(), title:val('recordTitle'), tool:val('recordTool'), seed:val('recordSeed'), parameters:val('recordParams'), prompt:val('recordPrompt'), notes:val('recordNotes'), privacy:'Local download only; media files are not embedded.' }; }
+      function downloadRecord() { var blob=new Blob([JSON.stringify(payload(),null,2)],{type:'application/json;charset=utf-8'}), url=URL.createObjectURL(blob), link=document.createElement('a'), safeTitle=(val('recordTitle')||'local-ai-record').replace(/[^\w\-\u4e00-\u9fff]+/g,'-').slice(0,60); link.href=url; link.download=safeTitle+'.json'; link.click(); setTimeout(function(){ URL.revokeObjectURL(url); },1000); showToast('紀錄已下載到本機'); }
+      function clearRecord() { ['recordTitle','recordTool','recordSeed','recordParams','recordPrompt','recordNotes'].forEach(function(id){ $(id).value=''; }); $('mediaInput').value=''; previewFiles([]); showToast('已清空目前表單'); }
+      all('.nav-button').forEach(function(button){ button.addEventListener('click',function(){ goToPage(button.dataset.page); }); });
+      all('[data-go]').forEach(function(button){ button.addEventListener('click',function(){ goToPage(button.dataset.go); }); });
+      $('composerTool').addEventListener('change',updateToolFields);
+      ['composerMode','fieldSubject','fieldPlace','fieldAction','fieldStyle','fieldCamera','fieldDuration','fieldRatio','fieldAudio','fieldNegative'].forEach(function(id){ $(id).addEventListener('input',updatePrompt); });
+      $('refreshPrompt').addEventListener('click',function(){ updatePrompt(); showToast('提示語已更新'); });
+      $('resetPrompt').addEventListener('click',resetPrompt);
+      $('copyPrompt').addEventListener('click',function(){ copyText($('promptOutput').textContent).then(function(){ showToast('提示語已複製'); }).catch(function(){ showToast('複製失敗，請手動選取文字'); }); });
+      $('useCurrentPrompt').addEventListener('click',function(){ $('recordPrompt').value=$('promptOutput').textContent; showToast('已帶入目前提示語'); });
+      $('downloadRecord').addEventListener('click',downloadRecord);
+      $('clearRecord').addEventListener('click',clearRecord);
+      $('mediaInput').addEventListener('change',function(event){ previewFiles(event.target.files); });
+      document.addEventListener('click',function(event){ var copyButton=event.target.closest('[data-copy-target]'); if (copyButton) { var target=$(copyButton.dataset.copyTarget); if (target) copyText(target.textContent).then(function(){ showToast('內容已複製'); }).catch(function(){ showToast('複製失敗，請手動選取文字'); }); } var textButton=event.target.closest('[data-copy-text]'); if (textButton) copyText(decodeURIComponent(textButton.dataset.copyText)).then(function(){ showToast('動作詞已複製'); }).catch(function(){ showToast('複製失敗'); }); var exampleButton=event.target.closest('[data-example-index]'); if (exampleButton) showExample(Number(exampleButton.dataset.exampleIndex)); var fillButton=event.target.closest('[data-fill-prompt]'); if (fillButton) fillComposer(Number(fillButton.dataset.fillPrompt)); });
+      renderActions(); renderExamples(); updateToolFields();
+    }());
+  </script>
+</body>
+</html>
