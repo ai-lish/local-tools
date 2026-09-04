@@ -20,6 +20,16 @@
 
 若只想先試介面，也可以直接用瀏覽器開啟 `Index.html`；GAS 的 `doGet()` 只負責輸出頁面。
 
+## 使用 Drive-GAS Bridge 推送
+
+本資料夾就是 Bridge 的同步來源，請把 Bridge 的 source folder 指向 `GAS-AI工具使用輔助/`，不要指向整個 repository。建議按以下檔名一對一同步：
+
+- `Code.gs` → Apps Script 的 `Code.gs`
+- `Index.html` → Apps Script 的 `Index.html`
+- `appsscript.json` → Apps Script manifest（如 Bridge 支援 manifest 同步）
+
+推送後，先在 Apps Script 編輯器檢查檔案是否齊全，再用現有部署作業測試 `doGet()`。本專案沒有需要由 Bridge 傳送的模型權重、真人媒體、學校資料或 API key；不要把這些檔案加入同步來源。部署 ID、Script ID 及 Drive 目標請保留在 Bridge 的本機設定，不要寫入 GitHub README。
+
 ## 隱私與安全範圍
 
 本專案沒有 `fetch`、XMLHttpRequest、外部 JavaScript、CDN、analytics、`google.script.run` 或第三方 API。瀏覽器預覽使用者選取的媒體只存在目前分頁的記憶體；「下載紀錄」是使用者主動將文字 JSON 下載到自己的裝置，不會送到伺服器。
