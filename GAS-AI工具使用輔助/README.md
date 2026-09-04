@@ -14,7 +14,7 @@
 ## 安裝到 GAS
 
 1. 在 [Google Apps Script](https://script.google.com/) 建立空白專案。
-2. 建立 `Code.gs`、`Index.html` 及 `appsscript.json`，把本資料夾內同名檔案內容貼上。
+2. 建立 `程式碼.gs`、`Index.html` 及 `appsscript.json`，把本資料夾內同名檔案內容貼上；若是新建英文介面專案，`程式碼.gs` 也可命名為 `Code.gs`。
 3. 儲存後按「部署 → 新增部署作業 → 網頁應用程式」。
 4. 以自己的帳戶執行，按照學校／機構的 Google Workspace 權限政策分享。
 
@@ -24,12 +24,12 @@
 
 本資料夾就是 Bridge 的同步來源，請把 Bridge 的 source folder 指向 `GAS-AI工具使用輔助/`，不要指向整個 repository。建議按以下檔名一對一同步：
 
-- `Code.gs` → Apps Script 的 `Code.gs`
+- `程式碼.gs` → 現有 Apps Script 的 `程式碼.gs`（避免另外新增第二個入口檔）
 - `Index.html` → Apps Script 的 `Index.html`
 - `appsscript.json` → Apps Script manifest（如 Bridge 支援 manifest 同步）
 - `README.txt` → Bridge 的本次更新摘要；請保留 `## 本次更新` 標題並更新其下項目
 
-`README.md` 是 GitHub／本機閱讀版，不需要推送到 Apps Script；`README.txt` 是 Bridge 讀取的維護說明，通常會保留在 Drive 資料夾內。
+`README.md` 是 GitHub／本機閱讀版，不需要推送到 Apps Script；`README.txt` 是 Bridge 讀取的維護說明，通常會保留在 Drive 資料夾內。若目標專案的伺服器檔名不同，請先同步並使用目標現有檔名，避免產生兩個 `doGet()`。
 
 ### 接手現有 Apps Script 專案
 
