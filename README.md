@@ -13,10 +13,10 @@ CloudSAMS server。學校來源資料、學生／教師真實資料、mapping �
 - 活動資料分析工具（去識別化公開版）
 - 圖片像素提升工具
 - 相機圖片合併工具
-- HTML LAB 單檔即時測試台
 - CloudSAMS SLP PDF 分割 HTML／CLI（`stable`）
 - CloudSAMS 班相改名 CLI（`wip` skeleton，尚未可正式使用）
 - MathLingo 數學文件翻譯工具（`beta`；通用詞庫、公開試／出版社題型、教案示例、EMI 分類表格及本機文件匯入）
+- 極簡籌號系統（1–100 循環叫號、語音廣播及過號管理）
 
 CloudSAMS tools 只在本機執行；SLP PDF HTML 會在瀏覽器內處理，
 CLI 使用者需要自行安裝 Python 及依賴。請先閱讀各工具目錄內的 README，
