@@ -31,6 +31,24 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/hkdse-question-split/README.md",
+      "destination": "tools/hkdse-question-split/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/hkdse-question-split/index.html",
+      "destination": "tools/hkdse-question-split/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/hkdse-question-split/tool.yaml",
+      "destination": "tools/hkdse-question-split/tool.yaml",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/image-upscaler/index.html",
       "destination": "tools/image-upscaler/index.html",
       "publicMode": "offline-single-file",

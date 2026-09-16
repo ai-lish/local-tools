@@ -1,0 +1,5 @@
+name: hkdse-question-split
+summary: Browser-only HKDSE PDF question boundary editor and image exporter
+status: wip
+runtime: browser
+entry: index.html

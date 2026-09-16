@@ -1,0 +1,1257 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HKDSE Split Question｜逐題切圖</title>
+  <meta name="description" content="把 HKDSE 試卷 PDF 以人手確認的題目界線切成逐題圖片。檔案只在本機瀏覽器處理。">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #151b24;
+      --panel-2: #1d2632;
+      --panel-3: #253244;
+      --border: #314055;
+      --text: #edf2f7;
+      --muted: #9aa9bb;
+      --accent: #6ca7ff;
+      --accent-strong: #3985f6;
+      --good: #58d68d;
+      --warn: #f1bd55;
+      --bad: #f17676;
+      --shadow: 0 18px 45px rgba(0, 0, 0, .22);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(74, 122, 194, .16), transparent 32rem),
+        var(--bg);
+      font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang TC", "Microsoft JhengHei", sans-serif;
+    }
+
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .48; }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(13, 17, 23, .82);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      backdrop-filter: blur(14px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent-strong), #8e68f0);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: -.04em;
+    }
+
+    .brand small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .14em;
+      line-height: 1.15;
+    }
+
+    .brand strong { display: block; font-size: 15px; line-height: 1.3; }
+    .topbar .privacy { margin-left: auto; color: var(--good); font-size: 12px; }
+    .topbar .back {
+      padding: 7px 11px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 12px;
+    }
+    .topbar .back:hover { border-color: var(--accent); color: var(--accent); }
+
+    .shell {
+      width: min(1540px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 50px;
+    }
+
+    .intro {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+
+    h1, h2, p { margin: 0; }
+    h1 { font-size: clamp(24px, 3vw, 36px); letter-spacing: -.04em; }
+    .intro p { max-width: 720px; margin-top: 8px; color: var(--muted); }
+    .badge {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      border: 1px solid rgba(88, 214, 141, .35);
+      border-radius: 999px;
+      color: var(--good);
+      background: rgba(88, 214, 141, .07);
+      font-size: 12px;
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(21, 27, 36, .92);
+      box-shadow: var(--shadow);
+    }
+
+    .settings {
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    .drop-zone {
+      display: grid;
+      place-items: center;
+      min-height: 148px;
+      padding: 20px;
+      border: 2px dashed #42536b;
+      border-radius: 13px;
+      text-align: center;
+      background: linear-gradient(135deg, rgba(43, 71, 108, .24), rgba(29, 38, 50, .52));
+      transition: .18s ease;
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(57, 133, 246, .13);
+      transform: translateY(-1px);
+    }
+
+    .drop-zone .drop-icon { font-size: 34px; }
+    .drop-zone strong { display: block; margin-top: 3px; font-size: 16px; }
+    .drop-zone span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .drop-zone input { display: none; }
+
+    .file-line {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 9px;
+      color: var(--accent);
+      background: rgba(57, 133, 246, .09);
+      font-size: 12px;
+    }
+    .file-line.show { display: flex; }
+    .file-line strong { color: var(--text); word-break: break-all; }
+    .file-line span { margin-left: auto; white-space: nowrap; color: var(--muted); }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(90px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .field input, .field select {
+      width: 100%;
+      min-height: 37px;
+      padding: 7px 9px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--panel-2);
+      outline: none;
+    }
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field .hint { margin-top: 4px; color: var(--muted); font-size: 10px; }
+
+    .setting-note {
+      margin-top: 12px;
+      padding: 9px 11px;
+      border-left: 3px solid var(--warn);
+      color: #d7dee8;
+      background: rgba(241, 189, 85, .08);
+      font-size: 12px;
+    }
+
+    .settings-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .btn {
+      min-height: 38px;
+      padding: 8px 13px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: var(--text);
+      background: var(--panel-2);
+      transition: .15s ease;
+    }
+    .btn:hover:not(:disabled) { border-color: var(--accent); color: #fff; }
+    .btn.primary { border-color: var(--accent-strong); background: var(--accent-strong); color: #fff; }
+    .btn.primary:hover:not(:disabled) { background: #4c95ff; }
+    .btn.good { border-color: rgba(88, 214, 141, .55); color: var(--good); }
+    .btn.danger { border-color: rgba(241, 118, 118, .45); color: var(--bad); }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(260px, 340px) minmax(520px, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .preview {
+      position: sticky;
+      top: 80px;
+      padding: 16px;
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .panel-head h2 { font-size: 14px; }
+    .panel-head .meta { color: var(--muted); font-size: 11px; }
+
+    .thumbs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-height: 430px;
+      padding: 2px;
+      overflow: auto;
+    }
+
+    .thumb {
+      position: relative;
+      min-height: 100px;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--panel-2);
+    }
+    .thumb:hover, .thumb.active { border-color: var(--accent); }
+    .thumb.active { box-shadow: 0 0 0 2px rgba(108, 167, 255, .22); }
+    .thumb canvas { display: block; width: 100%; height: auto; border-radius: 4px; background: #fff; }
+    .thumb .page-no {
+      position: absolute;
+      left: 7px;
+      bottom: 7px;
+      padding: 2px 5px;
+      border-radius: 4px;
+      color: #fff;
+      background: rgba(0, 0, 0, .7);
+      font-size: 10px;
+    }
+
+    .empty {
+      display: grid;
+      place-items: center;
+      min-height: 170px;
+      padding: 20px;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 12px;
+    }
+
+    .page-view {
+      margin-top: 14px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #10151c;
+      overflow: auto;
+    }
+    .page-view canvas { display: block; max-width: 100%; height: auto; margin: 0 auto; background: #fff; }
+    .page-help { margin-top: 8px; color: var(--muted); font-size: 11px; }
+    .page-help strong { color: var(--accent); }
+
+    .main-column { min-width: 0; }
+    .table-panel { padding: 16px; }
+
+    .boundary-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 10px;
+      border-radius: 10px;
+      background: var(--panel-2);
+    }
+    .boundary-bar span { margin-right: auto; color: var(--muted); font-size: 12px; }
+    .boundary-bar .btn { min-height: 31px; padding: 5px 9px; font-size: 12px; }
+    .boundary-bar .active { border-color: var(--accent); color: var(--accent); background: rgba(108, 167, 255, .12); }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 850px; }
+    th {
+      padding: 8px 6px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-size: 10px;
+      font-weight: 600;
+      text-align: left;
+      white-space: nowrap;
+    }
+    td {
+      padding: 7px 6px;
+      border-bottom: 1px solid rgba(49, 64, 85, .58);
+      vertical-align: middle;
+    }
+    tbody tr { transition: .12s ease; }
+    tbody tr:hover, tbody tr.selected { background: rgba(108, 167, 255, .08); }
+    tbody tr.invalid { background: rgba(241, 118, 118, .08); }
+    .id {
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    td input, td select {
+      width: 100%;
+      min-width: 54px;
+      min-height: 31px;
+      padding: 4px 6px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      background: rgba(13, 17, 23, .6);
+      outline: none;
+      font-size: 11px;
+    }
+    td input:focus, td select:focus { border-color: var(--accent); }
+    td .file-name { min-width: 190px; }
+    .coord { display: grid; grid-template-columns: 55px 55px; gap: 4px; }
+    .coord small { grid-column: 1 / -1; color: var(--muted); font-size: 9px; }
+    .row-status { color: var(--good); font-size: 10px; white-space: nowrap; }
+    .row-status.bad { color: var(--bad); }
+    .row-status.muted { color: var(--muted); }
+
+    .output-panel {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+      margin-top: 18px;
+      padding: 16px;
+    }
+    .output-panel h2 { font-size: 14px; }
+    .output-panel p { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .output-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 8px; }
+    .validation {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .validation.good { color: var(--good); }
+    .validation.bad { color: var(--bad); }
+    .validation.warn { color: var(--warn); }
+    .error-list { margin: 7px 0 0; padding-left: 17px; color: var(--bad); font-size: 11px; }
+
+    .progress {
+      display: none;
+      height: 5px;
+      margin-top: 10px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: var(--panel-3);
+    }
+    .progress.show { display: block; }
+    .progress i { display: block; width: 0; height: 100%; background: var(--accent); transition: width .12s; }
+
+    .footnote {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .footnote strong { color: var(--text); }
+
+    @media (max-width: 1050px) {
+      .settings-grid { grid-template-columns: repeat(4, 1fr); }
+      .workspace { grid-template-columns: 1fr; }
+      .preview { position: static; }
+      .thumbs { max-height: 250px; grid-template-columns: repeat(6, 1fr); }
+    }
+
+    @media (max-width: 640px) {
+      .topbar { padding: 14px 16px; }
+      .topbar .privacy { display: none; }
+      .shell { width: min(100% - 20px, 1540px); padding-top: 18px; }
+      .intro { display: block; }
+      .intro .badge { display: inline-block; margin-top: 12px; }
+      .settings-grid { grid-template-columns: repeat(2, 1fr); }
+      .thumbs { grid-template-columns: repeat(4, 1fr); }
+      .output-panel { grid-template-columns: 1fr; }
+      .output-actions { justify-content: start; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">
+      <span class="brand-mark">HK</span>
+      <span><small>HKDSE TOOLS</small><strong>Split Question</strong></span>
+    </a>
+    <span class="privacy">● 檔案只在此瀏覽器處理</span>
+    <a class="back" href="../../index.html">回到 Local Tools</a>
+  </header>
+
+  <main class="shell">
+    <div class="intro">
+      <div>
+        <h1>PDF 逐題切圖</h1>
+        <p>拖入一份試卷 PDF，逐題確認起止位置，再輸出穩定命名的圖片。跨頁題目會自動拼成一張長圖，方便稍後放入圖庫或主表流程。</p>
+      </div>
+      <span class="badge">階段一・瀏覽器本機版</span>
+    </div>
+
+    <section class="panel settings">
+      <div class="drop-zone" id="dropZone" tabindex="0" role="button" aria-label="拖入或選擇 PDF">
+        <div>
+          <div class="drop-icon">⇩</div>
+          <strong>拖入 PDF 到這裡</strong>
+          <span>或按一下選擇檔案；不會上載到 Drive 或任何伺服器</span>
+          <input id="fileInput" type="file" accept="application/pdf,.pdf">
+        </div>
+      </div>
+      <div class="file-line" id="fileLine">
+        <strong id="fileName"></strong>
+        <span id="fileMeta"></span>
+      </div>
+
+      <div class="settings-grid">
+        <div class="field">
+          <label for="paper">卷別</label>
+          <select id="paper">
+            <option value="M2">M2</option>
+            <option value="M1">M1</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="year">年份</label>
+          <input id="year" type="number" min="2000" max="2100" value="2012">
+        </div>
+        <div class="field">
+          <label for="language">語言</label>
+          <select id="language">
+            <option value="zh">中文</option>
+            <option value="en">英文</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="kind">內容</label>
+          <select id="kind">
+            <option value="q">題目</option>
+            <option value="a">Marking</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="count">題數</label>
+          <input id="count" type="number" min="1" max="200" placeholder="必須輸入">
+          <div class="hint">不由 PDF 自動猜</div>
+        </div>
+        <div class="field" id="sectionField">
+          <label for="sectionEnd">甲部最後題號</label>
+          <input id="sectionEnd" type="number" min="0" max="200" value="8">
+          <div class="hint">只作初始分類，逐題可改</div>
+        </div>
+        <div class="field">
+          <label for="dpi">輸出 DPI</label>
+          <select id="dpi">
+            <option value="150">150</option>
+            <option value="200" selected>200</option>
+            <option value="250">250</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="format">圖片格式</label>
+          <select id="format">
+            <option value="png">PNG</option>
+            <option value="jpg">JPG</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-note" id="modeHint">
+        題目界線由你在右側頁面預覽點選確認；工具不會猜題號、課題或分數。若題目跨頁，起點及終點可放在不同頁，輸出會拼成一張圖。
+      </div>
+      <div class="settings-actions">
+        <button class="btn primary" id="buildBtn" type="button">建立題目表</button>
+        <button class="btn" id="resetBtn" type="button">清除並重新開始</button>
+      </div>
+    </section>
+
+    <div class="workspace">
+      <aside class="panel preview">
+        <div class="panel-head">
+          <h2>頁面預覽</h2>
+          <span class="meta" id="pageMeta">未載入 PDF</span>
+        </div>
+        <div class="thumbs" id="thumbs">
+          <div class="empty">載入 PDF 後會顯示頁面縮圖</div>
+        </div>
+        <div class="page-view">
+          <canvas id="pageCanvas" aria-label="PDF 頁面預覽"></canvas>
+          <div class="empty" id="pageEmpty">選擇頁面後在這裡預覽</div>
+        </div>
+        <div class="page-help"><strong>提示：</strong>先在下方題目表選一題，再按「設定起點」或「設定終點」，最後在頁面上按一下。</div>
+      </aside>
+
+      <section class="main-column">
+        <div class="panel table-panel">
+          <div class="panel-head">
+            <div>
+              <h2>題目界線及檔名</h2>
+              <span class="meta">可直接編輯頁碼、百分比及檔名</span>
+            </div>
+            <span class="meta" id="rowMeta">0 題</span>
+          </div>
+          <div class="boundary-bar">
+            <span id="selectionHint">未選取題目</span>
+            <button class="btn" id="startBtn" type="button" disabled>設定起點</button>
+            <button class="btn" id="endBtn" type="button" disabled>設定終點</button>
+            <button class="btn" id="clearBoundaryBtn" type="button" disabled>清除界線</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>題目 ID</th>
+                  <th>甲乙部</th>
+                  <th>起點<br>頁 / %</th>
+                  <th>終點<br>頁 / %</th>
+                  <th>輸出檔名（可改）</th>
+                  <th>狀態</th>
+                </tr>
+              </thead>
+              <tbody id="rows">
+                <tr><td colspan="6"><div class="empty">輸入題數後按「建立題目表」</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel output-panel">
+          <div>
+            <h2>檢查及輸出</h2>
+            <p>所有題目的界線及檔名通過檢查後，才可以建立 ZIP。</p>
+            <div class="validation" id="validation">尚未建立題目表。</div>
+            <ul class="error-list" id="errorList" hidden></ul>
+            <div class="progress" id="progress"><i></i></div>
+          </div>
+          <div class="output-actions">
+            <button class="btn good" id="downloadOneBtn" type="button" disabled>下載目前一題</button>
+            <button class="btn primary" id="downloadZipBtn" type="button" disabled>下載逐題 ZIP</button>
+          </div>
+        </div>
+      </section>
+    </div>
+    <p class="footnote"><strong>本階段範圍：</strong>只做本機 PDF 渲染、裁切、跨頁拼接及改檔名；不連接 Google Drive，不寫入 HKDSE 主表，不進行正式 OCR、課題分類或 SVG 處理。</p>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    (function () {
+      "use strict";
+
+      var state = {
+        file: null,
+        pdf: null,
+        pageCount: 0,
+        currentPage: 1,
+        selected: -1,
+        boundaryMode: "",
+        rows: [],
+        loadingToken: 0
+      };
+
+      var $ = function (id) { return document.getElementById(id); };
+      var dropZone = $("dropZone");
+      var fileInput = $("fileInput");
+      var fileLine = $("fileLine");
+      var fileName = $("fileName");
+      var fileMeta = $("fileMeta");
+      var thumbs = $("thumbs");
+      var pageCanvas = $("pageCanvas");
+      var pageEmpty = $("pageEmpty");
+      var rowsEl = $("rows");
+      var validationEl = $("validation");
+      var errorListEl = $("errorList");
+      var progressEl = $("progress");
+      var progressBar = progressEl.querySelector("i");
+
+      if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      }
+
+      function value(id) {
+        return $(id).value;
+      }
+
+      function numberValue(id) {
+        var n = Number(value(id));
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      function escapeHtml(input) {
+        return String(input == null ? "" : input)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function pad(n) {
+        return String(n).padStart(2, "0");
+      }
+
+      function paper() {
+        return value("paper");
+      }
+
+      function usesSection() {
+        return ["P1", "M1", "M2"].indexOf(paper()) >= 0;
+      }
+
+      function stableId(number) {
+        var year = numberValue("year");
+        return (paper() === "M1" || paper() === "M2" ? String(year) + "AQ" : String(year) + "Q") + pad(number);
+      }
+
+      function defaultSection(number) {
+        if (!usesSection()) return "";
+        var end = numberValue("sectionEnd");
+        return number <= end ? "甲部" : "乙部";
+      }
+
+      function extension() {
+        return value("format") === "jpg" ? "jpg" : "png";
+      }
+
+      function outputName(number) {
+        var suffix = value("kind") === "a" ? "_a" : "_q";
+        if (value("language") === "en") suffix += "_en";
+        return stableId(number) + suffix + "." + extension();
+      }
+
+      function currentRow() {
+        return state.rows[state.selected] || null;
+      }
+
+      function setValidation(text, kind) {
+        validationEl.textContent = text;
+        validationEl.className = "validation" + (kind ? " " + kind : "");
+      }
+
+      function setStatus(text) {
+        setValidation(text, "");
+      }
+
+      function renderThumbs() {
+        if (!state.pdf) {
+          thumbs.innerHTML = '<div class="empty">載入 PDF 後會顯示頁面縮圖</div>';
+          return;
+        }
+        thumbs.innerHTML = "";
+        for (var i = 1; i <= state.pageCount; i += 1) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.className = "thumb" + (i === state.currentPage ? " active" : "");
+          button.dataset.page = String(i);
+          button.innerHTML = '<canvas></canvas><span class="page-no">第 ' + i + ' 頁</span>';
+          button.addEventListener("click", function () {
+            showPage(Number(this.dataset.page));
+          });
+          thumbs.appendChild(button);
+          renderThumbnail(i, button.querySelector("canvas"));
+        }
+      }
+
+      async function renderThumbnail(pageNumber, canvas) {
+        try {
+          var page = await state.pdf.getPage(pageNumber);
+          var base = page.getViewport({ scale: 1 });
+          var scale = Math.min(0.32, 112 / base.width);
+          var viewport = page.getViewport({ scale: scale });
+          canvas.width = Math.max(1, Math.round(viewport.width));
+          canvas.height = Math.max(1, Math.round(viewport.height));
+          await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
+        } catch (error) {
+          canvas.replaceWith(document.createTextNode("讀取失敗"));
+        }
+      }
+
+      async function showPage(pageNumber) {
+        if (!state.pdf || pageNumber < 1 || pageNumber > state.pageCount) return;
+        state.currentPage = pageNumber;
+        document.querySelectorAll(".thumb").forEach(function (el) {
+          el.classList.toggle("active", Number(el.dataset.page) === pageNumber);
+        });
+        pageEmpty.hidden = true;
+        pageCanvas.hidden = false;
+        var page = await state.pdf.getPage(pageNumber);
+        var base = page.getViewport({ scale: 1 });
+        var maxWidth = Math.max(420, Math.min(900, document.querySelector(".page-view").clientWidth - 20));
+        var scale = Math.min(1.25, maxWidth / base.width);
+        var viewport = page.getViewport({ scale: scale });
+        pageCanvas.width = Math.max(1, Math.round(viewport.width));
+        pageCanvas.height = Math.max(1, Math.round(viewport.height));
+        await page.render({
+          canvasContext: pageCanvas.getContext("2d"),
+          viewport: viewport
+        }).promise;
+        $("pageMeta").textContent = "第 " + pageNumber + " / " + state.pageCount + " 頁";
+      }
+
+      async function loadPdf(file) {
+        if (!window.pdfjsLib) {
+          setStatus("PDF.js 未能載入；請檢查網絡連線後重新整理。");
+          return;
+        }
+        if (!file || (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf")) {
+          setStatus("請選擇 PDF 檔案。", "bad");
+          return;
+        }
+        var token = ++state.loadingToken;
+        try {
+          setStatus("正在讀取 PDF...", "warn");
+          var data = await file.arrayBuffer();
+          var pdf = await window.pdfjsLib.getDocument({ data: data }).promise;
+          if (token !== state.loadingToken) return;
+          state.file = file;
+          state.pdf = pdf;
+          state.pageCount = pdf.numPages;
+          state.currentPage = 1;
+          fileLine.classList.add("show");
+          fileName.textContent = file.name;
+          fileMeta.textContent = pdf.numPages + " 頁・" + Math.round(file.size / 1024) + " KB";
+          renderThumbs();
+          await showPage(1);
+          setStatus("PDF 已載入。請輸入題數，建立題目表。", "good");
+        } catch (error) {
+          state.file = null;
+          state.pdf = null;
+          state.pageCount = 0;
+          fileLine.classList.remove("show");
+          setStatus("PDF 讀取失敗：" + (error && error.message ? error.message : error), "bad");
+        }
+      }
+
+      function makeRows() {
+        var count = numberValue("count");
+        if (!state.pdf) {
+          setStatus("請先拖入 PDF。", "bad");
+          return;
+        }
+        if (!Number.isInteger(count) || count < 1 || count > 200) {
+          setStatus("請輸入 1 至 200 的題數。", "bad");
+          return;
+        }
+        state.rows = [];
+        state.selected = -1;
+        state.boundaryMode = "";
+        for (var i = 1; i <= count; i += 1) {
+          state.rows.push({
+            number: i,
+            section: defaultSection(i),
+            start: { page: "", percent: "" },
+            end: { page: "", percent: "" },
+            name: outputName(i),
+            customName: false,
+            customSection: false
+          });
+        }
+        renderTable();
+        updateSelection();
+        validate(false);
+        setStatus("已建立 " + count + " 題。請先選一行，再按起點／終點到頁面上定位。", "warn");
+      }
+
+      function sectionOptions(selected) {
+        var choices = ["", "甲部", "乙部"];
+        return choices.map(function (item) {
+          var label = item || "未設定";
+          return '<option value="' + escapeHtml(item) + '"' +
+            (item === selected ? " selected" : "") + ">" + label + "</option>";
+        }).join("");
+      }
+
+      function coordHtml(row, side) {
+        var coord = row[side];
+        return '<div class="coord">' +
+          '<input type="number" min="1" max="' + state.pageCount + '" step="1" ' +
+          'data-field="' + side + 'Page" value="' + escapeHtml(coord.page) + '" placeholder="頁">' +
+          '<input type="number" min="0" max="100" step="0.1" ' +
+          'data-field="' + side + 'Percent" value="' + escapeHtml(coord.percent) + '" placeholder="%">' +
+          '<small>頁碼 / 頁面高度百分比</small>' +
+          "</div>";
+      }
+
+      function renderTable() {
+        $("rowMeta").textContent = state.rows.length + " 題";
+        if (!state.rows.length) {
+          rowsEl.innerHTML = '<tr><td colspan="6"><div class="empty">輸入題數後按「建立題目表」</div></td></tr>';
+          return;
+        }
+        rowsEl.innerHTML = state.rows.map(function (row, index) {
+          var result = rowValidation(row, index);
+          var sectionCell = usesSection()
+            ? '<select data-field="section">' + sectionOptions(row.section) + "</select>"
+            : '<span class="row-status muted">不適用</span>';
+          return '<tr data-index="' + index + '" class="' +
+            (index === state.selected ? "selected " : "") +
+            (result.length ? "invalid" : "") + '">' +
+            "<td><span class=\"id\">" + escapeHtml(stableId(row.number)) + "</span></td>" +
+            "<td>" + sectionCell + "</td>" +
+            "<td>" + coordHtml(row, "start") + "</td>" +
+            "<td>" + coordHtml(row, "end") + "</td>" +
+            '<td><input class="file-name" type="text" data-field="name" value="' +
+            escapeHtml(row.name) + '"></td>' +
+            '<td><span class="row-status ' + (result.length ? "bad" : "muted") + '">' +
+            (result.length ? result[0] : "可輸出") + "</span></td>" +
+            "</tr>";
+        }).join("");
+      }
+
+      function parseCoord(row, side) {
+        var page = Number(row[side].page);
+        var percent = Number(row[side].percent);
+        if (!Number.isInteger(page) || page < 1 || page > state.pageCount) return null;
+        if (!Number.isFinite(percent) || percent < 0 || percent > 100) return null;
+        return { page: page, percent: percent };
+      }
+
+      function orderValue(coord) {
+        return coord.page * 100000 + coord.percent;
+      }
+
+      function rowValidation(row, index) {
+        var errors = [];
+        var start = parseCoord(row, "start");
+        var end = parseCoord(row, "end");
+        if (!start) errors.push("未設定起點");
+        if (!end) errors.push("未設定終點");
+        if (start && end && orderValue(start) >= orderValue(end)) errors.push("起終點次序錯誤");
+        if (usesSection() && !row.section) errors.push("未設定部份");
+        if (!row.name || !/^[A-Za-z0-9][A-Za-z0-9._-]*[.](png|jpg)$/i.test(row.name)) {
+          errors.push("檔名不合規");
+        }
+        return errors;
+      }
+
+      function validate(showErrors) {
+        var errors = [];
+        var seenNames = {};
+        var year = numberValue("year");
+        if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+          errors.push("年份必須是 2000 至 2100 的整數");
+        }
+        state.rows.forEach(function (row, index) {
+          rowValidation(row, index).forEach(function (message) {
+            errors.push("第 " + row.number + " 題：" + message);
+          });
+          var nameKey = String(row.name || "").toLowerCase();
+          if (nameKey && seenNames[nameKey] != null) {
+            errors.push("檔名重複：" + row.name + "（第 " + (seenNames[nameKey] + 1) + " 題及第 " + (index + 1) + " 題）");
+          } else if (nameKey) {
+            seenNames[nameKey] = index;
+          }
+        });
+
+        var positioned = state.rows.map(function (row, index) {
+          var start = parseCoord(row, "start");
+          var end = parseCoord(row, "end");
+          return start && end ? { index: index, start: start, end: end } : null;
+        }).filter(Boolean).sort(function (a, b) {
+          return orderValue(a.start) - orderValue(b.start);
+        });
+        for (var i = 1; i < positioned.length; i += 1) {
+          if (positioned[i].index < positioned[i - 1].index) {
+            errors.push("題目界線順序錯誤：第 " + state.rows[positioned[i - 1].index].number +
+              " 題應在第 " + state.rows[positioned[i].index].number + " 題之前");
+          }
+          if (orderValue(positioned[i].start) < orderValue(positioned[i - 1].end)) {
+            errors.push("題目界線重疊：第 " + state.rows[positioned[i - 1].index].number +
+              " 題與第 " + state.rows[positioned[i].index].number + " 題");
+          }
+        }
+
+        if (!state.rows.length) {
+          setStatus("尚未建立題目表。", "");
+        } else if (errors.length) {
+          setStatus("仍有 " + errors.length + " 項需要處理，未能輸出。", "bad");
+        } else {
+          setStatus("全部 " + state.rows.length + " 題的界線及檔名已通過檢查，可以輸出。", "good");
+        }
+
+        errorListEl.innerHTML = errors.map(function (item) {
+          return "<li>" + escapeHtml(item) + "</li>";
+        }).join("");
+        errorListEl.hidden = !showErrors || !errors.length;
+        $("downloadZipBtn").disabled = !state.pdf || !state.rows.length || errors.length > 0;
+        $("downloadOneBtn").disabled = !state.pdf || state.selected < 0 || errors.length > 0;
+        return errors;
+      }
+
+      function updateSelection() {
+        var row = currentRow();
+        $("selectionHint").textContent = row
+          ? "已選第 " + row.number + " 題・" + stableId(row.number)
+          : "未選取題目";
+        $("startBtn").disabled = !row || !state.pdf;
+        $("endBtn").disabled = !row || !state.pdf;
+        $("clearBoundaryBtn").disabled = !row;
+        $("startBtn").classList.toggle("active", state.boundaryMode === "start");
+        $("endBtn").classList.toggle("active", state.boundaryMode === "end");
+      }
+
+      function selectRow(index) {
+        if (index < 0 || index >= state.rows.length) return;
+        state.selected = index;
+        renderTable();
+        updateSelection();
+        validate(false);
+      }
+
+      function chooseBoundary(side) {
+        if (!currentRow()) return;
+        state.boundaryMode = state.boundaryMode === side ? "" : side;
+        updateSelection();
+        setStatus(state.boundaryMode
+          ? "請在第 " + state.currentPage + " 頁按一下，設定第 " + currentRow().number + " 題的" + (side === "start" ? "起點" : "終點") + "。"
+          : "已取消頁面點選模式。", "warn");
+      }
+
+      pageCanvas.addEventListener("click", function (event) {
+        var row = currentRow();
+        if (!row || !state.boundaryMode || !state.pdf) return;
+        var rect = pageCanvas.getBoundingClientRect();
+        var percent = ((event.clientY - rect.top) / rect.height) * 100;
+        percent = Math.max(0, Math.min(100, Math.round(percent * 10) / 10));
+        row[state.boundaryMode] = { page: state.currentPage, percent: percent };
+        var side = state.boundaryMode;
+        state.boundaryMode = "";
+        renderTable();
+        updateSelection();
+        validate(false);
+        setStatus("第 " + row.number + " 題" + (side === "start" ? "起點" : "終點") +
+          " 已設為第 " + state.currentPage + " 頁 " + percent + "%。", "good");
+      });
+
+      rowsEl.addEventListener("click", function (event) {
+        var tr = event.target.closest("tr[data-index]");
+        if (tr) selectRow(Number(tr.dataset.index));
+      });
+
+      rowsEl.addEventListener("input", function (event) {
+        var tr = event.target.closest("tr[data-index]");
+        if (!tr) return;
+        var index = Number(tr.dataset.index);
+        var row = state.rows[index];
+        var field = event.target.dataset.field;
+        if (field === "name") {
+          row.name = event.target.value;
+          row.customName = true;
+        } else if (field === "section") {
+          row.section = event.target.value;
+          row.customSection = true;
+        } else if (field === "startPage" || field === "startPercent") {
+          row.start[field === "startPage" ? "page" : "percent"] = event.target.value;
+        } else if (field === "endPage" || field === "endPercent") {
+          row.end[field === "endPage" ? "page" : "percent"] = event.target.value;
+        }
+        var status = tr.querySelector(".row-status");
+        var problems = rowValidation(row, index);
+        if (status) {
+          status.textContent = problems.length ? problems[0] : "待確認";
+          status.className = "row-status " + (problems.length ? "bad" : "muted");
+        }
+        validate(false);
+      });
+
+      rowsEl.addEventListener("change", function (event) {
+        var tr = event.target.closest("tr[data-index]");
+        if (!tr || event.target.dataset.field !== "section") return;
+        var row = state.rows[Number(tr.dataset.index)];
+        row.section = event.target.value;
+        row.customSection = true;
+        renderTable();
+        updateSelection();
+        validate(false);
+      });
+
+      $("startBtn").addEventListener("click", function () { chooseBoundary("start"); });
+      $("endBtn").addEventListener("click", function () { chooseBoundary("end"); });
+      $("clearBoundaryBtn").addEventListener("click", function () {
+        var row = currentRow();
+        if (!row) return;
+        row.start = { page: "", percent: "" };
+        row.end = { page: "", percent: "" };
+        renderTable();
+        updateSelection();
+        validate(false);
+      });
+
+      $("buildBtn").addEventListener("click", makeRows);
+
+      ["paper", "year", "language", "kind", "format", "sectionEnd"].forEach(function (id) {
+        $(id).addEventListener("change", function () {
+          state.rows.forEach(function (row) {
+            if (!row.customName) row.name = outputName(row.number);
+            if (!usesSection()) {
+              row.section = "";
+            } else if (!row.customSection || id === "sectionEnd") {
+              row.section = defaultSection(row.number);
+            }
+          });
+          $("sectionField").style.display = usesSection() ? "" : "none";
+          renderTable();
+          updateSelection();
+          validate(false);
+        });
+      });
+
+      $("resetBtn").addEventListener("click", function () {
+        state.loadingToken += 1;
+        state.file = null;
+        state.pdf = null;
+        state.pageCount = 0;
+        state.currentPage = 1;
+        state.selected = -1;
+        state.boundaryMode = "";
+        state.rows = [];
+        fileInput.value = "";
+        fileLine.classList.remove("show");
+        $("pageMeta").textContent = "未載入 PDF";
+        pageCanvas.hidden = true;
+        pageEmpty.hidden = false;
+        thumbs.innerHTML = '<div class="empty">載入 PDF 後會顯示頁面縮圖</div>';
+        renderTable();
+        updateSelection();
+        validate(false);
+        setStatus("已清除，可以載入另一份 PDF。", "");
+      });
+
+      dropZone.addEventListener("click", function () { fileInput.click(); });
+      dropZone.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+      fileInput.addEventListener("change", function () {
+        if (fileInput.files[0]) loadPdf(fileInput.files[0]);
+      });
+      ["dragenter", "dragover"].forEach(function (eventName) {
+        dropZone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          dropZone.classList.add("dragover");
+        });
+      });
+      ["dragleave", "drop"].forEach(function (eventName) {
+        dropZone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          dropZone.classList.remove("dragover");
+        });
+      });
+      dropZone.addEventListener("drop", function (event) {
+        var file = event.dataTransfer.files[0];
+        if (file) loadPdf(file);
+      });
+
+      function csvCell(input) {
+        return '"' + String(input == null ? "" : input).replace(/"/g, '""') + '"';
+      }
+
+      function manifestText() {
+        var lines = [
+          ["paper", "year", "language", "type", "stable_id", "section",
+            "start_page", "start_percent", "end_page", "end_percent", "filename"].join(",")
+        ];
+        state.rows.forEach(function (row) {
+          lines.push([
+            paper(), numberValue("year"), value("language"), value("kind"),
+            stableId(row.number), row.section, row.start.page, row.start.percent,
+            row.end.page, row.end.percent, row.name
+          ].map(csvCell).join(","));
+        });
+        var newline = String.fromCharCode(13, 10);
+        return lines.join(newline) + newline;
+      }
+
+      function downloadBlob(blob, name) {
+        var url = URL.createObjectURL(blob);
+        var anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = name;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1200);
+      }
+
+      async function renderCrop(row) {
+        var dpi = Number(value("dpi"));
+        var start = parseCoord(row, "start");
+        var end = parseCoord(row, "end");
+        if (!start || !end) throw new Error("題目界線未完成");
+        var scale = dpi / 72;
+        var pieces = [];
+        var totalHeight = 0;
+        var maxWidth = 0;
+        for (var pageNumber = start.page; pageNumber <= end.page; pageNumber += 1) {
+          var page = await state.pdf.getPage(pageNumber);
+          var viewport = page.getViewport({ scale: scale });
+          var full = document.createElement("canvas");
+          full.width = Math.max(1, Math.ceil(viewport.width));
+          full.height = Math.max(1, Math.ceil(viewport.height));
+          await page.render({
+            canvasContext: full.getContext("2d"),
+            viewport: viewport
+          }).promise;
+          var top = pageNumber === start.page ? Math.floor(full.height * start.percent / 100) : 0;
+          var bottom = pageNumber === end.page ? Math.ceil(full.height * end.percent / 100) : full.height;
+          top = Math.max(0, Math.min(full.height - 1, top));
+          bottom = Math.max(top + 1, Math.min(full.height, bottom));
+          var piece = document.createElement("canvas");
+          piece.width = full.width;
+          piece.height = bottom - top;
+          var pieceContext = piece.getContext("2d");
+          if (value("format") === "jpg") {
+            pieceContext.fillStyle = "#fff";
+            pieceContext.fillRect(0, 0, piece.width, piece.height);
+          }
+          pieceContext.drawImage(full, 0, top, full.width, piece.height, 0, 0, piece.width, piece.height);
+          pieces.push(piece);
+          totalHeight += piece.height;
+          maxWidth = Math.max(maxWidth, piece.width);
+        }
+        var output = document.createElement("canvas");
+        output.width = maxWidth;
+        output.height = totalHeight;
+        var context = output.getContext("2d");
+        if (value("format") === "jpg") {
+          context.fillStyle = "#fff";
+          context.fillRect(0, 0, output.width, output.height);
+        }
+        var y = 0;
+        pieces.forEach(function (piece) {
+          context.drawImage(piece, 0, y);
+          y += piece.height;
+        });
+        var mime = value("format") === "jpg" ? "image/jpeg" : "image/png";
+        var quality = value("format") === "jpg" ? 0.94 : undefined;
+        return await new Promise(function (resolve, reject) {
+          output.toBlob(function (blob) {
+            if (blob) resolve(blob);
+            else reject(new Error("瀏覽器無法建立圖片"));
+          }, mime, quality);
+        });
+      }
+
+      async function downloadOne() {
+        var errors = validate(true);
+        var row = currentRow();
+        if (errors.length || !row) return;
+        try {
+          progressEl.classList.add("show");
+          progressBar.style.width = "25%";
+          var blob = await renderCrop(row);
+          downloadBlob(blob, row.name);
+          progressBar.style.width = "100%";
+          setStatus("已下載第 " + row.number + " 題：" + row.name, "good");
+        } catch (error) {
+          setStatus("切割失敗：" + error.message, "bad");
+        } finally {
+          setTimeout(function () {
+            progressEl.classList.remove("show");
+            progressBar.style.width = "0";
+          }, 700);
+        }
+      }
+
+      async function downloadZip() {
+        var errors = validate(true);
+        if (errors.length || !state.pdf || !window.JSZip) return;
+        var zip = new window.JSZip();
+        try {
+          progressEl.classList.add("show");
+          for (var i = 0; i < state.rows.length; i += 1) {
+            var row = state.rows[i];
+            setStatus("正在切割第 " + row.number + " / " + state.rows.length + " 題...", "warn");
+            var blob = await renderCrop(row);
+            zip.file(row.name, blob);
+            progressBar.style.width = Math.round(((i + 1) / (state.rows.length + 1)) * 100) + "%";
+          }
+          zip.file("manifest.csv", manifestText());
+          var result = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+          var name = String(numberValue("year")) + "_" + paper() + "_" +
+            (value("language") === "en" ? "en" : "zh") + "_" +
+            (value("kind") === "a" ? "marking" : "questions") + ".zip";
+          downloadBlob(result, name);
+          setStatus("已建立 ZIP：" + name + "，包括 " + state.rows.length + " 題圖片及 manifest.csv。", "good");
+        } catch (error) {
+          setStatus("建立 ZIP 失敗：" + error.message, "bad");
+        } finally {
+          setTimeout(function () {
+            progressEl.classList.remove("show");
+            progressBar.style.width = "0";
+          }, 700);
+        }
+      }
+
+      $("downloadOneBtn").addEventListener("click", downloadOne);
+      $("downloadZipBtn").addEventListener("click", downloadZip);
+
+      $("sectionField").style.display = usesSection() ? "" : "none";
+      updateSelection();
+      validate(false);
+    }());
+  </script>
+</body>
+</html>
