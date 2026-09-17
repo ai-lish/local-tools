@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF 工具箱 — Split / Encrypt / Watermark / Extract</title>
+<meta name="description" content="純前端 PDF 工具箱，無需上傳，瀏覽器內處理，支援分割、加密、浮水印、文字提取 4 種功能。">
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #1a1d23;
+    --panel-2: #232830;
+    --border: #2d333c;
+    --text: #e6e8eb;
+    --text-dim: #8b95a3;
+    --accent: #4f9eff;
+    --accent-hover: #6db0ff;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #ef4444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  .header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header .badge {
+    font-size: 11px;
+    background: var(--panel-2);
+    color: var(--text-dim);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  .header .privacy {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--success);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .home-link {
+    margin-left: auto;
+    padding: 6px 10px;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .home-link:hover, .home-link:focus-visible { color: var(--accent); border-color: var(--accent); outline: 3px solid rgba(79,158,255,.2); outline-offset: 2px; }
+
+  .container {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 20px;
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 900px) {
+    .container { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+  }
+
+  .panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    font-weight: 600;
+  }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--panel-2);
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(79, 158, 255, 0.05);
+  }
+  .drop-zone .icon { font-size: 36px; margin-bottom: 8px; }
+  .drop-zone .hint { color: var(--text-dim); font-size: 13px; margin-top: 6px; }
+  .drop-zone input[type=file] { display: none; }
+
+  .file-info {
+    background: var(--panel-2);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-top: 12px;
+    display: none;
+  }
+  .file-info.show { display: block; }
+  .file-info .name { font-size: 13px; font-weight: 500; word-break: break-all; }
+  .file-info .meta { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
+  .file-info .clear {
+    float: right;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .file-info .clear:hover { color: var(--danger); }
+
+  /* Tool tabs */
+  .tool-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--panel-2);
+    padding: 4px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+  }
+  .tool-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    padding: 8px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    font-size: 11px;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .tool-tab:hover { color: var(--text); }
+  .tool-tab.active {
+    background: var(--panel);
+    color: var(--accent-hover);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .tool-tab .icon { font-size: 16px; display: block; margin-bottom: 2px; }
+
+  /* Mode selector (split only) */
+  .mode-tabs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .mode-tab {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    font-size: 12px;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .mode-tab:hover { border-color: var(--accent); }
+  .mode-tab.active {
+    background: rgba(79, 158, 255, 0.15);
+    border-color: var(--accent);
+    color: var(--accent-hover);
+  }
+  .mode-tab .label { font-weight: 500; display: block; }
+  .mode-tab .desc { color: var(--text-dim); font-size: 10px; margin-top: 2px; }
+
+  /* Inputs */
+  .input-group { margin-bottom: 12px; }
+  .input-group label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .input-group input[type=text],
+  .input-group input[type=number],
+  .input-group input[type=password],
+  .input-group select,
+  .input-group textarea {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .input-group input:focus,
+  .input-group select:focus,
+  .input-group textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .input-group textarea { resize: vertical; min-height: 60px; }
+  .input-group .hint { color: var(--text-dim); font-size: 11px; margin-top: 4px; }
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  /* Buttons */
+  .btn {
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-primary:disabled {
+    background: var(--panel-2);
+    color: var(--text-dim);
+    cursor: not-allowed;
+  }
+  .btn-secondary {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    margin-top: 8px;
+  }
+  .btn-secondary:hover { border-color: var(--accent); }
+
+  /* Output area */
+  .output {
+    min-height: 400px;
+  }
+  .output-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 400px;
+    color: var(--text-dim);
+    text-align: center;
+    font-size: 13px;
+  }
+
+  .preview-list { list-style: none; }
+  .preview-item {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+  }
+  .preview-item .idx {
+    background: var(--panel);
+    color: var(--text-dim);
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .preview-item .name { flex: 1; word-break: break-all; }
+  .preview-item .pages { color: var(--text-dim); font-size: 11px; flex-shrink: 0; }
+
+  .preview-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--danger);
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: var(--danger);
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  .text-preview {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    max-height: 500px;
+    overflow-y: auto;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    color: var(--text);
+  }
+  .text-preview .page-header {
+    color: var(--accent-hover);
+    font-weight: 600;
+    margin-top: 12px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+  }
+  .text-preview .page-header:first-child { margin-top: 0; }
+
+  /* Status / progress */
+  .status {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    display: none;
+  }
+  .status.show { display: block; }
+  .status.info {
+    background: rgba(79, 158, 255, 0.1);
+    color: var(--accent-hover);
+  }
+  .status.success {
+    background: rgba(74, 222, 128, 0.1);
+    color: var(--success);
+  }
+  .status.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+  }
+
+  .progress {
+    margin-top: 8px;
+    height: 4px;
+    background: var(--panel-2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.2s;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-dim);
+    font-size: 11px;
+  }
+  .footer a { color: var(--accent); text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📄 PDF 工具箱</h1>
+  <span class="badge">v2.0</span>
+  <div class="privacy">🔒 100% 瀏覽器處理 · 檔案不上傳</div>
+  <a class="home-link" href="../../index.html">← 回到首頁</a>
+</div>
+
+<div class="container">
+  <!-- LEFT: File + Tool config -->
+  <div>
+    <div class="panel" style="margin-bottom: 16px;">
+      <h2>1. 載入 PDF</h2>
+      <label class="drop-zone" id="dropZone">
+        <div class="icon">📁</div>
+        <div>拖拽 PDF 到此處</div>
+        <div class="hint">或點擊選擇檔案</div>
+        <input type="file" id="fileInput" accept="application/pdf">
+      </label>
+      <div class="file-info" id="fileInfo">
+        <button class="clear" id="clearBtn" title="清除">✕</button>
+        <div class="name" id="fileName">—</div>
+        <div class="meta" id="fileMeta">—</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>2. 選擇工具</h2>
+      <div class="tool-tabs">
+        <button class="tool-tab active" data-tool="split">
+          <span class="icon">✂️</span>分割
+        </button>
+        <button class="tool-tab" data-tool="encrypt">
+          <span class="icon">🔒</span>加密
+        </button>
+        <button class="tool-tab" data-tool="decrypt">
+          <span class="icon">🔓</span>解密
+        </button>
+        <button class="tool-tab" data-tool="watermark">
+          <span class="icon">💧</span>浮水印
+        </button>
+        <button class="tool-tab" data-tool="extract">
+          <span class="icon">📝</span>提取
+        </button>
+      </div>
+
+      <div id="toolConfig">
+        <!-- Populated by JS based on selected tool -->
+      </div>
+
+      <button class="btn btn-primary" id="processBtn" disabled>⚡ 開始處理</button>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Preview -->
+  <div>
+    <div class="panel output">
+      <h2>3. 結果預覽</h2>
+      <div id="outputContent">
+        <div class="output-empty">載入 PDF 後會顯示結果預覽</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  PDF 工具箱 · 純前端實作 · 由 <a href="https://github.com/ai-lish/pdf-splitter" target="_blank" rel="noopener noreferrer">ai-lish/pdf-splitter</a> 提供
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+(() => {
+  const { PDFDocument, StandardFonts, rgb, degrees } = PDFLib;
+  const pdfjsLib = window['pdfjs-dist/build/pdf'];
+
+  // ========== State ==========
+  let pdfFile = null;
+  let pdfDoc = null;        // pdf-lib doc (after potential decrypt)
+  let pdfBytes = null;      // raw bytes
+  let currentTool = 'split';
+  let currentRanges = [];
+  let currentFilenames = [];
+  let lastDownloadBlob = null;
+  let lastDownloadName = '';
+
+  // ========== Elements ==========
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const fileInfo = document.getElementById('fileInfo');
+  const fileName = document.getElementById('fileName');
+  const fileMeta = document.getElementById('fileMeta');
+  const clearBtn = document.getElementById('clearBtn');
+  const toolConfig = document.getElementById('toolConfig');
+  const processBtn = document.getElementById('processBtn');
+  const status = document.getElementById('status');
+  const outputContent = document.getElementById('outputContent');
+
+  // ========== File handling ==========
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') loadFile(file);
+    else showStatus('請選擇 PDF 檔案', 'error');
+  });
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) loadFile(file);
+  });
+  clearBtn.addEventListener('click', resetAll);
+
+  async function loadFile(file) {
+    try {
+      showStatus('載入 PDF 中…', 'info');
+      pdfFile = file;
+      pdfBytes = await file.arrayBuffer();
+
+      // Try loading with pdf-lib (handles non-encrypted PDFs)
+      try {
+        pdfDoc = await PDFDocument.load(pdfBytes.slice(0));
+      } catch (err) {
+        if (err.message && err.message.toLowerCase().includes('encrypt')) {
+          // PDF is encrypted — for split/extract/watermark, need password or decrypt tool
+          pdfDoc = null;
+          showStatus('⚠️ 此 PDF 已加密。請用「解密」工具先移除密碼。', 'error');
+          fileName.textContent = file.name;
+          fileMeta.textContent = `${formatBytes(file.size)} · 已加密`;
+          fileInfo.classList.add('show');
+          renderToolConfig(); // re-render to enable password input if needed
+          refreshProcessButton();
+          return;
+        }
+        throw err;
+      }
+
+      const pageCount = pdfDoc.getPageCount();
+      fileName.textContent = file.name;
+      fileMeta.textContent = `${pageCount} 頁 · ${formatBytes(file.size)}`;
+      fileInfo.classList.add('show');
+      updatePreview();
+      refreshProcessButton();
+      hideStatus();
+    } catch (err) {
+      console.error(err);
+      showStatus('無法讀取 PDF：' + err.message, 'error');
+      resetAll();
+    }
+  }
+
+  function resetAll() {
+    pdfFile = null;
+    pdfDoc = null;
+    pdfBytes = null;
+    currentRanges = [];
+    currentFilenames = [];
+    lastDownloadBlob = null;
+    lastDownloadName = '';
+    fileInfo.classList.remove('show');
+    fileInput.value = '';
+    processBtn.disabled = true;
+    outputContent.innerHTML = '<div class="output-empty">載入 PDF 後會顯示結果預覽</div>';
+    hideStatus();
+  }
+
+  // ========== Tool selector ==========
+  document.querySelectorAll('.tool-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tool-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentTool = tab.dataset.tool;
+      renderToolConfig();
+      updatePreview();
+      refreshProcessButton();
+    });
+  });
+
+  // Enable process button correctly based on tool + file state
+  function refreshProcessButton() {
+    if (!pdfFile) {
+      processBtn.disabled = true;
+      return;
+    }
+    // For decrypt, file may be encrypted (pdfDoc null) — that's OK
+    if (currentTool === 'decrypt') {
+      processBtn.disabled = false;
+      return;
+    }
+    // For split/extract/watermark, need decrypted doc loaded
+    if (currentTool === 'split' || currentTool === 'watermark' || currentTool === 'extract') {
+      processBtn.disabled = !pdfDoc;
+      return;
+    }
+    // Encrypt works on whatever doc is loaded
+    if (currentTool === 'encrypt') {
+      processBtn.disabled = !pdfDoc;
+    }
+  }
+
+  function renderToolConfig() {
+    if (currentTool === 'split') {
+      toolConfig.innerHTML = `
+        <div class="mode-tabs">
+          <button class="mode-tab active" data-mode="every-n">
+            <span class="label">每 N 頁一份</span>
+            <span class="desc">每 N 頁切一份</span>
+          </button>
+          <button class="mode-tab" data-mode="ranges">
+            <span class="label">自訂範圍</span>
+            <span class="desc">每段一份 PDF</span>
+          </button>
+          <button class="mode-tab" data-mode="extract">
+            <span class="label">只保留指定頁</span>
+            <span class="desc">全部合併一份</span>
+          </button>
+        </div>
+        <div id="splitModeConfig"></div>
+      `;
+      // Re-bind mode tabs inside split config
+      toolConfig.querySelectorAll('.mode-tab').forEach(t => {
+        t.addEventListener('click', () => {
+          toolConfig.querySelectorAll('.mode-tab').forEach(x => x.classList.remove('active'));
+          t.classList.add('active');
+          renderSplitMode(t.dataset.mode);
+          updatePreview();
+        });
+      });
+      renderSplitMode('every-n');
+    } else if (currentTool === 'encrypt') {
+      toolConfig.innerHTML = `
+        <div class="input-group">
+          <label>用戶密碼（打開 PDF 需要）</label>
+          <input type="password" id="userPassword" placeholder="例如：mySecret123">
+        </div>
+        <div class="input-group">
+          <label>擁有者密碼（修改權限需要，留空用同上）</label>
+          <input type="password" id="ownerPassword" placeholder="可選">
+        </div>
+        <div class="input-group">
+          <label>權限設定</label>
+          <select id="permissions">
+            <option value="all">完全禁止（只可閱讀）</option>
+            <option value="print">可列印</option>
+            <option value="copy">可複製文字</option>
+            <option value="printcopy">可列印 + 可複製</option>
+            <option value="full" selected>完全開放</option>
+          </select>
+        </div>
+      `;
+    } else if (currentTool === 'decrypt') {
+      toolConfig.innerHTML = `
+        <div class="input-group">
+          <label>PDF 密碼</label>
+          <input type="password" id="decryptPassword" placeholder="請輸入 PDF 密碼">
+          <div class="hint">解密後會輸出冇密碼嘅新 PDF</div>
+        </div>
+      `;
+    } else if (currentTool === 'watermark') {
+      toolConfig.innerHTML = `
+        <div class="input-group">
+          <label>浮水印文字</label>
+          <input type="text" id="wmText" value="DRAFT" placeholder="例：機密 / DRAFT / 校內試卷">
+        </div>
+        <div class="input-row">
+          <div class="input-group">
+            <label>字體大小</label>
+            <input type="number" id="wmSize" value="48" min="8" max="200">
+          </div>
+          <div class="input-group">
+            <label>不透明度 (0.1-1.0)</label>
+            <input type="number" id="wmOpacity" value="0.3" min="0.1" max="1" step="0.05">
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="input-group">
+            <label>角度 (度)</label>
+            <input type="number" id="wmAngle" value="-30" min="-90" max="90">
+            <div class="hint">-30 = 斜向左上</div>
+          </div>
+          <div class="input-group">
+            <label>顏色</label>
+            <select id="wmColor">
+              <option value="red">紅色</option>
+              <option value="gray" selected>灰色</option>
+              <option value="black">黑色</option>
+              <option value="blue">藍色</option>
+            </select>
+          </div>
+        </div>
+      `;
+    } else if (currentTool === 'extract') {
+      toolConfig.innerHTML = `
+        <div class="input-group">
+          <label>輸出格式</label>
+          <select id="extractFormat">
+            <option value="text" selected>純文字 (TXT)</option>
+            <option value="json">JSON（含位置資訊）</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>頁碼範圍（可選，預設全部）</label>
+          <input type="text" id="extractRange" placeholder="例如：1-3, 5">
+          <div class="hint">留空 = 提取所有頁</div>
+        </div>
+      `;
+    }
+  }
+
+  function renderSplitMode(mode) {
+    const target = document.getElementById('splitModeConfig');
+    if (mode === 'every-n') {
+      target.innerHTML = `
+        <div class="input-group">
+          <label>每幾頁一份？</label>
+          <input type="number" id="nInput" min="1" value="1">
+        </div>
+      `;
+      document.getElementById('nInput').addEventListener('input', updatePreview);
+    } else if (mode === 'ranges') {
+      target.innerHTML = `
+        <div class="input-group">
+          <label>範圍（每段一份）</label>
+          <input type="text" id="rangesInput" placeholder="1-3, 5, 7-9">
+        </div>
+      `;
+      document.getElementById('rangesInput').addEventListener('input', updatePreview);
+    } else if (mode === 'extract') {
+      target.innerHTML = `
+        <div class="input-group">
+          <label>要保留嘅頁（合併一份）</label>
+          <input type="text" id="rangesInput" placeholder="1, 3, 5-7">
+        </div>
+      `;
+      document.getElementById('rangesInput').addEventListener('input', updatePreview);
+    }
+  }
+
+  // ========== Range parsing ==========
+  function parseRanges(text, totalPages) {
+    if (!text || !text.trim()) return { chunks: [], error: '請輸入範圍' };
+    const chunks = [];
+    const parts = text.split(/[,\s]+/).filter(Boolean);
+    for (const part of parts) {
+      const m = part.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+      if (!m) return { chunks: [], error: `無效範圍：「${part}」` };
+      let start = parseInt(m[1], 10);
+      let end = m[2] ? parseInt(m[2], 10) : start;
+      if (start > end) [start, end] = [end, start];
+      if (start < 1 || end > totalPages) {
+        return { chunks: [], error: `頁碼超出範圍：${start}-${end}（總共 ${totalPages} 頁）` };
+      }
+      const chunk = [];
+      for (let i = start; i <= end; i++) chunk.push(i - 1);
+      chunks.push(chunk);
+    }
+    return { chunks, error: null };
+  }
+
+  // ========== Preview / update ==========
+  function updatePreview() {
+    if (currentTool === 'split') {
+      updateSplitPreview();
+    } else if (currentTool === 'encrypt') {
+      const upw = document.getElementById('userPassword')?.value;
+      const opw = document.getElementById('ownerPassword')?.value;
+      if (!upw && !opw) {
+        renderErrorMsg('請輸入至少一個密碼');
+      } else {
+        renderSinglePreview(`${pdfFile?.name || 'output.pdf'}`, '加密後');
+      }
+    } else if (currentTool === 'decrypt') {
+      if (!pdfFile) return;
+      renderSinglePreview(pdfFile.name, '解密後');
+    } else if (currentTool === 'watermark') {
+      if (!pdfFile) return;
+      renderSinglePreview(pdfFile.name, '加浮水印後');
+    } else if (currentTool === 'extract') {
+      if (!pdfFile) return;
+      const fmt = document.getElementById('extractFormat')?.value || 'text';
+      renderSinglePreview(`${pdfFile.name.replace(/\.pdf$/i, '')}.${fmt}`, '提取結果');
+    }
+  }
+
+  function updateSplitPreview() {
+    if (!pdfDoc) return;
+    const totalPages = pdfDoc.getPageCount();
+    const baseName = pdfFile.name.replace(/\.pdf$/i, '');
+    const activeMode = toolConfig.querySelector('.mode-tab.active')?.dataset.mode || 'every-n';
+
+    if (activeMode === 'every-n') {
+      const n = parseInt(document.getElementById('nInput')?.value || '1', 10);
+      if (!n || n < 1) { renderErrorMsg('每頁數量必須 ≥ 1'); return; }
+      const chunks = [];
+      for (let i = 0; i < totalPages; i += n) {
+        const chunk = [];
+        for (let j = i; j < Math.min(i + n, totalPages); j++) chunk.push(j);
+        chunks.push(chunk);
+      }
+      const names = chunks.map((c, i) => `${baseName}-${pad(i + 1, String(chunks.length).length)}.pdf`);
+      renderChunkPreview(chunks, names);
+    } else {
+      const text = document.getElementById('rangesInput')?.value || '';
+      const parsed = parseRanges(text, totalPages);
+      if (parsed.error) { renderErrorMsg(parsed.error); return; }
+      if (activeMode === 'extract') {
+        const merged = parsed.chunks.flat();
+        renderChunkPreview([merged], [`${baseName}-selected.pdf`]);
+      } else {
+        const names = parsed.chunks.map(chunk => {
+          const first = chunk[0] + 1;
+          const last = chunk[chunk.length - 1] + 1;
+          return `${baseName}-${first === last ? first : first + '-' + last}.pdf`;
+        });
+        renderChunkPreview(parsed.chunks, names);
+      }
+    }
+  }
+
+  function pad(n, w) { return String(n).padStart(w, '0'); }
+
+  function renderChunkPreview(chunks, names) {
+    if (chunks.length === 0) { renderErrorMsg('設定正確的分割方式'); return; }
+    const items = chunks.map((chunk, i) => `
+      <li class="preview-item">
+        <div class="idx">${i + 1}</div>
+        <div class="name">${escapeHtml(names[i])}</div>
+        <div class="pages">${chunk.length} 頁</div>
+      </li>
+    `).join('');
+    const totalOut = chunks.reduce((s, c) => s + c.length, 0);
+    const summary = chunks.length === 1
+      ? `1 個檔案 · ${totalOut} 頁`
+      : `${chunks.length} 個檔案 · 合計 ${totalOut} 頁`;
+    outputContent.innerHTML = `
+      <div style="color: var(--text-dim); font-size: 12px; margin-bottom: 10px;">${summary}</div>
+      <ul class="preview-list">${items}</ul>
+    `;
+    currentRanges = chunks;
+    currentFilenames = names;
+    processBtn.disabled = !pdfDoc;
+  }
+
+  function renderSinglePreview(name, label) {
+    outputContent.innerHTML = `
+      <div style="color: var(--text-dim); font-size: 12px; margin-bottom: 10px;">${escapeHtml(label)}</div>
+      <ul class="preview-list">
+        <li class="preview-item">
+          <div class="idx">📦</div>
+          <div class="name">${escapeHtml(name)}</div>
+          <div class="pages">1 個檔案</div>
+        </li>
+      </ul>
+    `;
+  }
+
+  function renderErrorMsg(msg) {
+    outputContent.innerHTML = `<div class="preview-error">⚠ ${escapeHtml(msg)}</div>`;
+    processBtn.disabled = true;
+    currentRanges = [];
+  }
+
+  function renderTextPreview(text, pageHeaders) {
+    const html = pageHeaders
+      ? text.split(/(\[\[PAGE \d+\]\])/g).map(p => {
+          if (p.match(/\[\[PAGE \d+\]\]/)) {
+            const n = p.match(/\d+/)[0];
+            return `<div class="page-header">📄 第 ${n} 頁</div>`;
+          }
+          return `<div>${escapeHtml(p)}</div>`;
+        }).join('')
+      : `<div>${escapeHtml(text)}</div>`;
+    outputContent.innerHTML = `<div class="text-preview">${html}</div>`;
+  }
+
+  // ========== Process dispatch ==========
+  processBtn.addEventListener('click', async () => {
+    if (currentTool === 'split') return processSplit();
+    if (currentTool === 'encrypt') return processEncrypt();
+    if (currentTool === 'decrypt') return processDecrypt();
+    if (currentTool === 'watermark') return processWatermark();
+    if (currentTool === 'extract') return processExtract();
+  });
+
+  // ========== Split ==========
+  async function processSplit() {
+    if (!pdfDoc || currentRanges.length === 0) return;
+    processBtn.disabled = true;
+    showStatus('生成 PDF 中…', 'info', true, 0);
+    try {
+      const zip = new JSZip();
+      for (let i = 0; i < currentRanges.length; i++) {
+        const chunk = currentRanges[i];
+        const newDoc = await PDFDocument.create();
+        const copied = await newDoc.copyPages(pdfDoc, chunk);
+        copied.forEach(p => newDoc.addPage(p));
+        const bytes = await newDoc.save();
+        zip.file(currentFilenames[i], bytes);
+        const pct = Math.round(((i + 1) / currentRanges.length) * 100);
+        showStatus(`生成中：${i + 1} / ${currentRanges.length}`, 'info', true, pct);
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      lastDownloadBlob = blob;
+      lastDownloadName = makeZipName();
+      downloadBlob(blob, lastDownloadName);
+      showStatus(`✅ 完成！下載咗 ${currentRanges.length} 個 PDF`, 'success');
+      appendRedownload();
+    } catch (err) {
+      console.error(err);
+      showStatus('❌ 處理失敗：' + err.message, 'error');
+    } finally {
+      processBtn.disabled = false;
+    }
+  }
+
+  function makeZipName() {
+    const base = pdfFile.name.replace(/\.pdf$/i, '');
+    return `${base}-split-${currentRanges.length}files.zip`;
+  }
+
+  // ========== Encrypt ==========
+  async function processEncrypt() {
+    if (!pdfDoc) return;
+    const userPassword = document.getElementById('userPassword').value;
+    const ownerPassword = document.getElementById('ownerPassword').value || userPassword;
+    const permValue = document.getElementById('permissions').value;
+    if (!userPassword && !ownerPassword) {
+      showStatus('請輸入至少一個密碼', 'error'); return;
+    }
+    processBtn.disabled = true;
+    showStatus('加密中…', 'info');
+    try {
+      const permMap = {
+        all: { printing: 'low', modifying: false, copying: false, annotating: false, fillingForms: false, contentAccessibility: false, documentAssembly: false },
+        print: { printing: 'high', modifying: false, copying: false, annotating: false, fillingForms: false, contentAccessibility: false, documentAssembly: false },
+        copy: { printing: 'high', modifying: false, copying: true, annotating: false, fillingForms: false, contentAccessibility: false, documentAssembly: false },
+        printcopy: { printing: 'high', modifying: false, copying: true, annotating: false, fillingForms: false, contentAccessibility: false, documentAssembly: false },
+        full: { printing: 'high', modifying: true, copying: true, annotating: true, fillingForms: true, contentAccessibility: true, documentAssembly: true }
+      };
+      const bytes = await pdfDoc.save({
+        userPassword: userPassword || undefined,
+        ownerPassword: ownerPassword || undefined,
+        permissions: permMap[permValue]
+      });
+      const base = pdfFile.name.replace(/\.pdf$/i, '');
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      lastDownloadBlob = blob;
+      lastDownloadName = `${base}-encrypted.pdf`;
+      downloadBlob(blob, lastDownloadName);
+      showStatus(`✅ 已加密！下載 ${lastDownloadName}`, 'success');
+      appendRedownload();
+    } catch (err) {
+      console.error(err);
+      showStatus('❌ 加密失敗：' + err.message, 'error');
+    } finally {
+      processBtn.disabled = false;
+    }
+  }
+
+  // ========== Decrypt ==========
+  async function processDecrypt() {
+    if (!pdfBytes) return;
+    const password = document.getElementById('decryptPassword').value;
+    if (!password) { showStatus('請輸入密碼', 'error'); return; }
+    processBtn.disabled = true;
+    showStatus('解密中…', 'info');
+    try {
+      // ignoreEncryption only bypasses owner password; for user password, must provide it
+      const doc = await PDFDocument.load(pdfBytes.slice(0), {
+        ignoreEncryption: false,
+        password
+      });
+      const bytes = await doc.save();
+      const base = pdfFile.name.replace(/\.pdf$/i, '');
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      lastDownloadBlob = blob;
+      lastDownloadName = `${base}-decrypted.pdf`;
+      downloadBlob(blob, lastDownloadName);
+      showStatus(`✅ 已解密！下載 ${lastDownloadName}`, 'success');
+      appendRedownload();
+    } catch (err) {
+      console.error(err);
+      if (err.message && err.message.toLowerCase().includes('password')) {
+        showStatus('❌ 密碼錯誤', 'error');
+      } else {
+        showStatus('❌ 解密失敗：' + err.message, 'error');
+      }
+    } finally {
+      processBtn.disabled = false;
+    }
+  }
+
+  // ========== Watermark ==========
+  async function processWatermark() {
+    if (!pdfDoc) return;
+    const text = document.getElementById('wmText').value.trim();
+    if (!text) { showStatus('請輸入浮水印文字', 'error'); return; }
+    const fontSize = parseFloat(document.getElementById('wmSize').value) || 48;
+    const opacity = parseFloat(document.getElementById('wmOpacity').value) || 0.3;
+    const angle = parseFloat(document.getElementById('wmAngle').value) || -30;
+    const color = document.getElementById('wmColor').value;
+
+    const colorMap = {
+      red: rgb(1, 0, 0),
+      gray: rgb(0.5, 0.5, 0.5),
+      black: rgb(0, 0, 0),
+      blue: rgb(0, 0, 1)
+    };
+
+    processBtn.disabled = true;
+    showStatus('加浮水印中…', 'info', true, 0);
+    try {
+      const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const pages = pdfDoc.getPages();
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        const { width, height } = page.getSize();
+        const textWidth = font.widthOfTextAtSize(text, fontSize);
+        const x = (width - textWidth) / 2;
+        const y = height / 2;
+        page.drawText(text, {
+          x, y,
+          size: fontSize,
+          font,
+          color: colorMap[color],
+          opacity,
+          rotate: degrees(angle)
+        });
+        const pct = Math.round(((i + 1) / pages.length) * 100);
+        showStatus(`加浮水印：${i + 1} / ${pages.length} 頁`, 'info', true, pct);
+      }
+      const bytes = await pdfDoc.save();
+      const base = pdfFile.name.replace(/\.pdf$/i, '');
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      lastDownloadBlob = blob;
+      lastDownloadName = `${base}-watermarked.pdf`;
+      downloadBlob(blob, lastDownloadName);
+      showStatus(`✅ 已加浮水印！${pages.length} 頁全部覆蓋`, 'success');
+      appendRedownload();
+    } catch (err) {
+      console.error(err);
+      showStatus('❌ 處理失敗：' + err.message, 'error');
+    } finally {
+      processBtn.disabled = false;
+    }
+  }
+
+  // ========== Extract text ==========
+  async function processExtract() {
+    if (!pdfBytes) return;
+    const fmt = document.getElementById('extractFormat').value;
+    const rangeText = document.getElementById('extractRange').value.trim();
+
+    processBtn.disabled = true;
+    showStatus('提取文字中…', 'info', true, 0);
+    try {
+      // Use pdf.js for text extraction (handles more PDF variants)
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const loadingTask = pdfjsLib.getDocument({ data: pdfBytes.slice(0) });
+      const pdf = await loadingTask.promise;
+      const totalPages = pdf.numPages;
+
+      let pageList;
+      if (rangeText) {
+        const parsed = parseRanges(rangeText, totalPages);
+        if (parsed.error) { showStatus('❌ ' + parsed.error, 'error'); processBtn.disabled = false; return; }
+        pageList = parsed.chunks.flat();
+      } else {
+        pageList = Array.from({ length: totalPages }, (_, i) => i);
+      }
+
+      let fullText = '';
+      const pageTexts = [];
+      for (let i = 0; i < pageList.length; i++) {
+        const pageNum = pageList[i] + 1;
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const pageText = content.items.map(item => item.str).join(' ');
+        pageTexts.push({ page: pageNum, text: pageText });
+        const pct = Math.round(((i + 1) / pageList.length) * 100);
+        showStatus(`提取中：${i + 1} / ${pageList.length} 頁`, 'info', true, pct);
+      }
+
+      if (fmt === 'text') {
+        fullText = pageTexts.map(p => `[[PAGE ${p.page}]]\n${p.text}`).join('\n\n');
+        const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+        lastDownloadBlob = blob;
+        lastDownloadName = `${pdfFile.name.replace(/\.pdf$/i, '')}.txt`;
+        downloadBlob(blob, lastDownloadName);
+        renderTextPreview(fullText, true);
+        showStatus(`✅ 已提取 ${pageTexts.length} 頁文字，下載 TXT`, 'success');
+        appendRedownload();
+      } else {
+        const json = JSON.stringify({ source: pdfFile.name, pages: pageTexts }, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        lastDownloadBlob = blob;
+        lastDownloadName = `${pdfFile.name.replace(/\.pdf$/i, '')}.json`;
+        downloadBlob(blob, lastDownloadName);
+        renderTextPreview(JSON.stringify({ source: pdfFile.name, pages: pageTexts.map(p => ({ page: p.page, textLength: p.text.length, preview: p.text.substring(0, 200) })) }, null, 2), false);
+        showStatus(`✅ 已提取 ${pageTexts.length} 頁，下載 JSON`, 'success');
+        appendRedownload();
+      }
+    } catch (err) {
+      console.error(err);
+      showStatus('❌ 提取失敗：' + err.message, 'error');
+    } finally {
+      processBtn.disabled = false;
+    }
+  }
+
+  // ========== Download helpers ==========
+  function appendRedownload() {
+    if (status.querySelector('.btn-secondary')) return;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary';
+    btn.textContent = '⬇ 重新下載';
+    btn.onclick = () => {
+      if (lastDownloadBlob) downloadBlob(lastDownloadBlob, lastDownloadName);
+    };
+    status.appendChild(btn);
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 0);
+  }
+
+  // ========== Status ==========
+  function showStatus(msg, type, showProgress = false, pct = 0) {
+    status.className = `status show ${type}`;
+    status.innerHTML = msg;
+    if (showProgress) {
+      status.innerHTML += `<div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>`;
+    }
+  }
+  function hideStatus() {
+    status.className = 'status';
+    status.innerHTML = '';
+  }
+
+  // ========== Utils ==========
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  // ========== Init ==========
+  renderToolConfig();
+})();
+</script>
+
+</body>
+</html>

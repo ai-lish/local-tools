@@ -31,6 +31,18 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/pdf-splitter/index.html",
+      "destination": "tools/pdf-splitter/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-splitter/README.md",
+      "destination": "tools/pdf-splitter/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/hkdse-question-split/README.md",
       "destination": "tools/hkdse-question-split/README.md",
       "publicMode": "cli-documentation",
