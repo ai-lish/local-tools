@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PDF 工具箱 — Split / Encrypt / Watermark / Extract</title>
-<meta name="description" content="純前端 PDF 工具箱，無需上傳，瀏覽器內處理，支援分割、加密、浮水印、文字提取 4 種功能。">
+<title>PDF 工具箱 — Split / Print Unlock / Encrypt / Watermark / Extract</title>
+<meta name="description" content="純前端 PDF 工具箱，無需上傳，瀏覽器內處理，支援分割、解除列印限制、加密、浮水印、文字提取。">
 <style>
   :root {
     --bg: #0f1115;
@@ -410,6 +410,9 @@
         <button class="tool-tab" data-tool="decrypt">
           <span class="icon">🔓</span>解密
         </button>
+        <button class="tool-tab" data-tool="print-unlock">
+          <span class="icon">🖨️</span>解除列印
+        </button>
         <button class="tool-tab" data-tool="watermark">
           <span class="icon">💧</span>浮水印
         </button>
@@ -503,13 +506,14 @@
         pdfDoc = await PDFDocument.load(pdfBytes.slice(0));
       } catch (err) {
         if (err.message && err.message.toLowerCase().includes('encrypt')) {
-          // PDF is encrypted — for split/extract/watermark, need password or decrypt tool
+          // PDF is encrypted — PDF.js can still render it after the user supplies a password.
           pdfDoc = null;
-          showStatus('⚠️ 此 PDF 已加密。請用「解密」工具先移除密碼。', 'error');
+          showStatus('⚠️ 此 PDF 已加密。需要密碼的工具會要求你輸入密碼。', 'error');
           fileName.textContent = file.name;
           fileMeta.textContent = `${formatBytes(file.size)} · 已加密`;
           fileInfo.classList.add('show');
           renderToolConfig(); // re-render to enable password input if needed
+          updatePreview();
           refreshProcessButton();
           return;
         }
@@ -563,8 +567,8 @@
       processBtn.disabled = true;
       return;
     }
-    // For decrypt, file may be encrypted (pdfDoc null) — that's OK
-    if (currentTool === 'decrypt') {
+    // These tools can work from raw bytes when pdf-lib cannot open an encrypted PDF.
+    if (currentTool === 'decrypt' || currentTool === 'print-unlock') {
       processBtn.disabled = false;
       return;
     }
@@ -635,6 +639,20 @@
           <label>PDF 密碼</label>
           <input type="password" id="decryptPassword" placeholder="請輸入 PDF 密碼">
           <div class="hint">解密後會輸出冇密碼嘅新 PDF</div>
+        </div>
+      `;
+    } else if (currentTool === 'print-unlock') {
+      toolConfig.innerHTML = `
+        <div class="input-group">
+          <label>PDF 密碼（如有）</label>
+          <input type="password" id="printUnlockPassword" placeholder="有密碼才需要輸入">
+          <div class="hint">只使用你輸入的密碼，不會嘗試猜測；完成後建立新的可列印副本。</div>
+        </div>
+        <div class="input-group">
+          <div class="hint">一般 PDF 會保留原始文字及向量內容。加密 PDF 會以頁面影像重新建立，檔案可以列印，但文字選取及連結可能不會保留。</div>
+        </div>
+        <div class="input-group">
+          <div class="hint">如果忘記的是開啟密碼，工具無法復原或繞過；請向檔案提供者索取密碼，或使用未加密備份。只有禁止列印而不要求開啟密碼的檔案可以留空。</div>
         </div>
       `;
     } else if (currentTool === 'watermark') {
@@ -753,6 +771,9 @@
     } else if (currentTool === 'decrypt') {
       if (!pdfFile) return;
       renderSinglePreview(pdfFile.name, '解密後');
+    } else if (currentTool === 'print-unlock') {
+      if (!pdfFile) return;
+      renderSinglePreview(`${pdfFile.name.replace(/\.pdf$/i, '')}-printable.pdf`, '可列印副本');
     } else if (currentTool === 'watermark') {
       if (!pdfFile) return;
       renderSinglePreview(pdfFile.name, '加浮水印後');
@@ -859,6 +880,7 @@
     if (currentTool === 'split') return processSplit();
     if (currentTool === 'encrypt') return processEncrypt();
     if (currentTool === 'decrypt') return processDecrypt();
+    if (currentTool === 'print-unlock') return processPrintUnlock();
     if (currentTool === 'watermark') return processWatermark();
     if (currentTool === 'extract') return processExtract();
   });
@@ -942,32 +964,161 @@
   async function processDecrypt() {
     if (!pdfBytes) return;
     const password = document.getElementById('decryptPassword').value;
-    if (!password) { showStatus('請輸入密碼', 'error'); return; }
+    if (!pdfDoc && !password) { showStatus('請輸入密碼', 'error'); return; }
     processBtn.disabled = true;
     showStatus('解密中…', 'info');
     try {
-      // ignoreEncryption only bypasses owner password; for user password, must provide it
-      const doc = await PDFDocument.load(pdfBytes.slice(0), {
-        ignoreEncryption: false,
-        password
-      });
-      const bytes = await doc.save();
+      let bytes;
+      let method = '保留原始內容';
+      if (pdfDoc) {
+        // An unencrypted document can be saved directly; pdf-lib does not carry
+        // an encryption dictionary into the new file.
+        bytes = await pdfDoc.save();
+      } else {
+        // pdf-lib cannot open encrypted PDFs. PDF.js validates the supplied
+        // password and the raster copy removes the encryption wrapper.
+        const result = await buildRasterPdf(password, (page, total) => {
+          showStatus(`解密中：${page} / ${total} 頁`, 'info', true, Math.round((page / total) * 100));
+        });
+        bytes = result.bytes;
+        method = '以頁面影像重新建立';
+      }
       const base = pdfFile.name.replace(/\.pdf$/i, '');
       const blob = new Blob([bytes], { type: 'application/pdf' });
       lastDownloadBlob = blob;
       lastDownloadName = `${base}-decrypted.pdf`;
       downloadBlob(blob, lastDownloadName);
-      showStatus(`✅ 已解密！下載 ${lastDownloadName}`, 'success');
+      showStatus(`✅ 已解密（${method}）！下載 ${lastDownloadName}`, 'success');
       appendRedownload();
     } catch (err) {
       console.error(err);
-      if (err.message && err.message.toLowerCase().includes('password')) {
-        showStatus('❌ 密碼錯誤', 'error');
+      if (isPdfPasswordError(err)) {
+        showPdfPasswordError(err);
       } else {
         showStatus('❌ 解密失敗：' + err.message, 'error');
       }
     } finally {
       processBtn.disabled = false;
+    }
+  }
+
+  // ========== Print restriction removal ==========
+  async function processPrintUnlock() {
+    if (!pdfFile || !pdfBytes) return;
+    const password = document.getElementById('printUnlockPassword')?.value || '';
+    processBtn.disabled = true;
+    showStatus('建立可列印副本中…', 'info', true, 0);
+    try {
+      let bytes;
+      let method = '保留原始文字及向量內容';
+      if (pdfDoc) {
+        // Saving an unencrypted document produces a fresh PDF without the
+        // permission flags that prevent printing.
+        bytes = await pdfDoc.save();
+      } else {
+        // Encrypted PDFs are rendered only after PDF.js accepts the password.
+        // Rebuilding each page as an image gives the output a clean permission
+        // dictionary without attempting to crack or guess a password.
+        const result = await buildRasterPdf(password, (page, total) => {
+          showStatus(`建立可列印副本：${page} / ${total} 頁`, 'info', true, Math.round((page / total) * 100));
+        });
+        bytes = result.bytes;
+        method = '以頁面影像重新建立（文字選取及連結可能不會保留）';
+      }
+      const base = pdfFile.name.replace(/\.pdf$/i, '');
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      lastDownloadBlob = blob;
+      lastDownloadName = `${base}-printable.pdf`;
+      downloadBlob(blob, lastDownloadName);
+      showStatus(`✅ 已建立可列印副本（${method}）！下載 ${lastDownloadName}`, 'success');
+      appendRedownload();
+    } catch (err) {
+      console.error(err);
+      if (isPdfPasswordError(err)) {
+        showPdfPasswordError(err);
+      } else {
+        showStatus('❌ 建立可列印副本失敗：' + err.message, 'error');
+      }
+    } finally {
+      processBtn.disabled = false;
+    }
+  }
+
+  // ========== PDF.js / raster helpers ==========
+  const PDFJS_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  function ensurePdfJsWorker() {
+    if (!pdfjsLib || typeof pdfjsLib.getDocument !== 'function') {
+      throw new Error('PDF.js 載入失敗，請重新整理頁面後再試');
+    }
+    if (pdfjsLib.GlobalWorkerOptions) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
+    }
+  }
+
+  async function loadPdfJsDocument(password) {
+    ensurePdfJsWorker();
+    const options = { data: new Uint8Array(pdfBytes) };
+    if (password) options.password = password;
+    return pdfjsLib.getDocument(options).promise;
+  }
+
+  function isPdfPasswordError(err) {
+    const message = String(err?.message || err || '').toLowerCase();
+    return err?.name === 'PasswordException' || message.includes('password') || message.includes('encrypted');
+  }
+
+  function showPdfPasswordError(err) {
+    const message = String(err?.message || '').toLowerCase();
+    const incorrect = err?.code === 2 || /incorrect|invalid|wrong/.test(message);
+    showStatus(incorrect ? '❌ 密碼錯誤，請重新輸入。' : '🔐 此 PDF 需要密碼，請輸入後再試。', 'error');
+  }
+
+  function canvasToBlob(canvas, type, quality) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => {
+        if (blob) resolve(blob);
+        else reject(new Error('無法建立頁面影像'));
+      }, type, quality);
+    });
+  }
+
+  async function buildRasterPdf(password, onProgress) {
+    const sourcePdf = await loadPdfJsDocument(password);
+    const outputPdf = await PDFDocument.create();
+    const baseScale = 2; // 144 DPI: readable text when printed without excessive memory use.
+    const maxPixels = 3200;
+    try {
+      for (let pageNumber = 1; pageNumber <= sourcePdf.numPages; pageNumber++) {
+        const sourcePage = await sourcePdf.getPage(pageNumber);
+        const baseViewport = sourcePage.getViewport({ scale: baseScale });
+        const scale = Math.min(baseScale, maxPixels / Math.max(baseViewport.width, baseViewport.height));
+        const viewport = sourcePage.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.ceil(viewport.width));
+        canvas.height = Math.max(1, Math.ceil(viewport.height));
+        const context = canvas.getContext('2d', { alpha: false });
+        if (!context) throw new Error('瀏覽器不支援 Canvas，無法建立可列印副本');
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        await sourcePage.render({ canvasContext: context, viewport, background: 'white' }).promise;
+
+        const imageBlob = await canvasToBlob(canvas, 'image/jpeg', 0.92);
+        const image = await outputPdf.embedJpg(new Uint8Array(await imageBlob.arrayBuffer()));
+        const pageWidth = viewport.width / scale;
+        const pageHeight = viewport.height / scale;
+        const outputPage = outputPdf.addPage([pageWidth, pageHeight]);
+        outputPage.drawImage(image, { x: 0, y: 0, width: pageWidth, height: pageHeight });
+
+        // Release the large canvas before rendering the next page.
+        canvas.width = 0;
+        canvas.height = 0;
+        sourcePage.cleanup?.();
+        onProgress?.(pageNumber, sourcePdf.numPages);
+      }
+      return { bytes: await outputPdf.save(), pageCount: sourcePdf.numPages };
+    } finally {
+      await sourcePdf.destroy?.();
     }
   }
 
@@ -1036,9 +1187,7 @@
     showStatus('提取文字中…', 'info', true, 0);
     try {
       // Use pdf.js for text extraction (handles more PDF variants)
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      const loadingTask = pdfjsLib.getDocument({ data: pdfBytes.slice(0) });
-      const pdf = await loadingTask.promise;
+      const pdf = await loadPdfJsDocument();
       const totalPages = pdf.numPages;
 
       let pageList;
@@ -1083,7 +1232,11 @@
       }
     } catch (err) {
       console.error(err);
-      showStatus('❌ 提取失敗：' + err.message, 'error');
+      if (isPdfPasswordError(err)) {
+        showPdfPasswordError(err);
+      } else {
+        showStatus('❌ 提取失敗：' + err.message, 'error');
+      }
     } finally {
       processBtn.disabled = false;
     }
