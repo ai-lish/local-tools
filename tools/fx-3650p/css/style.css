@@ -1,0 +1,22 @@
+:root {
+  --ink: #20252b;
+  --paper: #e2e7eb;
+  --paper-deep: #c7d0d7;
+  --lcd: #c8d6c7;
+  --rule: #83909a;
+  --orange: #df8041;
+  --green: #408575;
+}
+
+#shell {
+  background: url('../assets/fx-3650p-panel.svg') center / 100% 100% no-repeat;
+}
+
+.mode-bar { color: #33414a; }
+.mode-tip { text-align: center; }
+.calculator-notice { max-width: 392px; }
+
+@media (prefers-color-scheme: dark) {
+  :root { --ink: #222831; }
+  .mode-bar { color: #d4d9dc; }
+}

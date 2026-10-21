@@ -1,0 +1,10 @@
+{
+  "name": "fx-3650p-open-source-variant",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Unofficial fx-3650P profile over the shared fx-50FH II open-source engine.",
+  "scripts": {
+    "test": "node --test tests/regression.test.js && npm --prefix ../fx-50fh-ii test"
+  }
+}

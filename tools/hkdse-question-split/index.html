@@ -172,7 +172,7 @@
 
     .settings-grid {
       display: grid;
-      grid-template-columns: repeat(8, minmax(90px, 1fr));
+      grid-template-columns: repeat(10, minmax(90px, 1fr));
       gap: 12px;
       margin-top: 16px;
     }
@@ -451,7 +451,7 @@
         <div>
           <div class="drop-icon">⇩</div>
           <strong>拖入 PDF 到這裡</strong>
-          <span>或按一下選擇檔案；不會上載到 Drive 或任何伺服器</span>
+          <span>或按一下選擇檔案；不會上載到 Drive 或任何伺服器。P1 試題答題簿可直接作題目來源。</span>
           <input id="fileInput" type="file" accept="application/pdf,.pdf">
         </div>
       </div>
@@ -513,9 +513,19 @@
             <option value="jpg">JPG</option>
           </select>
         </div>
+        <div class="field">
+          <label for="leftPercent">左裁切位置 %</label>
+          <input id="leftPercent" type="number" min="0" max="100" step="0.1" value="0">
+          <div class="hint">頁面左至右，0 = 不裁切</div>
+        </div>
+        <div class="field">
+          <label for="rightPercent">右裁切位置 %</label>
+          <input id="rightPercent" type="number" min="0" max="100" step="0.1" value="100">
+          <div class="hint">頁面左至右，100 = 不裁切</div>
+        </div>
       </div>
       <div class="setting-note" id="modeHint">
-        題目界線由你在右側頁面預覽點選確認；工具不會猜題號、課題或分數。若題目跨頁，起點及終點可放在不同頁，輸出會拼成一張圖。
+        題目界線由你在右側頁面預覽點選確認；工具不會猜題號、課題或分數。P1 的試題答題簿就是題目來源；如要移除答題簿外框或側邊提示，可設定左右裁切位置。若題目跨頁，起點及終點可放在不同頁，輸出會拼成一張圖。
       </div>
       <div class="settings-actions">
         <button class="btn primary" id="buildBtn" type="button">建立題目表</button>
@@ -588,7 +598,7 @@
         </div>
       </section>
     </div>
-    <p class="footnote"><strong>本階段範圍：</strong>只做本機 PDF 渲染、裁切、跨頁拼接及改檔名；不連接 Google Drive，不寫入 HKDSE 主表，不進行正式 OCR、課題分類或 SVG 處理。</p>
+    <p class="footnote"><strong>本階段範圍：</strong>只做本機 PDF 渲染、上下／左右裁切、跨頁拼接及改檔名；不連接 Google Drive，不寫入 HKDSE 主表，不進行正式 OCR、課題分類或 SVG 處理。P1 試題答題簿可作正式題目來源，但答題線是否保留由裁切界線決定。</p>
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -677,6 +687,14 @@
         var suffix = value("kind") === "a" ? "_a" : "_q";
         if (value("language") === "en") suffix += "_en";
         return stableId(number) + suffix + "." + extension();
+      }
+
+      function horizontalCrop() {
+        var left = Number(value("leftPercent"));
+        var right = Number(value("rightPercent"));
+        if (!Number.isFinite(left) || !Number.isFinite(right)) return null;
+        if (left < 0 || right > 100 || left >= right) return null;
+        return { left: left, right: right };
       }
 
       function currentRow() {
@@ -891,6 +909,9 @@
         if (!Number.isInteger(year) || year < 2000 || year > 2100) {
           errors.push("年份必須是 2000 至 2100 的整數");
         }
+        if (!horizontalCrop()) {
+          errors.push("左右裁切位置必須是 0 至 100，並且左邊小於右邊");
+        }
         state.rows.forEach(function (row, index) {
           rowValidation(row, index).forEach(function (message) {
             errors.push("第 " + row.number + " 題：" + message);
@@ -1039,7 +1060,7 @@
 
       $("buildBtn").addEventListener("click", makeRows);
 
-      ["paper", "year", "language", "kind", "format", "sectionEnd"].forEach(function (id) {
+      ["paper", "year", "language", "kind", "format", "sectionEnd", "leftPercent", "rightPercent"].forEach(function (id) {
         $(id).addEventListener("change", function () {
           state.rows.forEach(function (row) {
             if (!row.customName) row.name = outputName(row.number);
@@ -1065,6 +1086,8 @@
         state.selected = -1;
         state.boundaryMode = "";
         state.rows = [];
+        $("leftPercent").value = "0";
+        $("rightPercent").value = "100";
         fileInput.value = "";
         fileLine.classList.remove("show");
         $("pageMeta").textContent = "未載入 PDF";
@@ -1111,13 +1134,15 @@
       function manifestText() {
         var lines = [
           ["paper", "year", "language", "type", "stable_id", "section",
-            "start_page", "start_percent", "end_page", "end_percent", "filename"].join(",")
+            "start_page", "start_percent", "end_page", "end_percent",
+            "left_percent", "right_percent", "filename"].join(",")
         ];
         state.rows.forEach(function (row) {
           lines.push([
             paper(), numberValue("year"), value("language"), value("kind"),
             stableId(row.number), row.section, row.start.page, row.start.percent,
-            row.end.page, row.end.percent, row.name
+            row.end.page, row.end.percent, value("leftPercent"),
+            value("rightPercent"), row.name
           ].map(csvCell).join(","));
         });
         var newline = String.fromCharCode(13, 10);
@@ -1137,9 +1162,10 @@
 
       async function renderCrop(row) {
         var dpi = Number(value("dpi"));
+        var crop = horizontalCrop();
         var start = parseCoord(row, "start");
         var end = parseCoord(row, "end");
-        if (!start || !end) throw new Error("題目界線未完成");
+        if (!crop || !start || !end) throw new Error("題目界線或左右裁切位置未完成");
         var scale = dpi / 72;
         var pieces = [];
         var totalHeight = 0;
@@ -1154,19 +1180,23 @@
             canvasContext: full.getContext("2d"),
             viewport: viewport
           }).promise;
+          var left = Math.floor(full.width * crop.left / 100);
+          var right = Math.ceil(full.width * crop.right / 100);
           var top = pageNumber === start.page ? Math.floor(full.height * start.percent / 100) : 0;
           var bottom = pageNumber === end.page ? Math.ceil(full.height * end.percent / 100) : full.height;
+          left = Math.max(0, Math.min(full.width - 1, left));
+          right = Math.max(left + 1, Math.min(full.width, right));
           top = Math.max(0, Math.min(full.height - 1, top));
           bottom = Math.max(top + 1, Math.min(full.height, bottom));
           var piece = document.createElement("canvas");
-          piece.width = full.width;
+          piece.width = right - left;
           piece.height = bottom - top;
           var pieceContext = piece.getContext("2d");
           if (value("format") === "jpg") {
             pieceContext.fillStyle = "#fff";
             pieceContext.fillRect(0, 0, piece.width, piece.height);
           }
-          pieceContext.drawImage(full, 0, top, full.width, piece.height, 0, 0, piece.width, piece.height);
+          pieceContext.drawImage(full, left, top, piece.width, piece.height, 0, 0, piece.width, piece.height);
           pieces.push(piece);
           totalHeight += piece.height;
           maxWidth = Math.max(maxWidth, piece.width);

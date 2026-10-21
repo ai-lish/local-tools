@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>fx-3650P — unofficial browser simulation</title>
+<meta name="description" content="An unofficial fx-3650P browser simulation using the shared open-source calculator engine and a model-specific profile.">
+<link rel="stylesheet" href="../fx-50fh-ii/css/style.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <p id="key-hint" class="key-hint" role="status" aria-live="polite"></p>
+  <div id="workspace">
+    <div id="calculator-column">
+      <div id="stage">
+        <div id="shell" aria-label="fx-3650P-style calculator keyboard">
+          <canvas id="lcd" aria-hidden="true"></canvas>
+          <output id="lcd-accessible" class="sr-only" aria-live="polite" aria-atomic="true"></output>
+        </div>
+      </div>
+      <div id="mode-bar" class="mode-bar">
+        <button id="mode-chip" type="button" title="Current mode — opens the MODE menu">COMP · Deg</button>
+        <span class="mode-tip">MODE: 1 COMP · 2 CMPLX · 3 BASE · 4 SD · 5 REG · 6 PRGM · 7 RUN · 8 PCL</span>
+      </div>
+      <p class="calculator-notice" role="note">Unofficial simulation, not affiliated with CASIO or HKEAA. Differential and integration functions are not implemented. Verify important results on a physical calculator. <a href="NOTICE.md">Notice</a></p>
+      <nav id="utility-nav" aria-label="Calculator tools">
+        <button id="help-toggle" type="button" aria-controls="help" aria-expanded="false">keyboard &amp; notes</button>
+      </nav>
+    </div>
+  </div>
+  <section id="help" hidden>
+    <h1>fx-3650P — unofficial web simulation</h1>
+    <p>Click a key or use the computer keyboard: digits and arithmetic signs enter directly; Enter = EXE, Backspace = DEL, Escape = AC, Space = SHIFT, Tab = ALPHA, arrow keys move the cursor, and F1 opens MODE.</p>
+    <h2>Manual-based model profile</h2>
+    <ul>
+      <li>MODE options: 1 COMP, 2 CMPLX, 3 BASE, 4 SD, 5 REG, 6 PRGM, 7 RUN, 8 PCL.</li>
+      <li>SHIFT MODE exposes angle, number-format, fraction-format, and complex-format setup.</li>
+      <li>Input accepts 79 key steps. Program and statistical data share the model's documented memory profile.</li>
+      <li>Formula library and scientific-constants menu are unavailable on this model profile.</li>
+      <li>The official guide also documents differential and integration calculations; this shared engine does not implement them, so no such keys are shown.</li>
+      <li>The key layout is a schematic derived from the guide's documented key functions. The guide does not specify faceplate pixel coordinates.</li>
+    </ul>
+  </section>
+</main>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

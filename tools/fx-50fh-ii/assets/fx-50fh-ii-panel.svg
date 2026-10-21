@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 881 1785" role="img" aria-label="Unofficial fx-50FH II calculator panel illustration">
+  <defs>
+    <linearGradient id="case" x2="0" y2="1">
+      <stop stop-color="#555b65"/>
+      <stop offset=".45" stop-color="#252a32"/>
+      <stop offset="1" stop-color="#555b65"/>
+    </linearGradient>
+    <linearGradient id="face" x2="0" y2="1">
+      <stop stop-color="#fffdf7"/>
+      <stop offset=".52" stop-color="#f2efe7"/>
+      <stop offset="1" stop-color="#e8e3d8"/>
+    </linearGradient>
+    <linearGradient id="bezel" x2="0" y2="1">
+      <stop stop-color="#9ca2a3"/>
+      <stop offset=".18" stop-color="#f9f7f0"/>
+      <stop offset=".83" stop-color="#e0ded5"/>
+      <stop offset="1" stop-color="#7d8588"/>
+    </linearGradient>
+    <linearGradient id="solar" x2="0" y2="1">
+      <stop stop-color="#343e4a"/>
+      <stop offset="1" stop-color="#171e27"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-10%" width="140%" height="125%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#111820" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <path d="M137 18h607c79 0 121 37 128 120l8 1478c2 103-50 145-144 151H145C51 1761-1 1719 1 1616L9 138C16 55 58 18 137 18Z" fill="url(#case)" filter="url(#shadow)"/>
+  <path d="M142 39h597c65 0 104 33 110 98l8 1468c1 82-40 123-126 131H150c-86-8-127-49-126-131l8-1468c6-65 45-98 110-98Z" fill="url(#face)" stroke="#bdc0bf" stroke-width="5"/>
+  <path d="M170 63h541c31 0 52 15 56 43l6 53c2 21-11 34-32 34H154c-21 0-34-13-32-34l6-53c4-28 15-43 42-43Z" fill="#f7f5ee" opacity=".82"/>
+  <rect x="413" y="78" width="303" height="94" rx="15" fill="url(#solar)" stroke="#9ca1a1" stroke-width="6"/>
+  <path d="M489 83v84m76-84v84m76-84v84" stroke="#62707a" stroke-width="3" opacity=".56"/>
+  <text x="265" y="137" fill="#37404a" font-family="Arial, sans-serif" font-size="26" font-weight="700" letter-spacing="2">fx-50FH II</text>
+  <text x="265" y="164" fill="#737b82" font-family="Arial, sans-serif" font-size="11" font-weight="600" letter-spacing="2">SCIENTIFIC CALCULATOR</text>
+  <rect x="123" y="266" width="635" height="293" rx="32" fill="url(#bezel)" stroke="#d2d0c7" stroke-width="4"/>
+  <rect x="135" y="278" width="611" height="266" rx="20" fill="#cbd9d2" stroke="#596267" stroke-width="5"/>
+  <path d="M82 586h717" stroke="#c2bcae" stroke-width="3" opacity=".8"/>
+  <circle cx="446" cy="718" r="100" fill="#d7d5cf" stroke="#a7a8a5" stroke-width="7"/>
+  <circle cx="446" cy="718" r="75" fill="#c6c8c5" stroke="#b4b6b3" stroke-width="3"/>
+  <circle cx="446" cy="718" r="43" fill="#d8d9d4" opacity=".78"/>
+  <path d="M83 837h715M92 1119h697M92 1335h697" stroke="#d1caba" stroke-width="2" opacity=".72"/>
+</svg>

@@ -215,6 +215,798 @@
       "destination": "tools/ticket-queue/index.html",
       "publicMode": "offline-single-file",
       "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/index.html",
+      "destination": "tools/minimax-voices/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-expressive-narrator.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-expressive-narrator.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-radiant-girl.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-radiant-girl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-magnetic-voiced-man.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-magnetic-voiced-man.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-compelling-lady1.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-compelling-lady1.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-aussie-bloke.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-aussie-bloke.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-captivating-female1.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-captivating-female1.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-upbeat-woman.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-upbeat-woman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-trustworth-man.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-trustworth-man.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-calmwoman.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-calmwoman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-upsetgirl.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-upsetgirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-gentle-voiced-man.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-gentle-voiced-man.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-whispering-girl.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-whispering-girl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-diligent-man.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-diligent-man.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-graceful-lady.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-graceful-lady.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-reservedyoungman.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-reservedyoungman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-playfulgirl.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-playfulgirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-manwithdeepvoice.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-manwithdeepvoice.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-maturepartner.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-maturepartner.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-friendlyperson.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-friendlyperson.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-matureboss.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-matureboss.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-debator.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-debator.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-lovelygirl.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-lovelygirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-steadymentor.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-steadymentor.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-deep-voicedgentleman.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-deep-voicedgentleman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-wiselady.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-wiselady.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-captivatingstoryteller.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-captivatingstoryteller.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-decentyoungman.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-decentyoungman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-sentimentallady.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-sentimentallady.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-imposingmanner.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-imposingmanner.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-sadteen.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-sadteen.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-passionatewarrior.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-passionatewarrior.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-wisescholar.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-wisescholar.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-soft-spokengirl.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-soft-spokengirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-serenewoman.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-serenewoman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-confidentwoman.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-confidentwoman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-patientman.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-patientman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-comedian.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-comedian.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-bossyleader.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-bossyleader.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-strong-willedboy.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-strong-willedboy.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-stressedlady.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-stressedlady.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-assertivequeen.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-assertivequeen.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-animecharacter.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-animecharacter.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-jovialman.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-jovialman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-whimsicalgirl.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-whimsicalgirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-english-kind-heartedgirl.mp3",
+      "destination": "tools/minimax-voices/audio/en-english-kind-heartedgirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-reliable-executive.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-reliable-executive.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-news-anchor.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-news-anchor.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-unrestrained-young-man.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-unrestrained-young-man.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-mature-woman.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-mature-woman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-arrogant-miss.mp3",
+      "destination": "tools/minimax-voices/audio/zh-arrogant-miss.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-robot-armor.mp3",
+      "destination": "tools/minimax-voices/audio/zh-robot-armor.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-kind-hearted-antie.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-kind-hearted-antie.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-hk-flight-attendant.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-hk-flight-attendant.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-humorous-elder.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-humorous-elder.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-gentleman.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-gentleman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-warm-bestie.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-warm-bestie.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-stubborn-friend.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-stubborn-friend.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-sweet-lady.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-sweet-lady.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-southern-young-man.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-southern-young-man.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-wise-women.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-wise-women.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-gentle-youth.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-gentle-youth.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-warm-girl.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-warm-girl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-male-announcer.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-male-announcer.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-kind-hearted-elder.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-kind-hearted-elder.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-cute-spirit.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-cute-spirit.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-radio-host.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-radio-host.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-lyrical-voice.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-lyrical-voice.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-straightforward-boy.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-straightforward-boy.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-sincere-adult.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-sincere-adult.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-gentle-senior.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-gentle-senior.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-crisp-girl.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-crisp-girl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-pure-hearted-boy.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-pure-hearted-boy.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-soft-girl.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-soft-girl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-intellectualgirl.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-intellectualgirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-warm-heartedgirl.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-warm-heartedgirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-laid-backgirl.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-laid-backgirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-explorativegirl.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-explorativegirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-warm-heartedaunt.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-warm-heartedaunt.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/zh-chinese-mandarin-bashfulgirl.mp3",
+      "destination": "tools/minimax-voices/audio/zh-chinese-mandarin-bashfulgirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/yue-cantonese-professionalhost-f.mp3",
+      "destination": "tools/minimax-voices/audio/yue-cantonese-professionalhost-f.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/yue-cantonese-gentlelady.mp3",
+      "destination": "tools/minimax-voices/audio/yue-cantonese-gentlelady.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/yue-cantonese-professionalhost-m.mp3",
+      "destination": "tools/minimax-voices/audio/yue-cantonese-professionalhost-m.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/yue-cantonese-playfulman.mp3",
+      "destination": "tools/minimax-voices/audio/yue-cantonese-playfulman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/yue-cantonese-cutegirl.mp3",
+      "destination": "tools/minimax-voices/audio/yue-cantonese-cutegirl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/yue-cantonese-kindwoman.mp3",
+      "destination": "tools/minimax-voices/audio/yue-cantonese-kindwoman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-santa-claus.mp3",
+      "destination": "tools/minimax-voices/audio/en-santa-claus.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-attractive-girl.mp3",
+      "destination": "tools/minimax-voices/audio/en-attractive-girl.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/en-charming-lady.mp3",
+      "destination": "tools/minimax-voices/audio/en-charming-lady.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/.gitignore",
+      "destination": "tools/fx-50fh-ii/.gitignore",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/LICENSE",
+      "destination": "tools/fx-50fh-ii/LICENSE",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/NOTICE.md",
+      "destination": "tools/fx-50fh-ii/NOTICE.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/README.md",
+      "destination": "tools/fx-50fh-ii/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/assets/fx-50fh-ii-panel.svg",
+      "destination": "tools/fx-50fh-ii/assets/fx-50fh-ii-panel.svg",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/css/style.css",
+      "destination": "tools/fx-50fh-ii/css/style.css",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/index.html",
+      "destination": "tools/fx-50fh-ii/index.html",
+      "publicMode": "offline-multi-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/consts.js",
+      "destination": "tools/fx-50fh-ii/js/consts.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/expr.js",
+      "destination": "tools/fx-50fh-ii/js/expr.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/font.js",
+      "destination": "tools/fx-50fh-ii/js/font.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/format.js",
+      "destination": "tools/fx-50fh-ii/js/format.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/formulas.js",
+      "destination": "tools/fx-50fh-ii/js/formulas.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/keymap.js",
+      "destination": "tools/fx-50fh-ii/js/keymap.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/lcd.js",
+      "destination": "tools/fx-50fh-ii/js/lcd.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/machine.js",
+      "destination": "tools/fx-50fh-ii/js/machine.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/main.js",
+      "destination": "tools/fx-50fh-ii/js/main.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/program-catalog.generated.js",
+      "destination": "tools/fx-50fh-ii/js/program-catalog.generated.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/program-codec.js",
+      "destination": "tools/fx-50fh-ii/js/program-codec.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/program.js",
+      "destination": "tools/fx-50fh-ii/js/program.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/stats.js",
+      "destination": "tools/fx-50fh-ii/js/stats.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/studio.js",
+      "destination": "tools/fx-50fh-ii/js/studio.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/js/tokens.js",
+      "destination": "tools/fx-50fh-ii/js/tokens.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/output/pdf/fx-50fh-ii-s5-program-library.pdf",
+      "destination": "tools/fx-50fh-ii/output/pdf/fx-50fh-ii-s5-program-library.pdf",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/package.json",
+      "destination": "tools/fx-50fh-ii/package.json",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/programs.catalog.json",
+      "destination": "tools/fx-50fh-ii/programs.catalog.json",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/programs.md",
+      "destination": "tools/fx-50fh-ii/programs.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/tests/lcd-preview.html",
+      "destination": "tools/fx-50fh-ii/tests/lcd-preview.html",
+      "publicMode": "offline-multi-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/tests/run.js",
+      "destination": "tools/fx-50fh-ii/tests/run.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/tools/cut-green-background.py",
+      "destination": "tools/fx-50fh-ii/tools/cut-green-background.py",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/tools/extract-font.py",
+      "destination": "tools/fx-50fh-ii/tools/extract-font.py",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/tools/generate-program-library-pdf.py",
+      "destination": "tools/fx-50fh-ii/tools/generate-program-library-pdf.py",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-50fh-ii/tools/generate-programs.mjs",
+      "destination": "tools/fx-50fh-ii/tools/generate-programs.mjs",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-3650p/LICENSE",
+      "destination": "tools/fx-3650p/LICENSE",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-3650p/NOTICE.md",
+      "destination": "tools/fx-3650p/NOTICE.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-3650p/README.md",
+      "destination": "tools/fx-3650p/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-3650p/assets/fx-3650p-panel.svg",
+      "destination": "tools/fx-3650p/assets/fx-3650p-panel.svg",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-3650p/css/style.css",
+      "destination": "tools/fx-3650p/css/style.css",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-3650p/index.html",
+      "destination": "tools/fx-3650p/index.html",
+      "publicMode": "offline-multi-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-3650p/js/keymap.js",
+      "destination": "tools/fx-3650p/js/keymap.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-3650p/js/main.js",
+      "destination": "tools/fx-3650p/js/main.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-3650p/js/model.js",
+      "destination": "tools/fx-3650p/js/model.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-3650p/package.json",
+      "destination": "tools/fx-3650p/package.json",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/fx-3650p/tests/regression.test.js",
+      "destination": "tools/fx-3650p/tests/regression.test.js",
+      "publicMode": "offline-runtime-asset",
+      "managedBy": "math-lish/local-tools"
     }
   ],
   "generatedFiles": [

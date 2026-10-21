@@ -19,9 +19,10 @@ const allowedCdnUrls = new Set([
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js'
 ]);
+const calculatorPdf = 'tools/fx-50fh-ii/output/pdf/fx-50fh-ii-s5-program-library.pdf';
+const storageAccess = /\b(?:localStorage|sessionStorage|indexedDB)\b/i;
 const forbiddenPath = /(?:\.map$|\.pdf$|teacher-tool-snapshot_|(^|\/)docs(?:\/|$))/i;
 const forbiddenContent = [
-  /\b(?:localStorage|sessionStorage|indexedDB)\b/i,
   /navigator\.sendBeacon\s*\(/i,
   /-----BEGIN (?:RSA|OPENSSH|EC|DSA|PRIVATE) KEY-----/i,
   /(?:ghp_|github_pat_|xox[baprs]-|sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,})/,
@@ -59,12 +60,28 @@ if (unexpected.length || missing.length) {
 }
 
 for (const file of files) {
-  if (forbiddenPath.test(file.relative)) {
+  if (forbiddenPath.test(file.relative) && file.relative !== calculatorPdf) {
     throw new Error('forbidden public path: ' + file.relative);
   }
   if (file.relative === '.nojekyll') continue;
 
   const content = await readFile(file.fullPath, 'utf8');
+  if (storageAccess.test(content)) {
+    const allowedCalculatorStorageCalls = [
+      /\blocalStorage\.getItem\s*\(\s*STORAGE_KEY\s*\)/,
+      /\blocalStorage\.getItem\s*\(\s*LEGACY_STORAGE_KEY\s*\)/,
+      /\blocalStorage\.setItem\s*\(\s*STORAGE_KEY\s*,/
+    ];
+    const namespacedCalculatorStorage = file.relative === 'tools/fx-50fh-ii/js/studio.js' &&
+      content.includes("const STORAGE_KEY = 'math-lish.local-tools.fx-50fh-ii.program-studio.v3';") &&
+      content.includes("const LEGACY_STORAGE_KEY = 'math-lish.local-tools.fx-50fh-ii.program-studio.v2';") &&
+      (content.match(/\blocalStorage\b/g) || []).length === allowedCalculatorStorageCalls.length &&
+      allowedCalculatorStorageCalls.every((pattern) => (content.match(pattern) || []).length === 1) &&
+      !/\b(?:sessionStorage|indexedDB)\b/i.test(content);
+    if (!namespacedCalculatorStorage) {
+      throw new Error('unapproved browser storage in public file: ' + file.relative);
+    }
+  }
   for (const pattern of forbiddenContent) {
     if (pattern.test(content)) {
       throw new Error('forbidden public content in ' + file.relative + ': ' + pattern);

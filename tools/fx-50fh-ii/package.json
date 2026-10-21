@@ -1,0 +1,13 @@
+{
+  "name": "fx-50fh-ii",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "An unofficial browser simulation for the fx-50FH II programmable scientific calculator.",
+  "scripts": {
+    "generate:programs": "node tools/generate-programs.mjs generate",
+    "generate:pdf": "python3 tools/generate-program-library-pdf.py",
+    "check:generated": "node tools/generate-programs.mjs check",
+    "test": "npm run check:generated && node tests/run.js"
+  }
+}
