@@ -2,7 +2,7 @@
 // upstream hit box, a canvas laid over the glass, and the physical keyboard
 // mapped onto the same key ids.
 
-import { KEYS, SHELL_W, SHELL_H, PC_KEYS } from './keymap.js?v=studio-v9';
+import { KEYS, SHELL_W, SHELL_H, PC_KEYS } from './keymap.js?v=appearance-2';
 import { LCD, GLASS } from './lcd.js?v=studio-v9';
 import { Machine } from './machine.js?v=studio-v9';
 import { setupProgramStudio } from './studio.js?v=studio-v9';
@@ -30,11 +30,18 @@ function showHint(text) {
 }
 
 const pct = (v, total) => (v / total) * 100 + '%';
+// Match the photographed model-family proportions; key ids, cap sizes and
+// engine behavior remain unchanged.
+const PANEL_GLASS = { x: 100, y: GLASS.y, w: 681, h: GLASS.h };
+const KEY_X_CENTER = SHELL_W / 2;
+const KEY_Y_ANCHOR = 500;
+const keyPanelX = (key) => KEY_X_CENTER + (key.x + key.w / 2 - KEY_X_CENTER) * 1.18 - key.w / 2;
+const keyPanelY = (key) => KEY_Y_ANCHOR + (key.y + key.h / 2 - KEY_Y_ANCHOR) * 1.08 - key.h / 2;
 
 // ---- glass -----------------------------------------------------------------
 Object.assign(canvas.style, {
-  left: pct(GLASS.x, SHELL_W), top: pct(GLASS.y, SHELL_H),
-  width: pct(GLASS.w, SHELL_W), height: pct(GLASS.h, SHELL_H)
+  left: pct(PANEL_GLASS.x, SHELL_W), top: pct(PANEL_GLASS.y, SHELL_H),
+  width: pct(PANEL_GLASS.w, SHELL_W), height: pct(PANEL_GLASS.h, SHELL_H)
 });
 
 // ---- hotspots --------------------------------------------------------------
@@ -76,7 +83,7 @@ for (const k of KEYS) {
     b.appendChild(legend);
   }
   Object.assign(b.style, {
-    left: pct(k.x, SHELL_W), top: pct(k.y, SHELL_H),
+    left: pct(keyPanelX(k), SHELL_W), top: pct(keyPanelY(k), SHELL_H),
     width: pct(k.w, SHELL_W), height: pct(k.h, SHELL_H)
   });
   shell.appendChild(b);

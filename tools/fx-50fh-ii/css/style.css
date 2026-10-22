@@ -69,7 +69,7 @@ main {
   width: 100%;
   aspect-ratio: 881 / 1785;
   container-type: inline-size;
-  background: url('../assets/fx-50fh-ii-panel.svg') center / 100% 100% no-repeat;
+  background: url('../assets/fx-50fh-ii-panel.svg?v=appearance-2') center / 100% 100% no-repeat;
   filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .28));
   touch-action: manipulation;
   user-select: none;
@@ -78,7 +78,7 @@ main {
 #lcd {
   position: absolute;
   display: block;
-  border-radius: 2px;
+  border-radius: 4px;
 }
 
 .sr-only {
@@ -102,10 +102,10 @@ main {
   margin: 0;
   padding: 0;
   appearance: none;
-  border: 1px solid #111721;
+  border: 1px solid #24262d;
   border-radius: 27% / 37%;
-  background: linear-gradient(180deg, #444b57 0%, #292f39 48%, #1c222c 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 -3px 4px rgba(0,0,0,.42), 0 3px 5px rgba(25,30,36,.28);
+  background: linear-gradient(180deg, #45464e 0%, #2d2e36 48%, #202229 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), inset 0 -3px 4px rgba(0,0,0,.42), 0 3px 5px rgba(25,30,36,.28);
   color: #f7f6f1;
   font: 700 2.8cqw/1 "Avenir Next", Avenir, "Helvetica Neue", sans-serif;
   cursor: pointer;
@@ -120,16 +120,20 @@ main {
 }
 
 .key.numeric { border-radius: 29% / 38%; font-size: 5.2cqw; }
+.key[data-id="DEL"] .key-base,
+.key[data-id="AC"] .key-base { color: #e07a62; }
 .key.orange {
   border-color: #984725;
   background: linear-gradient(180deg, #f39a50 0%, #dc6d30 58%, #c45625 100%);
   color: #fffaf4;
 }
-.key.mod {
-  border-color: #575c62;
+.key.mod,
+.key[data-id="MODE"],
+.key[data-id="ON"] {
+  border-color: #686d72;
   border-radius: 36% / 42%;
-  background: linear-gradient(180deg, #a2a4a2 0%, #777b7d 60%, #63696c 100%);
-  color: #252a30;
+  background: linear-gradient(180deg, #c1c2c1 0%, #929597 60%, #74797c 100%);
+  color: #30343a;
   font-size: 2.45cqw;
 }
 .key.pad {
@@ -137,8 +141,13 @@ main {
   border-radius: 50%;
   background: transparent;
   box-shadow: none;
-  color: #677079;
+  color: #777c81;
   font-size: 3.5cqw;
+}
+.key[aria-disabled="true"] {
+  filter: grayscale(.7);
+  opacity: .62;
+  cursor: not-allowed;
 }
 
 .key-legend {

@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>fx-3650P — unofficial browser simulation</title>
 <meta name="description" content="An unofficial fx-3650P browser simulation using the shared open-source calculator engine and a model-specific profile.">
-<link rel="stylesheet" href="../fx-50fh-ii/css/style.css">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="../fx-50fh-ii/css/style.css?v=appearance-2">
+<link rel="stylesheet" href="css/style.css?v=appearance-2">
 </head>
 <body>
 <main>
@@ -38,11 +38,11 @@
       <li>SHIFT MODE exposes angle, number-format, fraction-format, and complex-format setup.</li>
       <li>Input accepts 79 key steps. Program and statistical data share the model's documented memory profile.</li>
       <li>Formula library and scientific-constants menu are unavailable on this model profile.</li>
-      <li>The official guide also documents differential and integration calculations; this shared engine does not implement them, so no such keys are shown.</li>
-      <li>The key layout is a schematic derived from the guide's documented key functions. The guide does not specify faceplate pixel coordinates.</li>
+      <li>The official guide also documents differential and integration calculations. The ∫dx / d/dx key is shown disabled because this shared engine does not implement those functions.</li>
+      <li>The key layout is a hand-drawn schematic derived from the guide's documented key functions. The guide does not specify faceplate pixel coordinates.</li>
     </ul>
   </section>
 </main>
-<script type="module" src="js/main.js"></script>
+<script type="module" src="js/main.js?v=appearance-2"></script>
 </body>
 </html>

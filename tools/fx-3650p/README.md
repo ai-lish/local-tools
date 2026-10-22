@@ -11,9 +11,10 @@ The profile uses the official guide's mode list, 79-step input limit,
 angle-specific trig ranges, and shared statistics/program memory rules. The
 formula library and scientific-constants menu are disabled because they are
 fx-50FH II additions. Differential and integration functions from the
-fx-3650P guide are not implemented, so the interface does not expose those
-keys. The panel is a hand-drawn schematic because the guide specifies key
-operations but not pixel coordinates.
+fx-3650P guide are not implemented; the `∫dx` / `d/dx` key remains visible but
+disabled. The panel is a hand-drawn approximation: the guide specifies key
+operations but not pixel coordinates. A published fx-3650P II image informs
+family-level proportions only; no product photo is used.
 
 See [NOTICE](NOTICE.md) for the MIT provenance, manual references, declared
 limits, and verification workflow.

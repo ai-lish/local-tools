@@ -1,26 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 881 1785" role="img" aria-label="Self-drawn fx-3650P-style calculator schematic">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 881 1785" role="img" aria-label="Self-drawn fx-3650P-style calculator panel">
   <defs>
-    <linearGradient id="case" x2="1" y2="1">
-      <stop offset="0" stop-color="#525b66"/>
-      <stop offset=".48" stop-color="#303842"/>
-      <stop offset="1" stop-color="#1d232b"/>
+    <linearGradient id="case-edge" x2="0" y2="1">
+      <stop stop-color="#50545b"/>
+      <stop offset=".45" stop-color="#31343a"/>
+      <stop offset="1" stop-color="#54575d"/>
+    </linearGradient>
+    <linearGradient id="face" x2="0" y2="1">
+      <stop stop-color="#f1f2ef"/>
+      <stop offset=".45" stop-color="#d9dbdc"/>
+      <stop offset="1" stop-color="#c7c9ca"/>
     </linearGradient>
     <linearGradient id="bezel" x2="0" y2="1">
-      <stop stop-color="#222a32"/>
-      <stop offset="1" stop-color="#111820"/>
+      <stop stop-color="#747a80"/>
+      <stop offset=".18" stop-color="#fafaf7"/>
+      <stop offset=".84" stop-color="#e1e3e3"/>
+      <stop offset="1" stop-color="#81868a"/>
+    </linearGradient>
+    <linearGradient id="solar" x2="0" y2="1">
+      <stop stop-color="#332e2c"/>
+      <stop offset="1" stop-color="#151719"/>
     </linearGradient>
   </defs>
-  <rect x="26" y="20" width="829" height="1745" rx="58" fill="#151a20" opacity=".34"/>
-  <rect x="18" y="12" width="829" height="1745" rx="58" fill="url(#case)" stroke="#77808a" stroke-width="5"/>
-  <rect x="44" y="42" width="777" height="1690" rx="42" fill="none" stroke="#121820" stroke-width="3" opacity=".65"/>
-  <text x="440" y="170" text-anchor="middle" fill="#e2e6e8" font-family="Arial, sans-serif" font-size="36" font-weight="700" letter-spacing="4">fx-3650P</text>
-  <text x="440" y="217" text-anchor="middle" fill="#aeb8c0" font-family="Arial, sans-serif" font-size="18" letter-spacing="3">PROGRAMMABLE SCIENTIFIC · SCHEMATIC</text>
-  <rect x="125" y="274" width="632" height="275" rx="16" fill="#10171c" stroke="#a7b0b3" stroke-width="7"/>
-  <rect x="145" y="288" width="588" height="245" rx="8" fill="#c8d6c7" stroke="#71817b" stroke-width="3"/>
-  <path d="M150 300h580v100H150z" fill="#dce6d8" opacity=".25"/>
-  <text x="440" y="598" text-anchor="middle" fill="#b7c1c7" font-family="Arial, sans-serif" font-size="18" letter-spacing="2">TWO-LINE LCD · MODEL-BASED KEY MAP</text>
-  <path d="M90 625h685" stroke="#7d8991" stroke-width="2" opacity=".5"/>
-  <path d="M90 1068h685" stroke="#7d8991" stroke-width="2" opacity=".5"/>
-  <path d="M90 1542h685" stroke="#7d8991" stroke-width="2" opacity=".5"/>
-  <text x="440" y="1640" text-anchor="middle" fill="#9ca8b0" font-family="Arial, sans-serif" font-size="16" letter-spacing="2">UNOFFICIAL BROWSER SIMULATION</text>
+
+  <path d="M78 18h725c37 0 63 36 69 120l8 1478c2 103-50 145-144 151H145C51 1761-1 1719 1 1616L9 138C15 55 35 18 78 18Z" fill="url(#case-edge)"/>
+  <path d="M91 39h699c28 0 53 31 59 98l8 1468c1 82-40 123-126 131H150c-86-8-127-49-126-131l8-1468c6-67 31-98 59-98Z" fill="url(#face)" stroke="#aeb2b4" stroke-width="5"/>
+  <text x="124" y="135" fill="#383b40" font-family="Arial, sans-serif" font-size="27" font-style="italic" font-weight="700" letter-spacing="1">fx-3650P</text>
+  <text x="124" y="160" fill="#686e73" font-family="Arial, sans-serif" font-size="12" font-weight="600" letter-spacing="1.3">SOLAR · TWO-LINE DISPLAY</text>
+  <rect x="385" y="55" width="390" height="126" rx="15" fill="url(#solar)" stroke="#8d9295" stroke-width="6"/>
+  <path d="M515 60v116m130-116v116" stroke="#5e6264" stroke-width="3" opacity=".68"/>
+
+  <rect x="72" y="259" width="737" height="306" rx="30" fill="#383d42" stroke="#858b8e" stroke-width="5"/>
+  <rect x="88" y="274" width="705" height="273" rx="20" fill="url(#bezel)" stroke="#a8adaf" stroke-width="3"/>
+  <rect x="100" y="288" width="681" height="245" rx="9" fill="#c8d6d0" stroke="#596368" stroke-width="5"/>
+  <path d="M106 296h669v61H106z" fill="#fff" opacity=".13"/>
+
+  <circle cx="446" cy="748" r="111" fill="#a9adb0" stroke="#8b9093" stroke-width="7"/>
+  <circle cx="446" cy="748" r="96" fill="#c7c9ca" stroke="#edf0ef" stroke-width="4"/>
+  <circle cx="446" cy="748" r="65" fill="#b9bdc0" stroke="#a3a8ab" stroke-width="3"/>
+  <text x="446" y="752" text-anchor="middle" fill="#747a7e" font-family="Arial, sans-serif" font-size="17" font-weight="700" letter-spacing="2">REPLAY</text>
 </svg>

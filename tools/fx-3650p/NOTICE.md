@@ -19,9 +19,9 @@ The menu presents those manual modes as numbered choices. Program text is capped
 
 ## Scope limits and artwork
 
-- The shared engine does not implement the manual's differential and integration calculations (E-34). Those functions are not shown as keys.
+- The shared engine does not implement the manual's differential and integration calculations (E-34). The physical `∫dx` / `d/dx` key is shown disabled and does not invoke the engine.
 - The 40-item scientific-constants menu and 23-item formula library are fx-50FH II additions and are disabled in this profile.
-- The local SVG panel is original code-created artwork. It contains no CASIO logo, HKEAA approval wording, external images, or embedded remote resources.
+- The local SVG panel is original code-created artwork. The published fx-3650P II product image informs family-level proportions only; no photo is copied. The panel contains no CASIO logo, HKEAA approval wording, external images, or embedded remote resources.
 - This variant imports the shared engine and LCD from `../fx-50fh-ii/js/`; it does not carry a second engine copy.
 
 ## Verification

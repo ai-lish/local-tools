@@ -1,5 +1,5 @@
 // Thin fx-3650P interface over the shared upstream engine.
-import { KEYS, SHELL_W, SHELL_H, PC_KEYS } from './keymap.js';
+import { KEYS, SHELL_W, SHELL_H, PC_KEYS } from './keymap.js?v=appearance-2';
 import { FX_3650P_CONFIG } from './model.js';
 import { Machine } from '../../fx-50fh-ii/js/machine.js';
 import { LCD, GLASS } from '../../fx-50fh-ii/js/lcd.js';
@@ -12,10 +12,17 @@ const hintEl = document.getElementById('key-hint');
 const machine = new Machine(FX_3650P_CONFIG);
 const lcd = new LCD(canvas);
 const pct = (value, total) => `${(value / total) * 100}%`;
+// Match the photographed model-family proportions; key ids, cap sizes and
+// engine behavior remain unchanged.
+const PANEL_GLASS = { x: 100, y: GLASS.y, w: 681, h: GLASS.h };
+const KEY_X_CENTER = SHELL_W / 2;
+const KEY_Y_ANCHOR = 500;
+const keyPanelX = (key) => KEY_X_CENTER + (key.x + key.w / 2 - KEY_X_CENTER) * 1.18 - key.w / 2;
+const keyPanelY = (key) => KEY_Y_ANCHOR + (key.y + key.h / 2 - KEY_Y_ANCHOR) * 1.08 - key.h / 2;
 
 Object.assign(canvas.style, {
-  left: pct(GLASS.x, SHELL_W), top: pct(GLASS.y, SHELL_H),
-  width: pct(GLASS.w, SHELL_W), height: pct(GLASS.h, SHELL_H)
+  left: pct(PANEL_GLASS.x, SHELL_W), top: pct(PANEL_GLASS.y, SHELL_H),
+  width: pct(PANEL_GLASS.w, SHELL_W), height: pct(PANEL_GLASS.h, SHELL_H)
 });
 
 const buttons = new Map();
@@ -30,10 +37,14 @@ for (const key of KEYS) {
     key.statShift && `statistics SHIFT: ${key.statShift}`,
     key.hex && `hexadecimal digit ${key.hex}`
   ].filter(Boolean);
-  button.className = `key${key.kind ? ` ${key.kind}` : ''}${/^N[0-9]$/.test(key.id) ? ' numeric' : ''}${key.pad ? ' pad' : ''}${key.orange ? ' orange' : ''}`;
+  button.className = `key${key.kind ? ` ${key.kind}` : ''}${/^N[0-9]$/.test(key.id) ? ' numeric' : ''}${key.pad ? ' pad' : ''}${key.orange ? ' orange' : ''}${key.disabledReason ? ' unavailable' : ''}`;
   button.type = 'button';
   button.dataset.id = key.id;
-  const label = `${key.base} key${functions.length ? `. ${functions.join('. ')}` : ''}`;
+  const label = `${key.base} key${functions.length ? `. ${functions.join('. ')}` : ''}${key.disabledReason ? `. Unavailable: ${key.disabledReason}` : ''}`;
+  if (key.disabledReason) {
+    button.dataset.disabledReason = key.disabledReason;
+    button.setAttribute('aria-disabled', 'true');
+  }
   button.setAttribute('aria-label', label);
   button.title = label;
   const base = document.createElement('span');
@@ -53,7 +64,7 @@ for (const key of KEYS) {
     button.appendChild(legend);
   }
   Object.assign(button.style, {
-    left: pct(key.x, SHELL_W), top: pct(key.y, SHELL_H),
+    left: pct(keyPanelX(key), SHELL_W), top: pct(keyPanelY(key), SHELL_H),
     width: pct(key.w, SHELL_W), height: pct(key.h, SHELL_H)
   });
   shell.appendChild(button);
@@ -61,13 +72,15 @@ for (const key of KEYS) {
 }
 
 let hintTimer;
-function showHint(message) {
+function showHint(message, highlightMode = true) {
   hintEl.textContent = message;
   hintEl.classList.add('show');
   clearTimeout(hintTimer);
   hintTimer = setTimeout(() => hintEl.classList.remove('show'), 5600);
-  buttons.get('MODE')?.classList.add('attention');
-  setTimeout(() => buttons.get('MODE')?.classList.remove('attention'), 1500);
+  if (highlightMode) {
+    buttons.get('MODE')?.classList.add('attention');
+    setTimeout(() => buttons.get('MODE')?.classList.remove('attention'), 1500);
+  }
 }
 
 let dirty = true;
@@ -79,6 +92,10 @@ let lastAnnouncement = '';
 
 function tap(id) {
   const button = buttons.get(id);
+  if (button?.dataset.disabledReason) {
+    showHint(button.dataset.disabledReason, false);
+    return;
+  }
   if (button) {
     button.classList.add('down');
     setTimeout(() => button.classList.remove('down'), 90);
@@ -106,6 +123,16 @@ shell.addEventListener('click', (event) => {
 
 window.addEventListener('keydown', (event) => {
   if (event.target instanceof Element && event.target.closest('textarea, input, select, [contenteditable="true"]')) return;
+  const unavailableButton = event.target instanceof Element
+    ? event.target.closest('.key[aria-disabled="true"]')
+    : null;
+  if (unavailableButton) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      tap(unavailableButton.dataset.id);
+    }
+    return;
+  }
   if (event.metaKey || event.ctrlKey) return;
   let id = PC_KEYS[event.key];
   if (id === undefined && event.key.length === 1) id = PC_KEYS[event.key.toLowerCase()];

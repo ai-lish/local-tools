@@ -1,7 +1,7 @@
 // keymap.js — physical key geometry and per-key function assignments.
 //
-// Coordinates use the upstream 881 x 1785 panel space and retain its original
-// interactive key positions. The replacement vector panel shares this geometry.
+// Coordinates use the upstream 881 x 1785 panel space. The view layer applies
+// the physical-panel spacing transform to both artwork and clickable key caps.
 //
 // Each key carries the functions printed on/around it:
 //   base        white legend on the key cap
@@ -45,10 +45,10 @@ export const KEYS = [
   k('ON', 660, 630, 92, 72, { base: 'ON' }),
 
   // ---- program / formula row ----------------------------------------------
-  k('PROG', 124, 768, 94, 64, { base: 'Prog', shift: 'EXIT', orange: true }),
-  k('FMLA', 230, 768, 94, 64, { base: 'FMLA', shift: 'LOOK', orange: true }),
-  k('RECIP', 557, 767, 96, 64, { base: 'x⁻¹', shift: 'x!', basen: 'LOGIC' }),
-  k('CUBE', 662, 767, 96, 64, { base: 'x³', shift: '∛(' }),
+  k('PROG', 124, 780, 94, 64, { base: 'Prog', shift: 'EXIT', orange: true }),
+  k('FMLA', 230, 780, 94, 64, { base: 'FMLA', shift: 'LOOK', orange: true }),
+  k('RECIP', 557, 780, 96, 64, { base: 'x⁻¹', shift: 'x!', basen: 'LOGIC' }),
+  k('CUBE', 662, 780, 96, 64, { base: 'x³', shift: '∛(' }),
 
   // ---- function rows -------------------------------------------------------
   ...row6(R.fn1, [

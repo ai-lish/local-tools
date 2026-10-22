@@ -9,7 +9,7 @@
 }
 
 #shell {
-  background: url('../assets/fx-3650p-panel.svg') center / 100% 100% no-repeat;
+  background: url('../assets/fx-3650p-panel.svg?v=appearance-2') center / 100% 100% no-repeat;
 }
 
 .mode-bar { color: #33414a; }
