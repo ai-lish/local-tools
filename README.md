@@ -1,4 +1,4 @@
-# 少康教學離線工具
+# Zach 教學離線工具
 
 這是 `math-lish/local-tools` 經安全 allowlist 產生的 public deployment，
 部署於 [ai-lish.github.io/local-tools](https://ai-lish.github.io/local-tools/)。
