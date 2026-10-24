@@ -3,9 +3,10 @@
 這是 `math-lish/local-tools` 經安全 allowlist 產生的 public deployment，
 部署於 [ai-lish.github.io/local-tools](https://ai-lish.github.io/local-tools/)。
 
-公開工具只在使用者自己的瀏覽器或電腦處理檔案，不會上載到網站伺服器或
-CloudSAMS server。學校來源資料、學生／教師真實資料、mapping 及 credentials
-不屬於這個 public repository。
+公開工具主要在使用者自己的瀏覽器或電腦處理檔案，不會自動上載到網站伺服器
+或 CloudSAMS server。個別工具可在使用者明確操作後連接外部 API；每項工具的
+README 會說明資料傳送範圍。學校來源資料、學生／教師真實資料、mapping 及
+credentials 不屬於這個 public repository。
 
 ## 公開項目
 
@@ -20,6 +21,7 @@ CloudSAMS server。學校來源資料、學生／教師真實資料、mapping �
 - MathLingo 數學文件翻譯工具（`beta`；通用詞庫、公開試／出版社題型、教案示例、EMI 分類表格及本機文件匯入）
 - 極簡籌號系統（1–100 循環叫號、語音廣播及過號管理）
 - fx-50FH II 瀏覽器模擬器（非官方、多檔案靜態版；重要結果以真機核對）
+- 箋紙濃情謝師恩文章核對及卡片工具（本機瀏覽器記錄、匯入／匯出、Word 預覽；MiniMax OCR 由使用者按次啟動）
 
 CloudSAMS tools 只在本機執行；SLP PDF HTML 會在瀏覽器內處理，
 CLI 使用者需要自行安裝 Python 及依賴。請先閱讀各工具目錄內的 README，

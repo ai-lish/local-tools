@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="在瀏覽器本機整理謝師恩文章、核對收稿張數、批改及製作感恩卡。">
+  <title>箋紙濃情謝師恩｜文章核對及卡片工具</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/docxtemplater@3.71.0/build/docxtemplater.js"></script>
+  <script src="https://unpkg.com/pizzip@3.2.0/dist/pizzip.js"></script>
+  <script src="https://unpkg.com/mammoth@1.13.0/mammoth.browser.min.js"></script>
+</head>
+<body>
+  <div class="le-app-shell">
+    <header class="le-topbar">
+      <div class="le-brand-mark" aria-hidden="true">謝</div>
+      <div class="le-brand-copy"><div class="le-eyebrow">生活教育課・2026/27</div><h1>箋紙濃情謝師恩</h1></div>
+      <div class="le-top-actions">
+        <span class="le-local-badge">本機瀏覽器記錄</span>
+      </div>
+    </header>
+    <main id="leApp" class="le-page" aria-live="polite">
+      <div class="le-loading"><span class="le-spinner"></span><b>正在載入本機記錄…</b></div>
+    </main>
+  <footer class="le-footer">學生文章和記錄保存在目前瀏覽器；請定期下載 JSON 備份。只有按下 MiniMax OCR 時，所選影像才會直接傳送至 MiniMax。正式姓名、老師稱謂及不清楚字句須由校方／學生確認。</footer>
+  </div>
+  <script src="template.js"></script>
+  <script src="app.js" defer></script>
+</body>
+</html>

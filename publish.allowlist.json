@@ -73,6 +73,36 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/thank-teacher-cards/index.html",
+      "destination": "tools/thank-teacher-cards/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/thank-teacher-cards/app.js",
+      "destination": "tools/thank-teacher-cards/app.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/thank-teacher-cards/styles.css",
+      "destination": "tools/thank-teacher-cards/styles.css",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/thank-teacher-cards/template.js",
+      "destination": "tools/thank-teacher-cards/template.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/thank-teacher-cards/README.md",
+      "destination": "tools/thank-teacher-cards/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/slp-split-pdf/README.md",
       "destination": "tools/slp-split-pdf/README.md",
       "publicMode": "cli-documentation",

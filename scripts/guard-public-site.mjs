@@ -17,7 +17,10 @@ const allowedCdnUrls = new Set([
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js',
+  'https://unpkg.com/docxtemplater@3.71.0/build/docxtemplater.js',
+  'https://unpkg.com/pizzip@3.2.0/dist/pizzip.js',
+  'https://unpkg.com/mammoth@1.13.0/mammoth.browser.min.js'
 ]);
 const calculatorPdf = 'tools/fx-50fh-ii/output/pdf/fx-50fh-ii-s5-program-library.pdf';
 const storageAccess = /\b(?:localStorage|sessionStorage|indexedDB)\b/i;
@@ -78,7 +81,13 @@ for (const file of files) {
       (content.match(/\blocalStorage\b/g) || []).length === allowedCalculatorStorageCalls.length &&
       allowedCalculatorStorageCalls.every((pattern) => (content.match(pattern) || []).length === 1) &&
       !/\b(?:sessionStorage|indexedDB)\b/i.test(content);
-    if (!namespacedCalculatorStorage) {
+    const namespacedThankTeacherStorage = file.relative === 'tools/thank-teacher-cards/app.js' &&
+      content.includes("var LIFE_EDU_LOCAL_KEY = 'local-tools.thank-teacher-cards.v1';") &&
+      (content.match(/\blocalStorage\b/g) || []).length === 2 &&
+      (content.match(/\blocalStorage\.getItem\s*\(\s*LIFE_EDU_LOCAL_KEY\s*\)/g) || []).length === 1 &&
+      (content.match(/\blocalStorage\.setItem\s*\(\s*LIFE_EDU_LOCAL_KEY\s*,/g) || []).length === 1 &&
+      !/\b(?:sessionStorage|indexedDB)\b/i.test(content);
+    if (!namespacedCalculatorStorage && !namespacedThankTeacherStorage) {
       throw new Error('unapproved browser storage in public file: ' + file.relative);
     }
   }
