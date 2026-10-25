@@ -182,7 +182,7 @@ function lifeEduArrangeWorkflow_(layout){
   var firstCard=content.querySelector('.le-import-card');
   var step1=element('section','le-panel le-step',heading(1,'匯入學生名單','第一次使用先匯入名單；已有名冊可直接前往第 2 步。'));
   step1.id='leStep1';firstCard.querySelector('h3').remove();step1.appendChild(firstCard);
-  var csvHelp=element('p','le-csv-help','<b>可直接上載 Excel：</b>支援 .xlsx／.xls，也可用 CSV。標題列需有「班別」和「班號」；小學欄可用「所屬小學」、「小學名稱」或「小學」。工作表在本機讀取，不會上傳。');step1.appendChild(csvHelp);
+  var csvHelp=element('p','le-csv-help','<b>可直接上載 Excel：</b>支援 .xlsx／.xls，也可用 CSV。會掃描每張工作表首 100 列找標題；標題列需有「班別」和「班號」，小學欄可用「所屬小學」、「所屬小學名稱」、「小學名稱」或「小學」。工作表在本機讀取，不會上傳。');step1.appendChild(csvHelp);
   var rosterControls=element('div','le-import-controls le-primary-import');step1.appendChild(rosterControls);
   ['label[for="leDataFile"]','#leDataFile','#leDataName','[data-le-download-csv-template]','#leImportMessage'].forEach(function(selector){move(rosterControls,selector);});
   rosterControls.querySelector('label').textContent='上載學生名單 Excel／CSV／JSON';
@@ -928,26 +928,39 @@ function lifeEduReadWorkbookRows_(buffer){
   if(!window.XLSX||typeof window.XLSX.read!=='function'||!window.XLSX.utils||typeof window.XLSX.utils.sheet_to_json!=='function')throw new Error('Excel 元件未載入；請檢查網絡連線後重新整理頁面。');
   var workbook;
   try{workbook=window.XLSX.read(buffer,{type:'array',cellDates:false,cellHTML:false,cellFormula:false});}catch(error){throw new Error('無法解析 Excel；請確認檔案是有效的 .xlsx 或 .xls。');}
-  var rows=[],sheetNames=[],identities=Object.create(null),schoolNames=Object.create(null),schoolRows=0;
+  var rows=[],sheetNames=[],identities=Object.create(null),schoolNames=Object.create(null),schoolRows=0,headerLimit=100;
   (workbook.SheetNames||[]).forEach(function(sheetName){
     var sheet=workbook.Sheets[sheetName];if(!sheet)return;
-    var sheetRows=window.XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false,blankrows:false});if(!sheetRows.length)return;
-    var first=lifeEduNormalizeImportRow_(sheetRows[0]);
-    if(first.className===undefined&&first.classNumber===undefined)return;
-    sheetRows.forEach(function(raw,index){
+    var matrix=window.XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false,blankrows:true});if(!Array.isArray(matrix)||!matrix.length)return;
+    var headerIndex=-1,headerKeys=null;
+    for(var scanIndex=0;scanIndex<Math.min(matrix.length,headerLimit);scanIndex++){
+      var candidate=lifeEduMapRosterHeaderRow_(matrix[scanIndex]);
+      if(candidate){headerIndex=scanIndex;headerKeys=candidate;break;}
+    }
+    if(headerIndex<0)return;
+    var headerCells=matrix[headerIndex]||[],ambiguousHeaders=headerKeys.reduce(function(list,key,index){if(key==='__ambiguous__')list.push(String(headerCells[index]||'未知欄名'));return list;},[]);if(ambiguousHeaders.length)throw new Error('工作表「'+sheetName+'」有無法判斷語義的姓名欄：'+ambiguousHeaders.map(function(label){return '「'+label+'」';}).join('、')+'；請明確標示中文或英文姓名後再匯入。');
+    var firstColumnByKey=Object.create(null),duplicateHeaders=[];headerKeys.forEach(function(key,columnIndex){if(!key)return;if(firstColumnByKey[key]!==undefined)duplicateHeaders.push('「'+String(headerCells[firstColumnByKey[key]]||key)+'」和「'+String(headerCells[columnIndex]||key)+'」');else firstColumnByKey[key]=columnIndex;});
+    if(duplicateHeaders.length)throw new Error('工作表「'+sheetName+'」標題列有重複或容易混淆的欄位：'+duplicateHeaders.join('、')+'。請每種資料只保留一欄後再匯入。');
+    for(var rowIndex=headerIndex+1;rowIndex<matrix.length;rowIndex++){
+      var cells=matrix[rowIndex]||[];
+      if(!cells.some(function(value){return value!==null&&value!==undefined&&String(value).trim()!=='';}))continue;
+      var raw={};cells.forEach(function(value,columnIndex){var key=headerKeys[columnIndex];if(key&&value!==null&&value!==undefined&&String(value).trim()!=='')raw[key]=value;});
       var normalized=lifeEduNormalizeImportRow_(raw),className=String(normalized.className||'').trim(),classNumber=String(normalized.classNumber==null?'':normalized.classNumber).trim();
-      if(!className||!lifeEduValidClassNumber_(classNumber))throw new Error('工作表「'+sheetName+'」第 '+(index+2)+' 列缺少有效的「班別」或「班號」；整份 Excel 未匯入。');
+      if(!className||!lifeEduValidClassNumber_(classNumber))throw new Error('工作表「'+sheetName+'」資料第 '+(rowIndex+1)+' 行缺少有效的「班別」或「班號」；整份 Excel 未匯入。');
       var normalizedClass=lifeEduNormalizeClassName_(className)||className.toUpperCase().replace(/\s/g,''),identity=normalizedClass+'-'+Number(classNumber);
       if(identities[identity])throw new Error('Excel 內有重複學生：'+className+' 第'+Number(classNumber)+'號；整份檔案未匯入。');identities[identity]=true;
       var school=String(normalized.primarySchool||'').trim();if(school){schoolRows++;schoolNames[school]=true;}
-      rows.push(raw);
-    });
+      rows.push(normalized);
+    }
     sheetNames.push(sheetName);
   });
-  if(!rows.length)throw new Error('找不到名冊工作表。Excel 標題列需包含「班別」和「班號」；小學欄可用「所屬小學」、「小學名稱」或「小學」。');
+  if(!sheetNames.length)throw new Error('找不到名冊工作表。已搜尋每張工作表的首 '+headerLimit+' 列（可略過標題上方內容）；標題列需包含「班別」和「班號」，小學欄可用「所屬小學」、「所屬小學名稱」、「小學名稱」或「小學」。');
+  if(!rows.length)throw new Error('已找到名冊標題列，但標題下方沒有學生資料。');
   var schoolCount=Object.keys(schoolNames).length;
   return {rows:rows,sourceInfo:'Excel 已讀取 '+sheetNames.length+' 個名冊工作表；'+schoolRows+'/'+rows.length+' 列有小學名稱（'+schoolCount+' 個不同名稱）。'};
 }
+function lifeEduMapRosterHeaderRow_(cells){if(!Array.isArray(cells))return null;var keys=cells.map(lifeEduCanonicalImportHeaderKey_);return keys.indexOf('className')>=0&&keys.indexOf('classNumber')>=0?keys:null;}
+
 function lifeEduRestoreBackup_(backup,messageNode){
   if(!lifeEduAcquireScanImport_('__data_import__')){lifeEduSetImportMessage_(messageNode,'本機掃描或匯入仍在進行；完成後再還原備份。',true);return Promise.resolve(false);}
   var expectedSnapshot=localStorage.getItem(LIFE_EDU_LOCAL_KEY);
@@ -977,14 +990,29 @@ function lifeEduGroupOcrPageRows_(pages){
   var rows=Object.keys(groups).sort(function(a,b){var left=groups[a],right=groups[b];return left.className.localeCompare(right.className,'zh-Hant')||left.classNumber-right.classNumber;}).map(function(id){var g=groups[id],pageNums=g.pages.map(function(p){return p.page;}).filter(Boolean);var source=g.pages.map(function(p){return '〔OCR'+(p.page?' 第'+p.page+'頁':'')+'〕\n'+p.text;}).filter(function(s){return s.trim();}).join('\n\n');var candidateNotes=['OCR候選；正式身份及文章未覆核。','來源頁碼：'+(pageNums.join('、')||'未標示')].concat(g.notes);return {id:g.id,className:g.className,classNumber:g.classNumber,ocrStudentName:g.names.join('／').slice(0,100),ocrTeacherName:g.teachers.join('／').slice(0,120),ocrPrimarySchool:g.schools.join('／').slice(0,160),sourceOcrText:source,scannedSheets:g.pages.length,reviewStatus:'待身份核對',ocrNote:candidateNotes.join('；').slice(0,500)};}).filter(function(row){if(row.sourceOcrText.length>2800){oversized+=row.scannedSheets;return false;}return true;});
   return {rows:rows,unresolved:unresolved,conflicted:conflicted,oversized:oversized};
 }
+function lifeEduImportHeadings_(){
+  return {className:['班別','班級','class','Class','Class Name','ClassName'],classNumber:['班號','班內編號','classNo','number','Class No','Class No.','Class Number'],studentNumber:['正式學號','學號','studentId','studentNumber','Student ID'],nameZh:['中文姓名OCR','中文姓名','姓名（中文）','姓名（中）','學生姓名（中文）','姓名','nameZh','Chinese Name'],nameEn:['英文姓名','姓名（英文）','姓名（英）','學生姓名（英文）','姓名（English）','English Name','nameEn'],gender:['性別','gender'],house:['社別','社','house'],primarySchool:['所屬小學','所屬小學名稱','小學','小學名稱','小學校名','primarySchool','Primary School','Primary School Name'],ocrStudentName:['OCR姓名候選','ocrStudentName'],ocrTeacherName:['OCR老師候選','ocrTeacherName'],ocrPrimarySchool:['OCR小學候選','ocrPrimarySchool'],teacherName:['收件老師','收件老師姓名','老師姓名','教師姓名','老師姓名（中文）','老師姓名（英文）','收件老師姓名（中文）','收件老師姓名（英文）','teacherName'],teacherTitle:['老師職銜','職銜','teacherTitle'],expectedSheets:['應交張數','應交','expectedSheets'],physicalReceived:['紙本已收張數','紙本已收','已收張數','physicalReceived'],scannedSheets:['掃描頁數','掃描頁','scannedSheets'],teacherNote:['批改備註','老師批改備註','teacherNote'],ocrNote:['OCR疑點','OCR／姓名核對記錄','ocrNote'],sourceUrl:['原稿連結','來源掃描連結','sourceUrl'],sourceOcrText:['原始OCR','原始 OCR','sourceOcrText'],verifiedOcrText:['核對後OCR','核對後 OCR','verifiedOcrText'],correctedText:['老師修訂稿','修訂稿','correctedText'],reviewStatus:['文章狀態','reviewStatus'],exempt:['免交','豁免','exempt'],checkSpelling:['錯字已核對','checkSpelling'],checkFlow:['文句已核對','checkFlow'],checkFormat:['格式已核對','checkFormat'],studentFollowup:['待學生澄清','studentFollowup']};
+}
+function lifeEduNormalizeImportHeading_(value){var text=String(value==null?'':value).replace(/^\uFEFF/,'');if(typeof text.normalize==='function')text=text.normalize('NFKC');text=text.replace(/[（(]\s*(?:必填|必須|選填|可選|required|optional)\s*[）)]/gi,'');return text.replace(/[\s\u200b\u2060_\-./\\:：,，.。*＊()[\]【】]/g,'').toLowerCase();}
+function lifeEduCanonicalImportHeaderKey_(value){
+  var text=String(value==null?'':value),normalized=lifeEduNormalizeImportHeading_(text);if(!normalized)return '';var headings=lifeEduImportHeadings_();
+  for(var key in headings){for(var i=0;i<headings[key].length;i++){if(lifeEduNormalizeImportHeading_(headings[key][i])===normalized)return key;}}
+  var normalizedText=text.replace(/^\uFEFF/,'');if(typeof normalizedText.normalize==='function')normalizedText=normalizedText.normalize('NFKC');var withoutParenthetical=normalizedText.replace(/\([^)]*\)/g,'');
+  var nameHeaderBase=lifeEduNormalizeImportHeading_(withoutParenthetical),studentNameBases={姓名:true,學生姓名:true,中文姓名:true,英文姓名:true,name:true,studentname:true,chinesename:true,englishname:true};
+  if(!/(?:老師|教師|teacher|家長|父親|母親|監護人|parent|guardian|father|mother)/i.test(withoutParenthetical)&&studentNameBases[nameHeaderBase]){
+    var annotations=normalizedText.match(/\([^)]*\)/g)||[],annotationText=annotations.join(''),hasEnglish=/(?:english|英(?:文|語))/i.test(annotationText),hasChinese=/(?:chinese|中文|繁體|簡體)/i.test(annotationText);
+    if(hasEnglish&&hasChinese)return '__ambiguous__';if(hasEnglish)return 'nameEn';if(hasChinese)return 'nameZh';
+  }
+  var base=lifeEduNormalizeImportHeading_(withoutParenthetical);if(base&&base!==normalized){for(var field in headings){for(var aliasIndex=0;aliasIndex<headings[field].length;aliasIndex++){if(lifeEduNormalizeImportHeading_(headings[field][aliasIndex])===base)return field;}}}return '';
+}
 function lifeEduNormalizeImportRow_(raw){
   if(!raw||typeof raw!=='object'||Array.isArray(raw))raw={};
-  var headings={className:['班別','班級','class','Class','Class Name','ClassName'],classNumber:['班號','班內編號','classNo','number','Class No','Class No.','Class Number'],studentNumber:['正式學號','學號','studentId','studentNumber','Student ID'],nameZh:['中文姓名OCR','中文姓名','姓名','nameZh','Chinese Name'],nameEn:['英文姓名','English Name','nameEn'],gender:['性別','gender'],house:['社別','社','house'],primarySchool:['所屬小學','所屬小學名稱','小學','小學名稱','小學校名','primarySchool','Primary School','Primary School Name'],ocrStudentName:['OCR姓名候選','ocrStudentName'],ocrTeacherName:['OCR老師候選','ocrTeacherName'],ocrPrimarySchool:['OCR小學候選','ocrPrimarySchool'],teacherName:['收件老師','老師姓名','teacherName'],teacherTitle:['老師職銜','職銜','teacherTitle'],expectedSheets:['應交張數','應交','expectedSheets'],physicalReceived:['紙本已收張數','紙本已收','已收張數','physicalReceived'],scannedSheets:['掃描頁數','掃描頁','scannedSheets'],teacherNote:['批改備註','老師批改備註','teacherNote'],ocrNote:['OCR疑點','OCR／姓名核對記錄','ocrNote'],sourceUrl:['原稿連結','來源掃描連結','sourceUrl'],sourceOcrText:['原始OCR','原始 OCR','sourceOcrText'],verifiedOcrText:['核對後OCR','核對後 OCR','verifiedOcrText'],correctedText:['老師修訂稿','修訂稿','correctedText'],reviewStatus:['文章狀態','reviewStatus'],exempt:['免交','豁免','exempt'],checkSpelling:['錯字已核對','checkSpelling'],checkFlow:['文句已核對','checkFlow'],checkFormat:['格式已核對','checkFormat'],studentFollowup:['待學生澄清','studentFollowup']};
-  var row={};Object.keys(headings).concat(['id','updatedAt','updatedBy']).forEach(function(key){if(Object.prototype.hasOwnProperty.call(raw,key))row[key]=raw[key];});Object.keys(headings).forEach(function(key){if(row[key]!==undefined)return;for(var i=0;i<headings[key].length;i++){if(Object.prototype.hasOwnProperty.call(raw,headings[key][i])){row[key]=raw[headings[key][i]];break;}}});
+  var headings=lifeEduImportHeadings_(),row={};Object.keys(headings).concat(['id','updatedAt','updatedBy']).forEach(function(key){if(Object.prototype.hasOwnProperty.call(raw,key))row[key]=raw[key];});Object.keys(headings).forEach(function(key){if(row[key]!==undefined)return;for(var i=0;i<headings[key].length;i++){if(Object.prototype.hasOwnProperty.call(raw,headings[key][i])){row[key]=raw[headings[key][i]];break;}}});
   var idMatch=String(row.id||'').match(/^(.*?)-(\d+)$/);if(idMatch){if(!row.className)row.className=idMatch[1];if(!row.classNumber)row.classNumber=Number(idMatch[2]);}
   ['exempt','checkSpelling','checkFlow','checkFormat','studentFollowup'].forEach(function(key){if(row[key]===undefined)return;row[key]=row[key]===true||/^(true|1|yes|y|是|✓)$/i.test(String(row[key]).trim());});
   if(String(row.expectedSheets||'').trim()==='免交'){row.expectedSheets=0;row.exempt=true;}return row;
 }
+
 function lifeEduParseCsv_(text){
   var rows=[],row=[],cell='',quoted=false;
   for(var i=0;i<text.length;i++){var c=text.charAt(i);if(quoted){if(c==='"'&&text.charAt(i+1)==='"'){cell+='"';i++;}else if(c==='"')quoted=false;else cell+=c;}else if(c==='"')quoted=true;else if(c===','){row.push(cell);cell='';}else if(c==='\n'||c==='\r'){if(c==='\r'&&text.charAt(i+1)==='\n')i++;row.push(cell);cell='';if(row.some(function(v){return v!=='';}))rows.push(row);row=[];}else cell+=c;}
