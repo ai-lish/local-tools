@@ -14,6 +14,7 @@ var LIFE_EDU_DB_NAME = 'local-tools-thank-teacher-cards';
 var LIFE_EDU_DB_STORE = 'attachments';
 var LIFE_EDU_MINIMAX_ENDPOINT = 'https://api.minimax.io/v1/chat/completions';
 var LIFE_EDU_MINIMAX_MODEL = 'MiniMax-M3.1-Flash';
+var LIFE_EDU_IMPORT_CLASS = '1A';
 
 function lifeEduEsc_(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});
@@ -141,7 +142,7 @@ function lifeEduRender_(){
       '<div class="le-source-line">班主任名冊 OCR：'+lifeEduEsc_(classTeachers||'待核')+'。所屬小學及正式學號不在目前來源內，待匯入正式資料。</div></div>'+
     '<section class="le-stats"><div class="le-stat"><b>'+rows.length+'</b><span>名冊學生</span></div><div class="le-stat"><b>'+expected+'</b><span>應交文章張數</span></div><div class="le-stat"><b>'+received+' / '+counted.length+'</b><span>已點收張數／人數</span></div><div class="le-stat"><b>'+scanned+'</b><span>目前掃描頁數</span></div><div class="le-stat"><b>'+gap+'</b><span>已核實欠交張數</span></div></section>'+classProgress+
     '<details class="le-panel le-import-panel" id="leImportPanel"><summary>匯入內容清單、名單／文章資料及 Word 範本</summary><div class="le-import-content">'+
-      '<div class="le-import-grid"><article class="le-import-card"><h3>① 學生名單 Excel／CSV／JSON</h3><p>正式名冊以「班別＋班號」配對，可匯入姓名、學號、小學、性別、社別和張數。只有姓名和小學的 Excel 資料表，會按已載入名冊的中英文姓名作唯一配對。</p><ul><li>正式名冊標題：班別、班號、正式學號、中文姓名、英文姓名、所屬小學、性別、社別、應交張數、紙本已收張數、掃描頁數</li><li>Excel 小學資料表可用「中文姓名／Student Name (ENG)／之前就讀小學」；須先匯入含班別和班號的學生名冊。「No.」不會當作班號；找不到或姓名不唯一的資料不會配對。</li><li>匯入採合併更新，未列出的學生保留。</li></ul></article>'+
+      '<div class="le-import-grid"><article class="le-import-card"><h3>① 1A 學生名單 Excel／CSV／JSON</h3><p>此流程只匯入 1A。正式名冊以「班別＋班號」配對，可匯入姓名、學號、小學、性別、社別和張數。只有姓名和小學的 Excel 資料表，會按已載入 1A 名冊的中英文姓名作唯一配對。</p><ul><li>正式名冊標題：班別、班號、正式學號、中文姓名、英文姓名、所屬小學、性別、社別、應交張數、紙本已收張數、掃描頁數；其他班別會略過</li><li>Excel 小學資料表可用「中文姓名／Student Name (ENG)／之前就讀小學」；須先匯入含班別和班號的 1A 正式名冊。「No.」不會當作班號；找不到或姓名不唯一的資料不會配對。</li><li>匯入採合併更新，未列出的學生保留；新 1A 記錄未提供張數時預設 1 張。</li></ul></article>'+
       '<article class="le-import-card"><h3>② 文章 OCR／批改資料 JSON</h3><p>可匯入逐頁 OCR JSON，按班別及班號合併；本機完整備份請用 ZIP，內含 PDF 掃描附件及逐頁工作區。</p><ul><li><code>sourceOcrText, verifiedOcrText, correctedText</code></li><li><code>ocrStudentName, ocrTeacherName, ocrPrimarySchool</code> 只存 OCR 候選，不覆蓋正式欄位</li><li>JSON 文字備份不含 PDF／色稿影像附件；ZIP 還原會取代目前資料並先要求確認</li></ul></article>'+
       '<article class="le-import-card"><h3>③ 感恩卡 Word 範本 DOCX</h3><p>在 Word 範本放入欄位標記。此工具會代入所選學生資料，並依字體大小設定產生 DOCX。</p><ul><li><code>{teacherDisplay}</code>、<code>{correctedText}</code></li><li><code>{studentName}</code>、<code>{studentNameEn}</code></li><li><code>{className}</code>、<code>{classNumber}</code></li><li><code>{studentNumber}</code>、<code>{primarySchool}</code>、<code>{activityTitle}</code></li></ul></article></div>'+
       '<section class="le-ocr-import"><h3>④ OCR 影像與貼上結果</h3><p>可貼上 Gemini、MiniMax 或其他 OCR 的文字／JSON；也可輸入自己的 MiniMax API key，在本頁直接進行單頁影像 OCR。OCR 結果先保留在原始 OCR 和核對後 OCR，老師修訂稿不會被改寫。</p><div class="le-ocr-controls"><label class="le-field le-ocr-key">MiniMax API key（只在本次要求使用）<input id="leMiniMaxKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="貼上 key；不會保存"></label><label class="le-field le-ocr-page">掃描頁碼（可留空）<input id="leOcrPageNumber" type="number" min="1" max="1000" step="1" placeholder="例如 1"></label><label class="le-button le-button-quiet le-button-small" for="leOcrImage">選擇單頁影像</label><input class="le-hidden" id="leOcrImage" type="file" accept="image/jpeg,image/png,image/webp"><span id="leOcrImageName" class="le-file-name">未選擇影像</span><button class="le-button le-button-small" type="button" data-le-minimax-ocr>送 MiniMax OCR</button><span id="leMiniMaxStatus" class="le-import-message" role="status"></span></div><p class="le-ocr-privacy">按下 OCR 後，所選影像和 API key 會由瀏覽器直接傳送到 MiniMax API；不會先經過 Local-tools 伺服器，也不會儲存在本工具。每次最多一張 5 MB 影像。請先確認校方資料處理要求，並避免傳送不需辨認的聯絡資料。</p><label class="le-field le-ocr-paste-label" for="leOcrPaste">貼上 Gemini／MiniMax OCR 結果</label><textarea id="leOcrPaste" class="le-textarea le-ocr-paste" spellcheck="false" placeholder="可貼純文章文字或單頁 JSON，例如 {&quot;page&quot;:1,&quot;class&quot;:&quot;例如 1A&quot;,&quot;classNumber&quot;:4,&quot;studentName&quot;:&quot;…&quot;,&quot;teacherName&quot;:&quot;…&quot;,&quot;ocrText&quot;:&quot;…&quot;}"></textarea><div class="le-ocr-paste-actions"><label class="le-review-check"><input id="leOcrAppend" type="checkbox">追加至所選學生原文（續頁使用）</label><button class="le-button le-button-quiet le-button-small" type="button" data-le-import-ocr>貼入所選學生</button><span class="le-muted">貼入後請檢查候選姓名／班號，再按「儲存此學生」。</span></div></section>'+
@@ -182,7 +183,7 @@ function lifeEduArrangeWorkflow_(layout){
   var firstCard=content.querySelector('.le-import-card');
   var step1=element('section','le-panel le-step',heading(1,'匯入學生名單','第一次使用先匯入名單；已有名冊可直接前往第 2 步。'));
   step1.id='leStep1';firstCard.querySelector('h3').remove();step1.appendChild(firstCard);
-  var csvHelp=element('p','le-csv-help','<b>可直接上載 Excel：</b>支援 .xlsx／.xls，也可用 CSV。正式名冊標題需有「班別」和「班號」；只有姓名和小學的資料表可按已匯入名冊的中英文姓名唯一配對。「No.」不會當作班號。小學欄可用「之前就讀小學」、「所屬小學」、「所屬小學名稱」、「小學名稱」或「小學」。工作表在本機讀取，不會上傳。');step1.appendChild(csvHelp);
+  var csvHelp=element('p','le-csv-help','<b>目前只處理 1A：</b>先上載含「班別＋班號」的 1A 正式名冊；再上載小學資料 Excel，工具只會按這份 1A 名冊的中英文姓名唯一配對並更新小學欄，其他班別不會加入。「No.」不會當作班號。小學欄可用「之前就讀小學」、「所屬小學」、「所屬小學名稱」、「小學名稱」或「小學」。工作表在本機讀取，不會上傳。');step1.appendChild(csvHelp);
   var rosterControls=element('div','le-import-controls le-primary-import');step1.appendChild(rosterControls);
   ['label[for="leDataFile"]','#leDataFile','#leDataName','[data-le-download-csv-template]','#leImportMessage'].forEach(function(selector){move(rosterControls,selector);});
   rosterControls.querySelector('label').textContent='上載學生名單 Excel／CSV／JSON';
@@ -223,12 +224,41 @@ function lifeEduQuantityReviewPanel_(rows){
   for(var expected=1;expected<=20;expected++)optionsExpected+='<option value="'+expected+'">'+expected+' 張</option>';
   var optionsReceived='<option value="">未點收</option>';
   for(var received=0;received<=20;received++)optionsReceived+='<option value="'+received+'">已收 '+received+' 張</option>';
-  var body=(rows||[]).map(function(row){
+  var oneARows=(rows||[]).filter(function(row){return lifeEduHasCanonicalImportClass_(row.className);});
+  var body=oneARows.map(function(row){
     var expectedValue=row.exempt||row.expectedSheets!==''&&row.expectedSheets!=null&&Number(row.expectedSheets)===0?'0':row.expectedSheets==null?'':String(row.expectedSheets),receivedValue=row.physicalReceived==null?'':String(row.physicalReceived),status=lifeEduSubmissionStatus_(row);
     var expectedOptions=optionsExpected.replace('value="'+expectedValue+'"','value="'+expectedValue+'" selected'),receivedOptions=optionsReceived.replace('value="'+receivedValue+'"','value="'+receivedValue+'" selected');
     return '<tr data-le-quantity-row="'+lifeEduEsc_(row.id)+'"><th scope="row"><span>'+lifeEduEsc_(row.className)+' 第'+lifeEduEsc_(row.classNumber)+'號</span><small>'+lifeEduEsc_(row.nameZh||'待確認姓名')+' '+lifeEduEsc_(row.nameEn||'')+'</small></th><td>'+lifeEduEsc_(row.primarySchool||'—')+'</td><td><label class="le-quantity-field"><span class="le-sr-only">'+lifeEduEsc_(row.className)+' 第'+lifeEduEsc_(row.classNumber)+'號應交張數</span><select data-le-quantity="expected" aria-label="'+lifeEduEsc_(row.className)+' 第'+lifeEduEsc_(row.classNumber)+'號應交張數">'+expectedOptions+'</select></label></td><td><label class="le-quantity-field"><span class="le-sr-only">'+lifeEduEsc_(row.className)+' 第'+lifeEduEsc_(row.classNumber)+'號紙本已收張數</span><select data-le-quantity="received" aria-label="'+lifeEduEsc_(row.className)+' 第'+lifeEduEsc_(row.classNumber)+'號紙本已收張數">'+receivedOptions+'</select></label></td><td><span class="le-pill '+lifeEduPill_(status)+'" data-le-quantity-status>'+lifeEduEsc_(status)+'</span></td></tr>';
   }).join('');
-  return '<div class="le-quantity-review"><div class="le-quantity-summary"><b>應交張數</b>按名冊「1／2」剔號設定；圈號選「免交」。<br><b>紙本已收</b>按實際收回數量點選；留空代表尚未點收。掃描頁不會自動計作紙本已收。</div><p class="le-quantity-status" id="leQuantityStatus" role="status" aria-live="polite">更改數量後會自動保存。</p><div class="le-quantity-wrap"><table class="le-quantity-table"><thead><tr><th>班別／學生</th><th>所屬小學</th><th>應交</th><th>紙本已收</th><th>點收狀態</th></tr></thead><tbody>'+(body||'<tr><td colspan="5">先在步驟 1 匯入學生名單。</td></tr>')+'</tbody></table></div></div>';
+  var bulkExpected='<option value="0">免交（圈號）</option>';for(var bulkCount=1;bulkCount<=20;bulkCount++)bulkExpected+='<option value="'+bulkCount+'"'+(bulkCount===1?' selected':'')+'>'+bulkCount+' 張</option>';
+  var emptyMessage=rows&&rows.length?'沒有 1A 學生；請先在步驟 1 匯入 1A 名冊。':'先在步驟 1 匯入 1A 學生名單。';
+  return '<div class="le-quantity-review"><div class="le-quantity-summary"><b>應交張數</b>預設 1 張；名冊「2」剔號改選 2 張，「1」下方圈號選「免交」。可整批只補未設定張數，或選擇覆蓋全班。<br><b>紙本已收</b>按實際收回數量點選；留空代表尚未點收。掃描頁不會自動計作紙本已收。</div><div class="le-quantity-bulk"><label for="leBulkExpectedSheets">整批應交張數</label><select id="leBulkExpectedSheets">'+bulkExpected+'</select><label for="leBulkExpectedScope">套用範圍</label><select id="leBulkExpectedScope"><option value="pending" selected>只補未設定，保留已剔選</option><option value="all">全部 1A（覆蓋現有設定）</option></select><button class="le-button le-button-quiet le-button-small" type="button" data-le-quantity-bulk>套用至 1A</button></div><p class="le-quantity-status" id="leQuantityStatus" role="status" aria-live="polite">新匯入的 1A 學生預設應交 1 張；更改數量後會保存到目前瀏覽器。</p><div class="le-quantity-wrap"><table class="le-quantity-table"><thead><tr><th>班別／學生</th><th>所屬小學</th><th>應交</th><th>紙本已收</th><th>點收狀態</th></tr></thead><tbody>'+(body||'<tr><td colspan="5">'+lifeEduEsc_(emptyMessage)+'</td></tr>')+'</tbody></table></div></div>';
+}
+function lifeEduSetQuantityStatus_(node,message,error){if(!node)return;node.className='le-quantity-status'+(error?' error':'');node.textContent=message;}
+function lifeEduApplyBulkQuantity_(){
+  var status=document.getElementById('leQuantityStatus'),quantity=document.getElementById('leBulkExpectedSheets'),scope=document.getElementById('leBulkExpectedScope');
+  if(!quantity||!scope)return;
+  if(LIFE_EDU_STATE.dirty){lifeEduSetQuantityStatus_(status,'請先到第 5 步保存目前學生的編輯，再批量修改應交張數。',true);return;}
+  var value=quantity.value,mode=scope.value;
+  if(!/^(?:0|[1-9]\d?)$/.test(value)||Number(value)>20){lifeEduSetQuantityStatus_(status,'張數必須在 0 至 20 之間。',true);return;}
+  var candidates=LIFE_EDU_STATE.rows.filter(function(row){return lifeEduHasCanonicalImportClass_(row.className);});
+  if(!candidates.length){lifeEduSetQuantityStatus_(status,'目前沒有 1A 學生；請先在步驟 1 匯入 1A 名冊。',true);return;}
+  var changed=candidates.filter(function(row){var current=row.exempt?'0':row.expectedSheets==null?'':String(row.expectedSheets),isExempt=value==='0';return mode==='all'?(current!==value||Boolean(row.exempt)!==isExempt||(isExempt&&row.reviewStatus!=='豁免')||(!isExempt&&row.reviewStatus==='豁免')):current===''&&!row.exempt;});
+  if(!changed.length){lifeEduSetQuantityStatus_(status,mode==='all'?'全班 1A 已是所選張數，沒有需要修改的學生。':'沒有未設定張數的 1A 學生；已有設定均保留。',false);return;}
+  if(mode==='all'&&!window.confirm('將 '+changed.length+' 位 1A 學生的應交張數改為 '+(value==='0'?'免交':value+' 張')+'，並覆蓋原有 2 張或免交設定；紙本已收數量不變。確定繼續？'))return;
+  var previous=lifeEduClone_(LIFE_EDU_STATE.rows),controls=Array.prototype.slice.call(document.querySelectorAll('#leApp input,#leApp select,#leApp textarea,#leApp button')).map(function(control){return {node:control,disabled:control.disabled};});
+  changed.forEach(function(row){row.expectedSheets=String(Number(value));row.exempt=value==='0';if(row.exempt)row.reviewStatus='豁免';else if(row.reviewStatus==='豁免')row.reviewStatus='待收稿';});
+  controls.forEach(function(entry){entry.node.disabled=true;});
+  LIFE_EDU_STATE.rows.filter(function(row){return changed.some(function(item){return item.id===row.id;});}).forEach(function(row){var node=Array.prototype.slice.call(document.querySelectorAll('[data-le-quantity-row]')).filter(function(item){return item.dataset.leQuantityRow===row.id;})[0],expected=node&&node.querySelector('[data-le-quantity="expected"]');if(expected)expected.value=row.exempt?'0':String(row.expectedSheets);lifeEduUpdateQuantityRowStatus_(node,row);lifeEduSyncQuantityToCurrentEditor_(row);});
+  if(status){status.className='le-quantity-status';status.textContent='正在保存 '+changed.length+' 位 1A 學生的應交張數…';}lifeEduUpdateQuantitySummary_();
+  function rollbackBulk_(){
+    changed.forEach(function(row){var original=previous.filter(function(item){return item.id===row.id;})[0],current=LIFE_EDU_STATE.rows.filter(function(item){return item.id===row.id;})[0];if(!original||!current)return;current.expectedSheets=original.expectedSheets;current.exempt=original.exempt;current.reviewStatus=original.reviewStatus;var node=Array.prototype.slice.call(document.querySelectorAll('[data-le-quantity-row]')).filter(function(item){return item.dataset.leQuantityRow===row.id;})[0],expected=node&&node.querySelector('[data-le-quantity="expected"]');if(expected)expected.value=current.exempt?'0':current.expectedSheets==null?'':String(current.expectedSheets);lifeEduUpdateQuantityRowStatus_(node,current);lifeEduSyncQuantityToCurrentEditor_(current);});
+    lifeEduUpdateQuantitySummary_();lifeEduSetQuantityStatus_(document.getElementById('leQuantityStatus'),'本機保存失敗，已還原批量張數；其他學生資料保持原狀。請確認本機記錄狀態後重試。',true);
+  }
+  Promise.resolve().then(lifeEduPersistLocal_).then(function(saved){
+    if(saved){LIFE_EDU_STATE.savedRows=lifeEduClone_(LIFE_EDU_STATE.rows);changed.forEach(lifeEduSyncQuantityToCurrentEditor_);if(status)status.textContent='已批量保存 '+changed.length+' 位 1A 學生；紙本已收數量保持不變。';lifeEduUpdateQuantitySummary_();return;}
+    rollbackBulk_();
+  }).catch(function(){rollbackBulk_();}).finally(function(){controls.forEach(function(entry){entry.node.disabled=entry.disabled;});});
 }
 function lifeEduSaveQuantitySelection_(select){
   var rowNode=select.closest('[data-le-quantity-row]'),id=rowNode&&rowNode.dataset.leQuantityRow,row=LIFE_EDU_STATE.rows.filter(function(item){return item.id===id;})[0];if(!row)return;
@@ -371,6 +401,7 @@ function lifeEduEnsureCardDesignPreviewUrls_(){
 }
 function lifeEduBind_(){
   document.querySelectorAll('[data-le-quantity]').forEach(function(select){select.addEventListener('change',function(){lifeEduSaveQuantitySelection_(select);});});
+  var bulkQuantity=document.querySelector('[data-le-quantity-bulk]');if(bulkQuantity)bulkQuantity.addEventListener('click',lifeEduApplyBulkQuantity_);
   document.querySelectorAll('[data-le-select]').forEach(function(button){button.addEventListener('click',function(){
     if(LIFE_EDU_STATE.teacherRevisionBusy){lifeEduToast_('MiniMax 正在修訂文章；完成後再切換學生。',true);return;}
     if(LIFE_EDU_STATE.dirty&&!window.confirm('目前學生有未儲存更改。放棄這些更改並切換？'))return;
@@ -597,7 +628,9 @@ function lifeEduRestoreBackupZipFile_(file,messageNode){
   },messageNode,'另一個分頁正在處理本機資料；完成後再還原。',expectedSnapshot).then(function(acquired){return Boolean(acquired&&restoreSucceeded);}).finally(function(){lifeEduReleaseScanImport_('__backup_restore__');});
 }
 function lifeEduGetPdfPage_(pageNumber){var pages=LIFE_EDU_STATE.pdfWorkspace&&LIFE_EDU_STATE.pdfWorkspace.pages||[];return pages.filter(function(page){return Number(page.pageNumber)===Number(pageNumber);})[0]||null;}
-function lifeEduNormalizeClassName_(value){var normalized=String(value||'').trim().toUpperCase().replace(/[\s.()（）]/g,'').replace(/^S(?=\d)/,'');return /^\d+[A-Z]$/.test(normalized)?normalized:'';}
+function lifeEduNormalizeClassName_(value){var normalized=String(value||'').trim().toUpperCase().replace(/[\s.()（）]/g,'').replace(/班$/,'').replace(/^S(?=\d)/,'');return /^\d+[A-Z]$/.test(normalized)?normalized:'';}
+function lifeEduIsImportClass_(value){return lifeEduNormalizeClassName_(value)===LIFE_EDU_IMPORT_CLASS;}
+function lifeEduHasCanonicalImportClass_(value){return String(value||'').trim().toUpperCase()===LIFE_EDU_IMPORT_CLASS;}
 function lifeEduValidClassNumber_(value){var raw=String(value==null?'':value).trim();return /^\d{1,3}$/.test(raw)&&Number(raw)>=1&&Number(raw)<=999;}
 function lifeEduStudentId_(className,classNumber){var number=String(Number(classNumber));return String(className).trim()+'-'+(number.length<2?'0'+number:number);}
 function lifeEduGetPdfSourceBlob_(){var workspace=LIFE_EDU_STATE.pdfWorkspace;if(!workspace||!workspace.sourceFileId)return Promise.reject(new Error('請先載入合併 PDF。'));return lifeEduAttachmentGet_(workspace.sourceFileId).then(function(record){if(!record||!record.blob)throw new Error('找不到本機原始 PDF；請重新選擇該 PDF。');return record.blob;});}
@@ -928,7 +961,7 @@ function lifeEduReadWorkbookRows_(buffer){
   if(!window.XLSX||typeof window.XLSX.read!=='function'||!window.XLSX.utils||typeof window.XLSX.utils.sheet_to_json!=='function')throw new Error('Excel 元件未載入；請檢查網絡連線後重新整理頁面。');
   var workbook;
   try{workbook=window.XLSX.read(buffer,{type:'array',cellDates:false,cellHTML:false,cellFormula:false});}catch(error){throw new Error('無法解析 Excel；請確認檔案是有效的 .xlsx 或 .xls。');}
-  var rows=[],schoolLookupRows=[],sheetNames=[],schoolSheetNames=[],identities=Object.create(null),rosterSchoolNames=Object.create(null),rosterSchoolRows=0,headerLimit=100;
+  var rows=[],schoolLookupRows=[],sheetNames=[],schoolSheetNames=[],identities=Object.create(null),rosterSchoolNames=Object.create(null),rosterSchoolRows=0,excludedClassRows=0,headerLimit=100;
   (workbook.SheetNames||[]).forEach(function(sheetName){
     var sheet=workbook.Sheets[sheetName];if(!sheet)return;
     var matrix=window.XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false,blankrows:true});if(!Array.isArray(matrix)||!matrix.length)return;
@@ -955,8 +988,12 @@ function lifeEduReadWorkbookRows_(buffer){
         continue;
       }
       var className=String(normalized.className||'').trim(),classNumber=String(normalized.classNumber==null?'':normalized.classNumber).trim();
-      if(!className||!lifeEduValidClassNumber_(classNumber))throw new Error('工作表「'+sheetName+'」資料第 '+(rowIndex+1)+' 行缺少有效的「班別」或「班號」；整份 Excel 未匯入。');
-      var normalizedClass=lifeEduNormalizeClassName_(className)||className.toUpperCase().replace(/\s/g,''),identity=normalizedClass+'-'+Number(classNumber);
+      if(!className)throw new Error('工作表「'+sheetName+'」資料第 '+(rowIndex+1)+' 行缺少「班別」；無法確認是否屬於 1A，整份 Excel 未匯入。');
+      var normalizedClass=lifeEduNormalizeClassName_(className);
+      if(normalizedClass!==LIFE_EDU_IMPORT_CLASS){excludedClassRows++;continue;}
+      if(!lifeEduValidClassNumber_(classNumber))throw new Error('工作表「'+sheetName+'」資料第 '+(rowIndex+1)+' 行缺少有效的「班號」；整份 Excel 未匯入。');
+      normalized.className=LIFE_EDU_IMPORT_CLASS;
+      var identity=normalizedClass+'-'+Number(classNumber);
       if(identities[identity])throw new Error('Excel 內有重複學生：'+className+' 第'+Number(classNumber)+'號；整份檔案未匯入。');identities[identity]=true;
       var school=String(normalized.primarySchool||'').trim();if(school){rosterSchoolRows++;rosterSchoolNames[school]=true;}
       rows.push(normalized);
@@ -966,22 +1003,24 @@ function lifeEduReadWorkbookRows_(buffer){
   if(!sheetNames.length&&!schoolSheetNames.length)throw new Error('找不到可識別的名冊或小學資料表。已搜尋每張工作表的首 '+headerLimit+' 列；學生名冊需有「班別」和「班號」，小學資料表需有中文／英文姓名及小學欄。');
   var schoolLookupStats=null;
   if(schoolLookupRows.length){
-    var matchRoster=[],matchSeen=Object.create(null);
-    LIFE_EDU_STATE.savedRows.concat(rows).forEach(function(item){var className=String(item.className||'').trim(),classNumber=String(item.classNumber==null?'':item.classNumber).trim();if(!className||!lifeEduValidClassNumber_(classNumber))return;var identity=className+'-'+Number(classNumber);if(matchSeen[identity]){var index=matchSeen[identity]-1;matchRoster[index]=Object.assign({},matchRoster[index],item);return;}matchSeen[identity]=matchRoster.push(item);});
+    var matchRoster=[],matchSeen=Object.create(null),ambiguousRoster=Object.create(null);
+    LIFE_EDU_STATE.savedRows.concat(rows).forEach(function(item){var className=String(item.className||'').trim(),classNumber=String(item.classNumber==null?'':item.classNumber).trim();if(!lifeEduHasCanonicalImportClass_(className)||!lifeEduValidClassNumber_(classNumber))return;var identity=LIFE_EDU_IMPORT_CLASS+'-'+Number(classNumber),studentId=String(item.id||lifeEduStudentId_(LIFE_EDU_IMPORT_CLASS,classNumber)),student=Object.assign({},item,{id:studentId,className:LIFE_EDU_IMPORT_CLASS});if(matchSeen[identity]){var index=matchSeen[identity]-1;if(matchRoster[index]&&String(matchRoster[index].id)===studentId)matchRoster[index]=Object.assign({},matchRoster[index],student);else{matchRoster[index]=null;ambiguousRoster[identity]=true;}return;}matchSeen[identity]=matchRoster.push(student);});
+    var duplicateRosterCount=Object.keys(ambiguousRoster).length;if(duplicateRosterCount)throw new Error('已載入的 1A 名冊有 '+duplicateRosterCount+' 個重複班號，已停止小學配對；請先整理班別和班號。');
     schoolLookupStats=lifeEduMatchSchoolLookupRows_(schoolLookupRows,matchRoster);rows=rows.concat(schoolLookupStats.rows);
   }
   if(!rows.length){
     if(schoolLookupStats){
       var lookupSummary=lifeEduDescribeSchoolLookup_(schoolLookupStats);
-      var rosterHint=matchRoster&&matchRoster.length?'請核對已載入名冊的中英文姓名；只有吻合且唯一的學生會自動配對。':'請先匯入含班別和班號的學生名冊，再匯入這份小學資料表。';
+      var rosterHint=matchRoster&&matchRoster.length?'請核對已載入的 1A 名冊中英文姓名；只有吻合且唯一的 1A 學生會自動配對。':'請先匯入含班別和班號的 1A 正式名冊，再匯入這份小學資料表。';
       throw new Error('已辨認到小學資料表，但沒有可安全更新的學生。'+lookupSummary+(rosterHint?' '+rosterHint:''));
     }
+    if(sheetNames.length&&excludedClassRows)throw new Error('已找到正式名冊，但沒有 1A 學生資料；目前只匯入 1A，略過了 '+excludedClassRows+' 列其他班別資料。');
     if(!sheetNames.length)throw new Error('已找到名冊標題列，但標題下方沒有學生資料。');
     throw new Error('已找到名冊標題列，但沒有可匯入的學生資料。');
   }
   var sourceInfo=[];
-  if(sheetNames.length)sourceInfo.push('Excel 已讀取 '+sheetNames.length+' 個正式名冊工作表；其中 '+rosterSchoolRows+' 列有小學名稱（'+Object.keys(rosterSchoolNames).length+' 個不同名稱）');
-  if(schoolLookupStats)sourceInfo.push('小學資料按姓名配對：'+lifeEduDescribeSchoolLookup_(schoolLookupStats));
+  if(sheetNames.length)sourceInfo.push('Excel 已讀取 '+sheetNames.length+' 個正式名冊工作表，只保留 1A；其中 '+rosterSchoolRows+' 列有小學名稱（'+Object.keys(rosterSchoolNames).length+' 個不同名稱）'+(excludedClassRows?'，略過其他班別 '+excludedClassRows+' 列':''));
+  if(schoolLookupStats)sourceInfo.push('小學資料只按 1A 名冊姓名配對：'+lifeEduDescribeSchoolLookup_(schoolLookupStats));
   return {rows:rows,sourceInfo:sourceInfo.join('；'),schoolLookup:schoolLookupStats};
 }
 function lifeEduMapRosterHeaderRow_(cells){if(!Array.isArray(cells))return null;var keys=cells.map(lifeEduCanonicalImportHeaderKey_);return keys.indexOf('className')>=0&&keys.indexOf('classNumber')>=0?keys:null;}
@@ -1012,7 +1051,7 @@ function lifeEduMatchSchoolLookupRows_(lookupRows,rosterRows){
   stats.rows=Object.keys(matched).map(function(id){return matched[id];});stats.matched=stats.rows.length;
   return stats;
 }
-function lifeEduDescribeSchoolLookup_(stats){return '配對成功 '+Number(stats.matched||0)+' 人，找不到 '+Number(stats.unmatched||0)+' 人，姓名不一致或不唯一 '+Number(stats.ambiguous||0)+' 人，缺少姓名 '+Number(stats.missingName||0)+' 列，缺少小學名稱 '+Number(stats.missingSchool||0)+' 列；「No.」不作班號。';}
+function lifeEduDescribeSchoolLookup_(stats){return '配對成功 '+Number(stats.matched||0)+' 人，未配對 '+Number(stats.unmatched||0)+' 人（可能屬其他班別），姓名不一致或不唯一 '+Number(stats.ambiguous||0)+' 人，缺少姓名 '+Number(stats.missingName||0)+' 列，缺少小學名稱 '+Number(stats.missingSchool||0)+' 列；「No.」不作班號。';}
 
 function lifeEduRestoreBackup_(backup,messageNode){
   if(!lifeEduAcquireScanImport_('__data_import__')){lifeEduSetImportMessage_(messageNode,'本機掃描或匯入仍在進行；完成後再還原備份。',true);return Promise.resolve(false);}
@@ -1079,13 +1118,36 @@ function lifeEduImportRows_(rows,messageNode,warnings){
 }
 function lifeEduImportRowsLocked_(rows,messageNode,warnings){
   var unresolved=Number(warnings&&warnings.unresolved)||0,conflicted=Number(warnings&&warnings.conflicted)||0,oversized=Number(warnings&&warnings.oversized)||0,sourceInfo=String(warnings&&warnings.sourceInfo||'').trim();
+  var scopedRows=[],excludedClassRows=0;(rows||[]).forEach(function(raw){var incoming=lifeEduNormalizeImportRow_(raw),className=String(incoming.className||'').trim();if(className&&!lifeEduIsImportClass_(className)){excludedClassRows++;return;}if(className)incoming.className=LIFE_EDU_IMPORT_CLASS;scopedRows.push(incoming);});rows=scopedRows;
+  if(!rows.length){lifeEduSetImportMessage_(messageNode,'目前只匯入 1A；這份檔案沒有可匯入的 1A 記錄，沒有更改本機資料。',true);return;}
+  if(excludedClassRows)sourceInfo+=(sourceInfo?'；':'')+'只保留 1A，略過其他班別 '+excludedClassRows+' 列';
   var textKeys=['sourceOcrText','verifiedOcrText','correctedText'],conflicts=[],textLimits={studentNumber:2000,nameZh:2000,nameEn:2000,gender:2000,house:2000,primarySchool:2000,ocrStudentName:2000,ocrTeacherName:2000,ocrPrimarySchool:2000,teacherName:2000,teacherTitle:2000,teacherNote:2000,ocrNote:2000,sourceUrl:2000,sourceOcrText:20000,verifiedOcrText:20000,correctedText:20000,updatedAt:2000,updatedBy:2000};
   rows.forEach(function(raw){var normalized=lifeEduNormalizeImportRow_(raw);Object.keys(textLimits).forEach(function(key){if(normalized[key]===undefined||normalized[key]===null)return;var value=normalized[key];if(typeof value!=='string'&&typeof value!=='number'&&typeof value!=='boolean')throw new Error('匯入列 '+key+' 必須是文字。');if(String(value).length>textLimits[key])throw new Error('匯入列 '+key+' 超過 '+textLimits[key]+' 字；沒有套用任何資料，請分段匯入。');});['expectedSheets','physicalReceived','scannedSheets'].forEach(function(key){var value=normalized[key];if(value===undefined||value===null||value==='')return;if(typeof value!=='string'&&typeof value!=='number')throw new Error('匯入列 '+key+' 必須是 0 至 20 的整數或留空。');var rawValue=String(value).trim();if(!/^\d{1,2}$/.test(rawValue)||Number(rawValue)>20)throw new Error('匯入列 '+key+' 必須是 0 至 20 的整數或留空；沒有套用任何資料。');});});
   rows.forEach(function(incoming){var normalized=lifeEduNormalizeImportRow_(incoming),current=LIFE_EDU_STATE.savedRows.filter(function(r){return String(r.className||'').trim()===String(normalized.className||'').trim()&&Number(r.classNumber)===Number(normalized.classNumber);})[0];if(!current)return;textKeys.forEach(function(key){if(incoming[key]!==undefined&&current[key]&&String(incoming[key])!==String(current[key]))conflicts.push(String(normalized.className||'')+' 第'+incoming.classNumber+'號 '+key);});});
   if(conflicts.length&&!window.confirm('匯入會覆蓋現有文章文字（'+conflicts.length+'項），例如 '+conflicts.slice(0,4).join('、')+'。已先匯出 JSON 備份嗎？確定繼續？')){lifeEduSetImportMessage_(messageNode,'已取消匯入；現有文章保留。',false);return;}
   var merged=lifeEduClone_(LIFE_EDU_STATE.savedRows),updated=0,previousState={rows:lifeEduClone_(LIFE_EDU_STATE.rows),savedRows:lifeEduClone_(LIFE_EDU_STATE.savedRows),selectedId:LIFE_EDU_STATE.selectedId,dirty:LIFE_EDU_STATE.dirty,importing:LIFE_EDU_STATE.importing};
   try{
-    rows.forEach(function(raw){var incoming=lifeEduNormalizeImportRow_(raw),number=Number(incoming.classNumber),className=String(incoming.className||'').trim();if(!className||!Number.isInteger(number)||number<1||number>999)throw new Error('每列必須有班別和 1 至 999 的班號；未能辨認的 OCR 頁請逐頁選取學生後貼入。');incoming.className=className;incoming.classNumber=number;incoming.id=incoming.id||lifeEduStudentId_(className,number);var index=merged.findIndex(function(item){return item.id===incoming.id||(String(item.className||'').trim()===className&&Number(item.classNumber)===number);});if(index<0){var initial={id:incoming.id,className:className,classNumber:number,expectedSheets:'',physicalReceived:'',scannedSheets:'',reviewStatus:'待身份核對',exempt:false};merged.push(Object.assign(initial,incoming));}else{var next=Object.assign({},merged[index]);Object.keys(incoming).forEach(function(key){var value=incoming[key];if(value!==undefined&&value!==null&&value!=='')next[key]=value;});merged[index]=next;}updated++;});
+    rows.forEach(function(raw){
+      var incoming=lifeEduNormalizeImportRow_(raw),number=Number(incoming.classNumber),className=String(incoming.className||'').trim();
+      if(!className||!Number.isInteger(number)||number<1||number>999)throw new Error('每列必須有班別和 1 至 999 的班號；未能辨認的 OCR 頁請逐頁選取學生後貼入。');
+      incoming.className=LIFE_EDU_IMPORT_CLASS;incoming.classNumber=number;incoming.id=lifeEduStudentId_(incoming.className,number);
+      var matches=[];merged.forEach(function(item,index){if(lifeEduHasCanonicalImportClass_(item.className)&&Number(item.classNumber)===number)matches.push(index);});
+      if(matches.length>1)throw new Error('現有 1A 記錄有重複班號 '+number+'，已停止匯入以免更新錯誤學生。');
+      var index=matches.length?matches[0]:-1;
+      if(index<0){
+        var initial={id:incoming.id,className:LIFE_EDU_IMPORT_CLASS,classNumber:number,expectedSheets:'1',physicalReceived:'',scannedSheets:'',reviewStatus:'待身份核對',exempt:false},fresh=Object.assign(initial,incoming);
+        var hasExpectedSheets=fresh.expectedSheets!==undefined&&fresh.expectedSheets!==null&&String(fresh.expectedSheets).trim()!=='';
+        if(fresh.exempt||(hasExpectedSheets&&Number(fresh.expectedSheets)===0)){fresh.exempt=true;fresh.expectedSheets='0';}
+        else if(!hasExpectedSheets)fresh.expectedSheets='1';
+        merged.push(fresh);
+      }else{
+        var next=Object.assign({},merged[index]);Object.keys(incoming).forEach(function(key){if(key==='id')return;var value=incoming[key];if(value!==undefined&&value!==null&&value!=='')next[key]=value;});
+        if(incoming.expectedSheets!==undefined&&incoming.expectedSheets!==null&&String(incoming.expectedSheets).trim()!=='')next.exempt=Number(incoming.expectedSheets)===0;else if(incoming.exempt!==undefined)next.exempt=Boolean(incoming.exempt);
+        if(next.exempt)next.expectedSheets='0';
+        merged[index]=next;
+      }
+      updated++;
+    });
     merged.sort(function(a,b){return String(a.className||'').localeCompare(String(b.className||''),'zh-Hant')||Number(a.classNumber)-Number(b.classNumber);});
     LIFE_EDU_STATE.rows=merged;LIFE_EDU_STATE.savedRows=lifeEduClone_(merged);LIFE_EDU_STATE.dirty=false;LIFE_EDU_STATE.importing=false;
     if(!LIFE_EDU_STATE.rows.some(function(r){return r.id===LIFE_EDU_STATE.selectedId;}))LIFE_EDU_STATE.selectedId=LIFE_EDU_STATE.rows[0]&&LIFE_EDU_STATE.rows[0].id||'';
