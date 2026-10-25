@@ -6,26 +6,54 @@
   <meta name="referrer" content="no-referrer">
   <meta name="description" content="在瀏覽器本機整理謝師恩文章、核對收稿張數、批改及製作感恩卡。">
   <title>箋紙濃情謝師恩｜文章核對及卡片工具</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://ai-lish.github.io/ai-learning/css/auth-widget.css">
+  <link rel="stylesheet" href="styles.css?v=20261025-12">
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js" defer></script>
+  <script src="https://ai-lish.github.io/ai-learning/js/firebase-config.js" defer></script>
+  <script src="https://ai-lish.github.io/ai-learning/js/auth-state.js" defer></script>
   <script src="https://unpkg.com/docxtemplater@3.71.0/build/docxtemplater.js"></script>
   <script src="https://unpkg.com/pizzip@3.2.0/dist/pizzip.js"></script>
   <script src="https://unpkg.com/mammoth@1.13.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js" integrity="sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
 </head>
-<body>
+<body data-no-auth-widget>
   <div class="le-app-shell">
     <header class="le-topbar">
       <div class="le-brand-mark" aria-hidden="true">謝</div>
       <div class="le-brand-copy"><div class="le-eyebrow">生活教育課・2026/27</div><h1>箋紙濃情謝師恩</h1></div>
       <div class="le-top-actions">
         <span class="le-local-badge">本機瀏覽器記錄</span>
+        <button class="le-button le-button-light le-drive-paused-trigger" id="leDriveOpen" type="button" title="雲端備份暫停中；按此仍可登入" aria-label="Google Drive 備份暫停中；按此仍可使用 Google 登入">Google Drive 備份（暫停）</button>
       </div>
     </header>
     <main id="leApp" class="le-page" aria-live="polite">
       <div class="le-loading"><span class="le-spinner"></span><b>正在載入本機記錄…</b></div>
     </main>
-  <footer class="le-footer">學生文章和記錄保存在目前瀏覽器；請定期下載 JSON 備份。只有按下 MiniMax OCR 時，所選影像才會直接傳送至 MiniMax。正式姓名、老師稱謂及不清楚字句須由校方／學生確認。</footer>
+  <footer class="le-footer">Google Drive 備份、雲端清單及載入目前暫停；按上方入口仍可使用 Google 登入。本機記錄和掃描附件仍保存在目前瀏覽器。只有按下 MiniMax OCR 時，所選影像才會直接傳送至 MiniMax。正式姓名、老師稱謂及不清楚字句須由校方／學生確認。</footer>
   </div>
+  <dialog class="le-drive-dialog" id="leDriveDialog" aria-labelledby="leDriveTitle">
+    <button class="le-dialog-close" id="leDriveClose" type="button" aria-label="關閉">×</button>
+    <h2 id="leDriveTitle">Google Drive 雲端備份</h2>
+    <p>使用 AI-Learning 共用 Google 登入。Google 登入仍可使用；雲端備份上載、雲端清單及載入暫停中。本機匯入、匯出及記錄不受影響。</p>
+    <p class="le-drive-status" id="leDriveStatus" role="status" aria-live="polite">正在檢查登入狀態…</p>
+    <div class="le-dialog-actions">
+      <button class="le-button" id="leDriveConnect" type="button">Google 登入</button>
+      <button class="le-button le-button-quiet" id="leDriveUpload" type="button" disabled>上載新完整備份 ZIP</button>
+      <button class="le-button le-button-quiet" id="leDriveRefresh" type="button" disabled>重新整理雲端備份</button>
+      <label class="le-drive-select">選擇雲端備份
+        <select id="leDriveBackupSelect" disabled>
+          <option value="">請先連接 Google Drive</option>
+        </select>
+      </label>
+      <button class="le-button le-button-quiet" id="leDriveLoad" type="button" disabled>載入所選備份</button>
+    </div>
+    <p class="le-drive-note">暫停期間仍可登入 Google，但不會上載、讀取或載入 Drive 備份。重新啟用後，完整 ZIP 會包含學生記錄、Word 範本、逐頁工作區、掃描附件及色稿；載入前會要求確認，並取代目前本機記錄。請只使用學校核准的 Google 帳戶和 Drive 位置。</p>
+  </dialog>
   <script src="template.js"></script>
-  <script src="app.js" defer></script>
+  <script src="app.js?v=20261025-12" defer></script>
+  <script src="drive-sync.js?v=20261025-4" defer></script>
 </body>
 </html>

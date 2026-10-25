@@ -85,6 +85,12 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/thank-teacher-cards/drive-sync.js",
+      "destination": "tools/thank-teacher-cards/drive-sync.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/thank-teacher-cards/styles.css",
       "destination": "tools/thank-teacher-cards/styles.css",
       "publicMode": "cli-source",
