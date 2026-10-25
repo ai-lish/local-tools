@@ -16,6 +16,7 @@ const allowedCdnUrls = new Set([
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js',
+  'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js',
   'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',
@@ -94,10 +95,10 @@ for (const file of files) {
     const namespacedThankTeacherStorage = file.relative === 'tools/thank-teacher-cards/app.js' &&
       content.includes("var LIFE_EDU_LOCAL_KEY = 'local-tools.thank-teacher-cards.v1';") &&
       content.includes("var LIFE_EDU_DB_NAME = 'local-tools-thank-teacher-cards';") &&
-      (content.match(/\blocalStorage\b/g) || []).length === 15 &&
-      thankTeacherStorageCalls.length === 15 &&
+      (content.match(/\blocalStorage\b/g) || []).length === 17 &&
+      thankTeacherStorageCalls.length === 17 &&
       thankTeacherStorageCalls.every((match) => match[2] === 'LIFE_EDU_LOCAL_KEY') &&
-      thankTeacherStorageCalls.filter((match) => match[1] === 'getItem').length === 14 &&
+      thankTeacherStorageCalls.filter((match) => match[1] === 'getItem').length === 16 &&
       thankTeacherStorageCalls.filter((match) => match[1] === 'setItem').length === 1 &&
       (content.match(/\bindexedDB\b/g) || []).length === 2 &&
       (content.match(/\bindexedDB\.open\s*\(\s*LIFE_EDU_DB_NAME\s*,\s*1\s*\)/g) || []).length === 1 &&

@@ -7,7 +7,7 @@
   <meta name="description" content="在瀏覽器本機整理謝師恩文章、核對收稿張數、批改及製作感恩卡。">
   <title>箋紙濃情謝師恩｜文章核對及卡片工具</title>
   <link rel="stylesheet" href="https://ai-lish.github.io/ai-learning/css/auth-widget.css">
-  <link rel="stylesheet" href="styles.css?v=20261025-12">
+  <link rel="stylesheet" href="styles.css?v=20261026-9">
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js" defer></script>
@@ -18,6 +18,7 @@
   <script src="https://unpkg.com/mammoth@1.13.0/mammoth.browser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js" integrity="sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
 </head>
 <body data-no-auth-widget>
   <div class="le-app-shell">
@@ -32,7 +33,7 @@
     <main id="leApp" class="le-page" aria-live="polite">
       <div class="le-loading"><span class="le-spinner"></span><b>正在載入本機記錄…</b></div>
     </main>
-  <footer class="le-footer">Google Drive 備份、雲端清單及載入目前暫停；按上方入口仍可使用 Google 登入。本機記錄和掃描附件仍保存在目前瀏覽器。只有按下 MiniMax OCR 時，所選影像才會直接傳送至 MiniMax。正式姓名、老師稱謂及不清楚字句須由校方／學生確認。</footer>
+  <footer class="le-footer">Google Drive 備份、雲端清單及載入目前暫停；按上方入口仍可使用 Google 登入。本機記錄和掃描附件仍保存在目前瀏覽器。只有按下 MiniMax OCR 或 MiniMax 老師修訂時，所選影像或文章文字及當次 API key 才會由瀏覽器直接傳送至 MiniMax；使用 Gemini Web 時，須由老師自行複製及貼上。正式姓名、老師稱謂及不清楚字句須由校方／學生確認。</footer>
   </div>
   <dialog class="le-drive-dialog" id="leDriveDialog" aria-labelledby="leDriveTitle">
     <button class="le-dialog-close" id="leDriveClose" type="button" aria-label="關閉">×</button>
@@ -53,7 +54,7 @@
     <p class="le-drive-note">暫停期間仍可登入 Google，但不會上載、讀取或載入 Drive 備份。重新啟用後，完整 ZIP 會包含學生記錄、Word 範本、逐頁工作區、掃描附件及色稿；載入前會要求確認，並取代目前本機記錄。請只使用學校核准的 Google 帳戶和 Drive 位置。</p>
   </dialog>
   <script src="template.js"></script>
-  <script src="app.js?v=20261025-12" defer></script>
+  <script src="app.js?v=20261026-11" defer></script>
   <script src="drive-sync.js?v=20261025-4" defer></script>
 </body>
 </html>

@@ -109,6 +109,12 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/thank-teacher-cards/gemini-teacher-article-ocr-skill.md",
+      "destination": "tools/thank-teacher-cards/gemini-teacher-article-ocr-skill.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/slp-split-pdf/README.md",
       "destination": "tools/slp-split-pdf/README.md",
       "publicMode": "cli-documentation",
