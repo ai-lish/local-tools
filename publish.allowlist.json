@@ -1049,6 +1049,48 @@
       "destination": "tools/fx-3650p/tests/regression.test.js",
       "publicMode": "offline-runtime-asset",
       "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/shared/calculator-support.js",
+      "destination": "tools/shared/calculator-support.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/shared/calculator-screenshot.js",
+      "destination": "tools/shared/calculator-screenshot.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/shared/calculator-support.css",
+      "destination": "tools/shared/calculator-support.css",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/shared/report-config.js",
+      "destination": "tools/shared/report-config.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/calculator-report/apps-script/Code.gs",
+      "destination": "tools/calculator-report/apps-script/Code.gs",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/calculator-report/apps-script/appsscript.json",
+      "destination": "tools/calculator-report/apps-script/appsscript.json",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/calculator-report/DEPLOYMENT.md",
+      "destination": "tools/calculator-report/DEPLOYMENT.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
     }
   ],
   "generatedFiles": [

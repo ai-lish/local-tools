@@ -12,6 +12,18 @@ const canvas = document.getElementById('lcd');
 const accessibleDisplay = document.getElementById('lcd-accessible');
 const modeChip = document.getElementById('mode-chip');
 const hintEl = document.getElementById('key-hint');
+const supportLaserButton = document.getElementById('support-laser');
+const supportReportButton = document.getElementById('support-report');
+function checkReportConfiguration() {
+  import('../../shared/report-config.js').then(({ applyReportButtonState }) => {
+    applyReportButtonState(supportReportButton);
+  }).catch(() => {
+    supportReportButton.textContent = '回報問題（無法檢查設定）';
+    supportReportButton.title = '無法檢查回報設定；請稍後重試。';
+  });
+}
+if (document.readyState === 'complete') checkReportConfiguration();
+else window.addEventListener('load', checkReportConfiguration, { once: true });
 const machine = new Machine();
 const lcd = new LCD(canvas);
 
@@ -109,12 +121,49 @@ function tap(id) {
     b.classList.add('down');
     setTimeout(() => b.classList.remove('down'), 90);
   }
+  window.dispatchEvent(new CustomEvent('local-tools-calculator-key', {
+    detail: { id, time: performance.now() }
+  }));
   machine.press(id);
   studioController.syncFromMachine();
   blink = true;
   lastBlink = performance.now();
   dirty = true;
 }
+
+let supportModulePromise;
+function loadCalculatorSupport() {
+  if (!supportModulePromise) {
+    supportModulePromise = import('../../shared/calculator-support.js')
+      .then(({ installCalculatorSupport }) => installCalculatorSupport({
+        model: 'fx-50FH II', shell, canvas, buttons,
+        laserButton: supportLaserButton, reportButton: supportReportButton
+      }))
+      .catch((error) => {
+        supportModulePromise = undefined;
+        supportLaserButton.disabled = false;
+        supportLaserButton.title = '功能載入失敗，請檢查網絡後重試';
+        if (!supportReportButton.disabled) {
+          supportReportButton.title = '功能載入失敗，請檢查網絡後重試';
+        }
+        throw error;
+      });
+  }
+  return supportModulePromise;
+}
+
+supportLaserButton.addEventListener('click', async () => {
+  try { (await loadCalculatorSupport()).toggleLaser(); }
+  catch { supportLaserButton.textContent = '雷射筆（載入失敗）'; }
+});
+supportReportButton.addEventListener('click', async () => {
+  try { (await loadCalculatorSupport()).openReport(); }
+  catch { supportReportButton.textContent = '回報功能（載入失敗）'; }
+});
+window.addEventListener('local-tools-calculator-replay', (event) => {
+  const id = event.detail?.id;
+  if (typeof id === 'string' && buttons.has(id)) tap(id);
+});
 
 // Pointer down gives the key its tactile feel. The click listener is the
 // fallback that makes the keys reachable by Tab and Enter, and by anything

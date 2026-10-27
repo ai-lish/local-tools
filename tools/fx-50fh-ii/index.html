@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'/%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>fx-50FH II — unofficial browser simulation</title>
 <meta name="description" content="An unofficial browser simulation of the fx-50FH II calculator with six modes, built-in formulas, scientific constants, base-n, statistics and program mode.">
@@ -26,9 +27,11 @@
       </div>
       <p class="calculator-notice" role="note">Unofficial simulation; not affiliated with CASIO or HKEAA. Check important results against a physical calculator. <a href="NOTICE.md">Notice</a></p>
 
-      <nav id="utility-nav" aria-label="Calculator tools">
+      <nav id="utility-nav" aria-label="Calculator tools" style="flex-wrap:wrap;justify-content:center">
         <button id="studio-toggle" type="button" aria-controls="studio" aria-expanded="false">Program Studio</button>
         <button id="help-toggle" type="button" aria-controls="help" aria-expanded="false">keyboard &amp; notes</button>
+        <button id="support-laser" type="button" aria-pressed="false" aria-label="開啟老師模式雷射筆" style="min-height:36px;padding:7px 8px;border:0;background:transparent;color:inherit;font:inherit;font-size:12px;cursor:pointer">雷射筆</button>
+        <button id="support-report" type="button" disabled title="正在檢查回報設定。" style="min-height:36px;padding:7px 8px;border:0;background:transparent;color:inherit;font:inherit;font-size:12px;cursor:not-allowed;opacity:.55">回報問題（檢查設定）</button>
       </nav>
     </div>
 
@@ -209,6 +212,6 @@
   </section>
 </main>
 
-<script type="module" src="js/main.js?v=appearance-2"></script>
+<script type="module" src="js/main.js?v=appearance-3"></script>
 </body>
 </html>
