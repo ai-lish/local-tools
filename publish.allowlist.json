@@ -775,6 +775,96 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/minimax-voices/audio/ja-japanese-kind-lady.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-kind-lady.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-calm-lady.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-calm-lady.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-dependable-woman.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-dependable-woman.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-graceful-maiden.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-graceful-maiden.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-decisive-princess.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-decisive-princess.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-cold-queen.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-cold-queen.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-gentle-butler.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-gentle-butler.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-intellectual-senior.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-intellectual-senior.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-loyal-knight.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-loyal-knight.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-optimistic-youth.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-optimistic-youth.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-sporty-student.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-sporty-student.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-innocent-boy.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-innocent-boy.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-serious-commander.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-serious-commander.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-dominant-man.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-dominant-man.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/minimax-voices/audio/ja-japanese-generous-izakaya-owner.mp3",
+      "destination": "tools/minimax-voices/audio/ja-japanese-generous-izakaya-owner.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/minimax-voices/audio/en-santa-claus.mp3",
       "destination": "tools/minimax-voices/audio/en-santa-claus.mp3",
       "publicMode": "cli-source",
