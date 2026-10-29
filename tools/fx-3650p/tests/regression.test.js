@@ -179,6 +179,31 @@ test('degree, radian, and gradian trig modes', () => {
   assert.ok(Math.abs(value('atan(1)', { angleMode: 'RAD' }) - Math.PI / 4) < 1e-12);
 });
 
+test('degree special angles are exact without changing nearby trigonometric values', () => {
+  const options = { angleMode: 'DEG' };
+  for (const angle of ['0', '180', '360', '-180', '720']) {
+    assert.equal(value(`sin(${angle})`, options), 0, `sin(${angle})`);
+  }
+  assert.equal(value('cos(90)', options), 0);
+  assert.equal(value('cos(270)', options), 0);
+  assert.equal(value('tan(180)', options), 0);
+  assert.equal(value('sin(30)', options), 0.5);
+  assert.equal(value('sin(45)', options), Number(Math.sin(Math.PI / 4).toPrecision(15)));
+  const radianPi = value('pi', { angleMode: 'RAD' });
+  assert.equal(value('sin(pi)', { angleMode: 'RAD' }), Number(Math.sin(radianPi).toPrecision(15)));
+});
+
+test('gradian special angles are exact without changing nearby trigonometric values', () => {
+  const options = { angleMode: 'GRA' };
+  for (const angle of ['0', '200', '400', '-200', '800']) {
+    assert.equal(value(`sin(${angle})`, options), 0, `sin(${angle})`);
+  }
+  assert.equal(value('cos(100)', options), 0);
+  assert.equal(value('cos(300)', options), 0);
+  assert.equal(value('tan(200)', options), 0);
+  assert.equal(value('sin(50)', options), Number(Math.sin(50 * (Math.PI / 200)).toPrecision(15)));
+});
+
 test('trig functions reduce large angles, reject tangent poles, and enforce E-50 ranges', () => {
   assert.ok(Math.abs(value('sin(9999990)', { angleMode: 'DEG' }) + 1) < 1e-12);
   assert.equal(machineForError('tan(9999990)', { angleMode: 'DEG' }), 'Math');

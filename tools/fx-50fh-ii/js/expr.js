@@ -95,6 +95,20 @@ const ANG = { Deg: Math.PI / 180, Rad: 1, Gra: Math.PI / 200 };
 const toRad = (x, unit) => x * ANG[unit];
 const fromRad = (x, unit) => x / ANG[unit];
 
+function reduceCircularAngle(x, unit) {
+  if (unit === 'Rad') return { value: x, quadrant: null };
+  const period = unit === 'Deg' ? 360 : 400;
+  let value = x % period;
+  const halfPeriod = period / 2;
+  if (value > halfPeriod) value -= period;
+  else if (value < -halfPeriod) value += period;
+  const quarterTurns = value / (period / 4);
+  const quadrant = Number.isInteger(quarterTurns)
+    ? ((quarterTurns % 4) + 4) % 4
+    : null;
+  return { value, quadrant };
+}
+
 // ---------------------------------------------------------------------------
 // Base-n word sizes.  The guide gives 10 binary digits, 10 octal digits and a
 // 32-bit signed decimal/hex range, so each base has its own word width.
@@ -645,7 +659,8 @@ function callFn(f, args, ctx, E, real) {
       const limit = range?.max ?? (ctx.angle === 'Deg' ? 9e9
         : ctx.angle === 'Gra' ? 1e10 : 157079632.7);
       if (range?.inclusive ? Math.abs(z.re) > limit : Math.abs(z.re) >= limit) err('Math');
-      const x = toRad(z.re, ctx.angle);
+      const reduced = reduceCircularAngle(z.re, ctx.angle);
+      const x = toRad(reduced.value, ctx.angle);
       if (f === 'tan') {
         const q = z.re / (ctx.angle === 'Deg' ? 90 : ctx.angle === 'Gra' ? 100 : Math.PI / 2);
         const nearest = Math.round(q);
@@ -653,6 +668,11 @@ function callFn(f, args, ctx, E, real) {
           ? (ctx.angle === 'Rad' ? z.re === r15(nearest * Math.PI / 2) : q === nearest)
           : Math.abs(q - nearest) < 1e-12;
         if (pole && nearest % 2 !== 0) err('Math');
+      }
+      if (reduced.quadrant !== null) {
+        if (f === 'sin') return C([0, 1, 0, -1][reduced.quadrant]);
+        if (f === 'cos') return C([1, 0, -1, 0][reduced.quadrant]);
+        return C(0);
       }
       return C(r15(Math[f](x)));
     }
