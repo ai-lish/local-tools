@@ -1285,13 +1285,18 @@ export class Machine {
         if (f.varIdx >= spec.vars.length) this.formulaRun();
         return;
       }
-      const t = this.tokenFor(id, shift, false);
+      let t = this.tokenFor(id, shift, false);
+      if (t) t = this.signedToken(t, f.edit[f.edit.length - 1]);
       if (t && (t.k === K.DIGIT || t.k === K.PRE || t.k === K.CONST || t.k === K.INFIX)) f.edit.push(t);
       return;
     }
 
     if (f.stage === 'result') {
-      if (id === 'EXE') { this.formulaStart(); return; }
+      if (id === 'EXE') {
+        if (FORMULAS[f.index].extra && !f.showExtra) { f.showExtra = true; return; }
+        this.formulaStart();
+        return;
+      }
       if (id === 'DOWN' || id === 'UP') {
         const spec = FORMULAS[f.index];
         if (spec.extra) f.showExtra = !f.showExtra;
