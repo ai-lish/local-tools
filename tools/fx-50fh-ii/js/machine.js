@@ -602,8 +602,18 @@ export class Machine {
     if (toks.length === 1 && toks[0].k === K.FN && this.ans) {
       toks = toks.concat([tok('Ans')]);
     }
+    // A shown "expr→A" (left by STO) stores again when executed.
+    let storeVar = null;
+    if (toks.length >= 3) {
+      const asg = toks[toks.length - 2], dst = toks[toks.length - 1];
+      if (asg.id === 'pAsg' && dst.k === K.CONST && dst.v && dst.id === 'var' + dst.v) {
+        storeVar = dst.v;
+        toks = toks.slice(0, -2);
+      }
+    }
     const ast = parse(toks, this.ctx());
     const z = evaluate(ast, this.ctx());
+    if (storeVar) this.vars[storeVar] = storeZ(z);
     this.ans = C(z.re, z.im);
     this.result = {
       z: C(z.re, z.im),
@@ -642,14 +652,22 @@ export class Machine {
   }
 
   storeTo(v) {
-    let value;
-    if (this.screen === 'result' && this.result) value = this.result.z;
-    else if (this.tokens.length) {
+    let value, source;
+    if (this.screen === 'result' && this.result) {
+      value = this.result.z;
+      source = [tok('Ans')];
+    } else if (this.tokens.length) {
       value = evaluate(parse(this.tokens, this.ctx()), this.ctx());
-    } else value = this.ans;
+      source = this.tokens.map((t) => Object.assign({}, t));
+    } else {
+      value = this.ans;
+      source = [tok('Ans')];
+    }
     this.vars[v] = storeZ(value);
     this.ans = asZ(this.vars[v]);
     this.result = { z: this.ans, view: 'normal', engShift: 0, part: 0 };
+    this.tokens = [...source, tok('pAsg'), tok('var' + v)];
+    this.cursor = this.tokens.length;
     this.screen = 'result';
   }
 

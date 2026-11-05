@@ -1056,6 +1056,25 @@ for (let i = 0; i < CONSTANTS.length; i++) {
 }
 
 {
+  // STO shows "Ans→A" (or "expr→A" for an unexecuted entry), as on the real calculator.
+  const m = new Machine();
+  send(m, '1+2=@[RCL][NEG]');
+  check('STO shows Ans→A on line 1', m.view().line1, 'Ans→A');
+  check('STO shows the stored value on line 2', m.view().line2, '3');
+  check('STO stores the result in A', m.vars.A, 3);
+  send(m, '=');
+  check('EXE on Ans→A keeps the stored value', m.view().line2, '3');
+  check('EXE on Ans→A stores again without error', m.vars.A, 3);
+  const m2 = new Machine();
+  send(m2, '5@[RCL][NEG]');
+  check('STO of an unexecuted entry shows 5→A', m2.view().line1, '5→A');
+  check('STO of an unexecuted entry stores it', m2.vars.A, 5);
+  const m3 = new Machine();
+  send(m3, '1+2=@[RCL][NEG]4=');
+  check('typing after Ans→A replaces the display', m3.view().line2, '4');
+}
+
+{
   const commandsRoundTrip = Object.entries(TOK)
     .filter(([, spec]) => spec.k === K.PROG)
     .every(([id, spec]) => {
