@@ -788,8 +788,13 @@ for (const [type, data, coef, yCase, xCase] of REG_MODEL_CASES) {
   const m2 = new Machine();
   send(m2, '[FMLA]01=1=[NEG]5=6=');
   check('Quadratic x²−5x+6 first root', shown(m2), '3');
+  check('Quadratic x1 view shows down arrow', m2.view().histDown, true);
   send(m2, '[DOWN]');
   check('Quadratic second root', shown(m2), '2');
+  check('Quadratic x2 view shows up arrow', m2.view().histUp, true);
+  check('Quadratic x2 label', m2.view().left, 'x2');
+  check('Heron result has no down arrow', m.view().histDown === true, false);
+  check('Heron result has no up arrow', m.view().histUp === true, false);
   const m3 = new Machine();
   send(m3, '[FMLA]15=1=');
   check('Pendulum of 1 m', shown(m3), '2.006409293');

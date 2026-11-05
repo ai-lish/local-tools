@@ -1805,7 +1805,12 @@ export class Machine {
     const key = f.showExtra && spec.extra ? spec.extra[0] : spec.result;
     const val = f.results[key];
     const l2 = formatReal(r15(val), this.setup);
-    return { line1: formulaTitle(spec), left: key, line2: l2.main, exp: l2.exp };
+    const view = { line1: formulaTitle(spec), left: key, line2: l2.main, exp: l2.exp };
+    if (spec.extra) {
+      if (f.showExtra) view.histUp = true;
+      else view.histDown = true;
+    }
+    return view;
   }
 
   progView() {
