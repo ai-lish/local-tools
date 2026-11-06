@@ -95,8 +95,19 @@ const ANG = { Deg: Math.PI / 180, Rad: 1, Gra: Math.PI / 200 };
 const toRad = (x, unit) => x * ANG[unit];
 const fromRad = (x, unit) => x / ANG[unit];
 
+// The machine's own pi constant; Rad-mode angles are snapped to multiples of
+// pi/2 against it, which is how the real calculator gets sin(pi) = 0.
+const PI_MACHINE = 3.14159265358980;
+
 function reduceCircularAngle(x, unit) {
-  if (unit === 'Rad') return { value: x, quadrant: null };
+  if (unit === 'Rad') {
+    const q = x / (PI_MACHINE / 2);
+    const n = Math.round(q);
+    if (Math.abs(q - n) <= 1e-13 * Math.max(1, Math.abs(n))) {
+      return { value: x, quadrant: ((n % 4) + 4) % 4 };
+    }
+    return { value: x, quadrant: null };
+  }
   const period = unit === 'Deg' ? 360 : 400;
   let value = x % period;
   const halfPeriod = period / 2;
@@ -510,7 +521,7 @@ export function parseBaseDigits(s, base) {
 }
 
 function valueOf(t, ctx) {
-  if (t.id === 'pi') return C(3.14159265358980);
+  if (t.id === 'pi') return C(PI_MACHINE);
   if (t.id === 'napier') return C(2.71828182845904);
   if (t.id === 'Ans') return ctx.ans ? C(ctx.ans.re, ctx.ans.im) : C(0);
   if (t.id === 'Ran') return C(Math.floor(Math.random() * 1000) / 1000);

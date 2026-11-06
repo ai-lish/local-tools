@@ -384,6 +384,41 @@ t('7×8−4×5', '7*8-4*5=', '36');
 t('(2+3)×(4−1 with open paren', '(2+3)*(4-1=', '15');
 t('sin 30', '[SIN]30)=', '0.5');
 t('sin⁻¹ 0.5', '@[SIN]0.5)=', '30');
+{
+  // Rad mode: multiples of pi/2 give exact values, measured against the
+  // machine's own pi (3.14159265358980).
+  const rad = (name, seq, want) => {
+    const m = new Machine();
+    m.setup.angle = 'Rad';
+    send(m, seq);
+    check(name, m.view().line2, want);
+  };
+  const radErr = (name, seq) => {
+    const m = new Machine();
+    m.setup.angle = 'Rad';
+    send(m, seq);
+    check(name, m.view().line1 + m.view().line2, 'Math ERROR');
+  };
+  rad('Rad sin π = 0', '[SIN]@[EXP])=', '0');
+  rad('Rad cos π÷2 = 0', '[COS]@[EXP][DIV]2)=', '0');
+  rad('Rad tan π = 0', '[TAN]@[EXP])=', '0');
+  rad('Rad sin 2π = 0', '[SIN]2@[EXP])=', '0');
+  rad('Rad sin −π = 0', '[SIN][NEG]@[EXP])=', '0');
+  rad('Rad sin 1000π = 0', '[SIN]1000@[EXP])=', '0');
+  rad('Rad cos π = −1', '[COS]@[EXP])=', '-1');
+  rad('Rad sin π÷2 = 1', '[SIN]@[EXP][DIV]2)=', '1');
+  rad('Rad sin 180° = 0', '[SIN]180@[ANS]1)=', '0');
+  {
+    const m = new Machine();
+    m.setup.angle = 'Rad';
+    send(m, '[SIN]3.141592653589)=');
+    near('Rad sin 3.141592653589 stays a small non-zero value', m.result.z.re * 1e13, 7.93265793472127);
+  }
+  radErr('Rad tan π÷2 is Math ERROR', '[TAN]@[EXP][DIV]2)=');
+  const deg = new Machine();
+  send(deg, '[SIN]180)=');
+  check('Deg sin 180 = 0 still holds', deg.view().line2, '0');
+}
 t('100÷7 Norm1', '100/7=', '14.28571429');
 t('1÷200 Norm1', '1/200=', '5.e-03');
 t('omitted × before (', '2(5+4)=', '18');

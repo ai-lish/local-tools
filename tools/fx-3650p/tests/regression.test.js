@@ -189,8 +189,16 @@ test('degree special angles are exact without changing nearby trigonometric valu
   assert.equal(value('tan(180)', options), 0);
   assert.equal(value('sin(30)', options), 0.5);
   assert.equal(value('sin(45)', options), Number(Math.sin(Math.PI / 4).toPrecision(15)));
-  const radianPi = value('pi', { angleMode: 'RAD' });
-  assert.equal(value('sin(pi)', { angleMode: 'RAD' }), Number(Math.sin(radianPi).toPrecision(15)));
+});
+
+test('radian multiples of pi/2 are exact', () => {
+  const options = { angleMode: 'RAD' };
+  assert.equal(value('sin(pi)', options), 0);
+  assert.equal(value('cos(pi/2)', options), 0);
+  assert.equal(value('tan(pi)', options), 0);
+  assert.equal(value('cos(pi)', options), -1);
+  assert.equal(value('sin(pi/2)', options), 1);
+  assert.notEqual(value('sin(3.141592653589)', options), 0);
 });
 
 test('gradian special angles are exact without changing nearby trigonometric values', () => {
