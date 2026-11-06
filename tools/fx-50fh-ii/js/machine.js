@@ -431,7 +431,7 @@ export class Machine {
   // subtraction. The display prints the same minus either way.
   signedToken(t, prev) {
     if (t.f !== 'sub') return t;
-    if (!prev || [K.OPEN, K.SEP, K.INFIX, K.POW, K.PRE, K.PROG].includes(prev.k)) return tok('neg');
+    if (!prev || [K.OPEN, K.SEP, K.INFIX, K.POW, K.PRE, K.PROG, K.FN].includes(prev.k)) return tok('neg');
     return t;
   }
 

@@ -373,6 +373,19 @@ t('leading minus is a negative sign', '-5=', '-5');
 t('minus after an operator is a negative sign', '2+-3=', '-1');
 t('minus after an open parenthesis is a negative sign', '2*(-3)=', '-6');
 t('minus after a comma is a negative sign', '@[ADD]3,-4)=', '5');
+t('minus after a function is a negative sign: sin(−30)', '[SIN]-30)=', '-0.5');
+t('minus after a function is a negative sign: cos(−60)', '[COS]-60)=', '0.5');
+te('minus after √( is a negative sign, so √(−4) is Math ERROR', '[SQRT]-4)=', 'Math ERROR');
+t('infix minus after a number stays subtraction', '2-3=', '-1');
+{
+  const m = new Machine();
+  send(m, '[SIN]-');
+  check('minus typed after sin( is stored as the neg token', m.tokens[m.tokens.length - 1].id, 'neg');
+  const r = new Machine();
+  r.setup.angle = 'Rad';
+  send(r, '[SIN]-@[EXP])=');
+  check('Rad sin(−π) is not a Syntax ERROR', r.error === 'Syntax', false);
+}
 {
   const m = new Machine();
   m.setStudioProgram(0, 'CMPLX', parseProgramText(PROGRAM_BY_ID.get('P8').source, 'CMPLX').tokenIds);
