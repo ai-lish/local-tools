@@ -24,6 +24,21 @@ const M = {
   expLegendY: 466.09, expLegendDot: 4.25
 };
 
+const MINUS_W = M.l2W * 0.72;
+
+/** Glass-relative x of the first mantissa cell's left edge for a digit index. */
+export const digitCellX = (index) => (M.l2X - GLASS.x) + index * M.l2Pitch;
+
+/**
+ * Glass-relative x of the minus sign for a result whose first digit sits in
+ * cell `start`. The sign hugs the digit (right-aligned in the cell just to its
+ * left); only a full ten-digit result falls back to the separate sign position.
+ */
+export function minusSignX(start) {
+  if (start <= 0) return M.signX - GLASS.x;
+  return digitCellX(start - 1) + (M.l2W - MINUS_W);
+}
+
 const ON = '#22282b';
 // Unlit segments are not drawn at all. Overlapping hexagons accumulate alpha,
 // so even a very low opacity ghost reads as a second row of digits.
@@ -188,9 +203,10 @@ export class LCD {
     const start = fixed ? 0 : Math.max(0, M.l2Cells - cells.length);
     const y = M.l2Y - GLASS.y;
 
-    // The minus sign has its own annunciator cell and does not consume one of
-    // the ten mantissa digits on the physical 10+2 display.
-    if (negative) this.#cell(M.signX - GLASS.x, y, M.l2W * 0.72, M.l2H, { ch: '-', dp: false });
+    // The minus sign does not consume one of the ten mantissa digits; it is
+    // drawn just left of the first digit (or in the sign cell when all ten
+    // cells are used).
+    if (negative) this.#cell(minusSignX(start), y, MINUS_W, M.l2H, { ch: '-', dp: false });
 
     for (let i = 0; i < cells.length && start + i < M.l2Cells; i++) {
       const x = (M.l2X - GLASS.x) + (start + i) * M.l2Pitch;

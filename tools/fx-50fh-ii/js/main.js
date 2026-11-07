@@ -3,7 +3,7 @@
 // mapped onto the same key ids.
 
 import { KEYS, SHELL_W, SHELL_H, PC_KEYS } from './keymap.js?v=appearance-2';
-import { LCD, GLASS } from './lcd.js?v=studio-v9';
+import { LCD, GLASS } from './lcd.js?v=minus-adjacent';
 import { Machine } from './machine.js?v=studio-v9';
 import { setupProgramStudio } from './studio.js?v=studio-v9';
 
