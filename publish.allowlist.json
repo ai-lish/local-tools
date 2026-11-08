@@ -1181,6 +1181,126 @@
       "destination": "tools/calculator-report/DEPLOYMENT.md",
       "publicMode": "cli-documentation",
       "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/README.md",
+      "destination": "tools/bgm-auditions/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/index.html",
+      "destination": "tools/bgm-auditions/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/00_dry_baseline.mp3",
+      "destination": "tools/bgm-auditions/audio/00_dry_baseline.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/01_sparse_piano_solo.mp3",
+      "destination": "tools/bgm-auditions/audio/01_sparse_piano_solo.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/01_sparse_piano_with_voice.mp3",
+      "destination": "tools/bgm-auditions/audio/01_sparse_piano_with_voice.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/02_warm_epiano_solo.mp3",
+      "destination": "tools/bgm-auditions/audio/02_warm_epiano_solo.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/02_warm_epiano_with_voice.mp3",
+      "destination": "tools/bgm-auditions/audio/02_warm_epiano_with_voice.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/03_nylon_guitar_solo.mp3",
+      "destination": "tools/bgm-auditions/audio/03_nylon_guitar_solo.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/03_nylon_guitar_with_voice.mp3",
+      "destination": "tools/bgm-auditions/audio/03_nylon_guitar_with_voice.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/04_ambient_pad_solo.mp3",
+      "destination": "tools/bgm-auditions/audio/04_ambient_pad_solo.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/04_ambient_pad_with_voice.mp3",
+      "destination": "tools/bgm-auditions/audio/04_ambient_pad_with_voice.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/05_light_electronic_solo.mp3",
+      "destination": "tools/bgm-auditions/audio/05_light_electronic_solo.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/05_light_electronic_with_voice.mp3",
+      "destination": "tools/bgm-auditions/audio/05_light_electronic_with_voice.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/06_soft_mallet_solo.mp3",
+      "destination": "tools/bgm-auditions/audio/06_soft_mallet_solo.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/06_soft_mallet_with_voice.mp3",
+      "destination": "tools/bgm-auditions/audio/06_soft_mallet_with_voice.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/comparison_00_to_06.mp3",
+      "destination": "tools/bgm-auditions/audio/comparison_00_to_06.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/licenses/ASSET_SHA256.txt",
+      "destination": "tools/bgm-auditions/licenses/ASSET_SHA256.txt",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/licenses/FluidR3-COPYING.txt",
+      "destination": "tools/bgm-auditions/licenses/FluidR3-COPYING.txt",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/licenses/SOURCES.txt",
+      "destination": "tools/bgm-auditions/licenses/SOURCES.txt",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/licenses/TinySoundFont-LICENSE.txt",
+      "destination": "tools/bgm-auditions/licenses/TinySoundFont-LICENSE.txt",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
     }
   ],
   "generatedFiles": [

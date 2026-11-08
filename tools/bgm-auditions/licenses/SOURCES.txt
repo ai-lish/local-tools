@@ -1,0 +1,14 @@
+Original six arrangements: programmatically composed for mathematics teaching auditions on 2026-11-08 HKT. No existing song and no specific composer imitation. These arrangements may be used and modified for those teaching videos.
+
+Instrument samples: FluidR3_GM.sf2 by Frank Wen; MIT license; full copyright and permission text in FluidR3-COPYING.txt.
+Upstream project: https://github.com/pianobooster/fluid-soundfont
+Release used to render the audition files: https://github.com/pianobooster/fluid-soundfont/releases/download/v3.1/FluidR3_GM.sf2
+
+Offline renderer: TinySoundFont by Bernhard Schelling; MIT license; full text in TinySoundFont-LICENSE.txt.
+Upstream header: https://github.com/schellingb/TinySoundFont
+
+Narration: an existing mathematics-video dry voice, reused without a new text-to-speech request. This directory does not grant any separate right in a third-party voice service.
+
+General MIDI presets: 0 acoustic grand piano; 4 electric piano 1; 24 nylon guitar; 89 warm pad; 4 electric piano 1 with the standard GM drum bank; 11 vibraphone.
+
+The MP3 files in ../audio/ are the approved audition assets for this directory. Generation logs, local paths, the SoundFont binary, and intermediate caches are not published with this page. Checksums for the published MP3 files are in ASSET_SHA256.txt.

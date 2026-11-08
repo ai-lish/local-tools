@@ -15,6 +15,7 @@ CloudSAMS server；有外部 API 的工具只會在使用者明確啟動後傳�
 - `math-translator`：`beta`，單頁工作台、通用數學詞庫、公開試／出版社題型、教學語境示例及 EMI 分類表格；可在本地 server 模式匯入 DOCX、PDF 及可供檢視的 Google Docs，並選用 GPT-5.6 Luna、MiniMax、LocalAI 或其他 OpenAI-compatible LLM。
 - `thank-teacher-cards`：`beta`，瀏覽器內整理班別名單、OCR 文章、老師修訂稿、收稿張數和感恩卡；支援本機 JSON／CSV 匯入匯出及 Word 預覽／匯出。MiniMax OCR 只在使用者按下按鈕時直接傳送所選影像。
 - `fx-50fh-ii`：`beta`，非官方、多檔案瀏覽器計算機模擬器；只載入本機資源，重要結果應以真機核對。
+- `bgm-auditions`：瀏覽器內逐款試聽六款 30 秒原創背景音樂，可切換純音樂或配旁白；不會上載，也不會更改現有影片。
 
 使用者需要自行安裝 Python 及各工具的 `requirements.txt` 依賴。input、output、
 mapping、學生資料及相片不得提交到 Git 或公開服務。使用外部 OCR／LLM 功能前，請閱讀工具內的資料傳送說明並遵守校方規定。

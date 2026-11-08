@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="逐款試聽六款數學影片背景音樂，可切換純音樂或配旁白。">
+  <title>背景音樂試聽｜Local Tools</title>
+  <style>
+    :root { color-scheme: light; --ink:#162537; --muted:#68798a; --navy:#102a43; --blue:#2367a8; --gold:#d99b22; --gold-soft:#fff7df; --green:#2b7a65; --green-soft:#eaf6f1; --line:#dce5eb; --canvas:#f4f7f9; --surface:#fff; --shadow:0 16px 42px rgba(16,42,67,.08); }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; color: var(--ink); background: var(--canvas); font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; line-height: 1.55; }
+    a { color: inherit; }
+    .page { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 58px; }
+    .topbar { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+    .brand { display: inline-flex; align-items: center; gap: 11px; color: var(--navy); text-decoration: none; }
+    .brand-mark { display: grid; place-items: center; width: 42px; height: 42px; color: var(--navy); background: var(--gold); border-radius: 12px; font-size: 14px; font-weight: 900; }
+    .brand small { display: block; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .16em; }
+    .brand strong { display: block; margin-top: 1px; font-size: 16px; }
+    .privacy { margin-left: auto; padding: 6px 10px; color: #27664f; background: var(--green-soft); border-radius: 999px; font-size: 12px; font-weight: 800; }
+    h1 { margin: 0; font-size: clamp(28px, 4vw, 40px); line-height: 1.2; letter-spacing: -.02em; }
+    h2 { margin: 0; font-size: 22px; }
+    h3 { margin: 0; font-size: 18px; line-height: 1.3; }
+    .intro { max-width: 760px; margin: 10px 0 0; color: var(--muted); }
+    .notice, .panel, .track, .preference { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 18px rgba(16,42,67,.04); }
+    .notice { margin-top: 18px; padding: 16px 18px; border-left: 4px solid var(--gold); }
+    .notice p, .panel p, .track p { margin: 8px 0 0; }
+    .notice strong { color: var(--navy); }
+    .panel { margin-top: 18px; padding: 18px; }
+    .panel-head, .track-head, .mode-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .kicker { margin: 0; color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+    audio { display: block; width: 100%; margin-top: 12px; }
+    .seek, .downloads, .choice { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    button, .downloads a, .choice label { font: inherit; }
+    .seek button, .mode-row button, .downloads a, .copy { min-height: 44px; padding: 8px 12px; color: var(--navy); background: #f4f8fb; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; }
+    .seek button:hover, .mode-row button:hover, .downloads a:hover, .copy:hover, .seek button:focus-visible, .mode-row button:focus-visible, .downloads a:focus-visible, .copy:focus-visible { border-color: #9abbd4; outline: 3px solid rgba(35,103,168,.12); outline-offset: 2px; }
+    .mode { position: sticky; top: 0; z-index: 2; margin-top: 18px; padding: 12px; background: rgba(244,247,249,.94); border: 1px solid var(--line); border-radius: 14px; }
+    .mode p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+    .mode-row button[aria-pressed="true"] { color: #18334b; background: var(--gold); border-color: var(--gold); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; margin-top: 13px; }
+    .track { display: flex; flex-direction: column; padding: 16px; }
+    .track-baseline { border-top: 4px solid var(--green); }
+    .num { margin: 0; color: var(--blue); font-size: 12px; font-weight: 800; }
+    .facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+    .facts li, .tag { padding: 3px 7px; color: #506678; background: #f1f5f7; border-radius: 6px; font-size: 12px; font-weight: 700; }
+    .tag-drum { color: #8b6312; background: var(--gold-soft); }
+    .preference { margin-top: 18px; padding: 16px 18px; }
+    fieldset { margin: 12px 0 0; padding: 0; border: 0; }
+    legend { font-weight: 800; }
+    .choice label { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 6px 10px; background: #f4f8fb; border: 1px solid var(--line); border-radius: 10px; }
+    textarea { width: 100%; min-height: 88px; margin-top: 12px; padding: 10px 12px; color: var(--ink); background: #f8fbfc; border: 1px solid var(--line); border-radius: 10px; font: inherit; resize: vertical; }
+    .fine { color: var(--muted); font-size: 13px; }
+    footer { margin-top: 22px; color: var(--muted); font-size: 13px; }
+    footer a { color: var(--blue); font-weight: 700; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } .panel-head, .track-head { flex-direction: column; } }
+    @media (max-width: 560px) { .page { width: min(100% - 20px, 1120px); padding-top: 12px; } .topbar { align-items: flex-start; } .privacy { display: none; } h1 { font-size: 30px; } }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <a class="brand" href="../../index.html"><span class="brand-mark">LT</span><span><small>LOCAL TOOLS</small><strong>返回工具入口</strong></span></a>
+      <span class="privacy">只在瀏覽器播放</span>
+    </header>
+    <h1>背景音樂試聽</h1>
+    <p class="intro">六款原創編曲，每款 30 秒。可以先聽比較合集，再逐款切換純音樂或配旁白。頁面沒有自動播放，一次只播一首。</p>
+    <section class="notice" aria-label="音量與使用範圍">
+      <p><strong>純音樂的音量只供聽音色，不可直接套入影片。</strong>純音樂約 −23.3 LUFS。配旁白時，旁白約 −18.3 LUFS；有聲區的旁白與音樂相差 23.50 dB。選定之後，仍要按那條影片的旁白再混，目標大約低 22–25 dB。</p>
+      <p>這頁不會改任何現有影片，也不會把任何一款設成音樂預設。請自己播放比較。</p>
+    </section>
+
+    <section class="panel" aria-labelledby="comparison-title">
+      <div class="panel-head">
+        <div>
+          <p class="kicker">比較合集</p>
+          <h2 id="comparison-title">00 至 06，同一旁白</h2>
+        </div>
+        <span class="tag">3:34.500</span>
+      </div>
+      <p>順序是無音樂，然後 01 至 06。每段 30 秒，中間 0.75 秒靜音，沒有口述標籤。合集使用配旁白版本。</p>
+      <audio id="comparison" controls preload="none" src="audio/comparison_00_to_06.mp3"></audio>
+      <div class="seek">
+        <button type="button" data-seek="0">00 無音樂 · 0:00.000</button>
+        <button type="button" data-seek="30.75">01 鋼琴 · 0:30.750</button>
+        <button type="button" data-seek="61.5">02 電鋼琴 · 1:01.500</button>
+        <button type="button" data-seek="92.25">03 木結他 · 1:32.250</button>
+        <button type="button" data-seek="123">04 氛圍 pad · 2:03.000</button>
+        <button type="button" data-seek="153.75">05 輕電子 · 2:33.750</button>
+        <button type="button" data-seek="184.5">06 顫音琴 · 3:04.500</button>
+      </div>
+      <div class="downloads"><a download="comparison_00_to_06.mp3" href="audio/comparison_00_to_06.mp3">下載比較合集</a></div>
+    </section>
+
+    <div class="mode">
+      <div class="mode-row">
+        <div>
+          <p class="kicker">六款切換</p>
+          <h2>純音樂或配旁白</h2>
+        </div>
+        <div class="seek" role="group" aria-label="播放版本">
+          <button type="button" id="mode-voice" aria-pressed="true">配旁白</button>
+          <button type="button" id="mode-solo" aria-pressed="false">純音樂</button>
+        </div>
+      </div>
+      <p id="mode-note">現在顯示配旁白。00 永遠是無音樂旁白，不受這個切換影響。切換時會停止正在播放的聲音。</p>
+    </div>
+
+    <section class="track track-baseline" aria-labelledby="baseline-title">
+      <div class="track-head">
+        <div>
+          <p class="num">00</p>
+          <h3 id="baseline-title">無音樂旁白基準</h3>
+        </div>
+        <span class="tag">30 秒</span>
+      </div>
+      <p>同一段粵語乾聲，沒有背景音樂。六款配旁白都使用這段聲音和同一個音量。</p>
+      <ul class="facts"><li>鼓：無</li><li>旁白約 −18.3 LUFS</li><li>合集 0:00.000</li></ul>
+      <audio controls preload="none" src="audio/00_dry_baseline.mp3"></audio>
+      <div class="downloads"><a download="00_dry_baseline.mp3" href="audio/00_dry_baseline.mp3">下載旁白基準</a></div>
+    </section>
+
+    <div class="grid">
+      <article class="track" data-solo="audio/01_sparse_piano_solo.mp3" data-voice="audio/01_sparse_piano_with_voice.mp3">
+        <div class="track-head"><div><p class="num">01</p><h3>稀疏柔和鋼琴</h3></div><span class="tag">30 秒</span></div>
+        <p>極簡柔和鋼琴：稀疏低音與和聲。</p>
+        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>合集 0:30.750</li></ul>
+        <audio controls preload="none" src="audio/01_sparse_piano_with_voice.mp3"></audio>
+        <div class="downloads"><a download="01_sparse_piano_solo.mp3" href="audio/01_sparse_piano_solo.mp3">下載純音樂</a><a download="01_sparse_piano_with_voice.mp3" href="audio/01_sparse_piano_with_voice.mp3">下載配旁白</a></div>
+      </article>
+      <article class="track" data-solo="audio/02_warm_epiano_solo.mp3" data-voice="audio/02_warm_epiano_with_voice.mp3">
+        <div class="track-head"><div><p class="num">02</p><h3>暖電鋼琴</h3></div><span class="tag">30 秒</span></div>
+        <p>較長和弦，帶輕補拍。</p>
+        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>合集 1:01.500</li></ul>
+        <audio controls preload="none" src="audio/02_warm_epiano_with_voice.mp3"></audio>
+        <div class="downloads"><a download="02_warm_epiano_solo.mp3" href="audio/02_warm_epiano_solo.mp3">下載純音樂</a><a download="02_warm_epiano_with_voice.mp3" href="audio/02_warm_epiano_with_voice.mp3">下載配旁白</a></div>
+      </article>
+      <article class="track" data-solo="audio/03_nylon_guitar_solo.mp3" data-voice="audio/03_nylon_guitar_with_voice.mp3">
+        <div class="track-head"><div><p class="num">03</p><h3>尼龍木結他</h3></div><span class="tag">30 秒</span></div>
+        <p>木結他輕撥弦：尼龍弦分解和弦。</p>
+        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>合集 1:32.250</li></ul>
+        <audio controls preload="none" src="audio/03_nylon_guitar_with_voice.mp3"></audio>
+        <div class="downloads"><a download="03_nylon_guitar_solo.mp3" href="audio/03_nylon_guitar_solo.mp3">下載純音樂</a><a download="03_nylon_guitar_with_voice.mp3" href="audio/03_nylon_guitar_with_voice.mp3">下載配旁白</a></div>
+      </article>
+      <article class="track" data-solo="audio/04_ambient_pad_solo.mp3" data-voice="audio/04_ambient_pad_with_voice.mp3">
+        <div class="track-head"><div><p class="num">04</p><h3>氛圍 pad</h3></div><span class="tag">30 秒</span></div>
+        <p>暖色氛圍 pad，沒有鼓，也沒有主旋律。</p>
+        <ul class="facts"><li>72 BPM 和聲格</li><li>鼓：無</li><li>合集 2:03.000</li></ul>
+        <audio controls preload="none" src="audio/04_ambient_pad_with_voice.mp3"></audio>
+        <div class="downloads"><a download="04_ambient_pad_solo.mp3" href="audio/04_ambient_pad_solo.mp3">下載純音樂</a><a download="04_ambient_pad_with_voice.mp3" href="audio/04_ambient_pad_with_voice.mp3">下載配旁白</a></div>
+      </article>
+      <article class="track" data-solo="audio/05_light_electronic_solo.mp3" data-voice="audio/05_light_electronic_with_voice.mp3">
+        <div class="track-head"><div><p class="num">05</p><h3>輕電子節拍</h3></div><span class="tag tag-drum">有鼓</span></div>
+        <p>低密度節奏加上電鋼琴。鼓只有輕 kick、rim 及 hat。</p>
+        <ul class="facts"><li>80 BPM</li><li>鼓：有，輕</li><li>合集 2:33.750</li></ul>
+        <audio controls preload="none" src="audio/05_light_electronic_with_voice.mp3"></audio>
+        <div class="downloads"><a download="05_light_electronic_solo.mp3" href="audio/05_light_electronic_solo.mp3">下載純音樂</a><a download="05_light_electronic_with_voice.mp3" href="audio/05_light_electronic_with_voice.mp3">下載配旁白</a></div>
+      </article>
+      <article class="track" data-solo="audio/06_soft_mallet_solo.mp3" data-voice="audio/06_soft_mallet_with_voice.mp3">
+        <div class="track-head"><div><p class="num">06</p><h3>柔和顫音琴</h3></div><span class="tag">30 秒</span></div>
+        <p>低中音域顫音琴，不是尖銳鐘琴。</p>
+        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>合集 3:04.500</li></ul>
+        <audio controls preload="none" src="audio/06_soft_mallet_with_voice.mp3"></audio>
+        <div class="downloads"><a download="06_soft_mallet_solo.mp3" href="audio/06_soft_mallet_solo.mp3">下載純音樂</a><a download="06_soft_mallet_with_voice.mp3" href="audio/06_soft_mallet_with_voice.mp3">下載配旁白</a></div>
+      </article>
+    </div>
+
+    <section class="preference" aria-labelledby="preference-title">
+      <h2 id="preference-title">記下想先試的一款</h2>
+      <p class="fine">選擇只留在這個頁面，重新整理後會清空。複製文字要由你自己貼上；頁面不會自動送出，也不會更改任何影片或音樂預設。</p>
+      <fieldset>
+        <legend>偏好</legend>
+        <div class="choice" id="preference-choices">
+          <label><input type="radio" name="preference" value="尚未選擇" checked> 尚未選擇</label>
+          <label><input type="radio" name="preference" value="01 稀疏柔和鋼琴"> 01 稀疏柔和鋼琴</label>
+          <label><input type="radio" name="preference" value="02 暖電鋼琴"> 02 暖電鋼琴</label>
+          <label><input type="radio" name="preference" value="03 尼龍木結他"> 03 尼龍木結他</label>
+          <label><input type="radio" name="preference" value="04 氛圍 pad"> 04 氛圍 pad</label>
+          <label><input type="radio" name="preference" value="05 輕電子節拍"> 05 輕電子節拍</label>
+          <label><input type="radio" name="preference" value="06 柔和顫音琴"> 06 柔和顫音琴</label>
+        </div>
+      </fieldset>
+      <textarea id="preference-text" readonly>背景音樂試聽偏好：尚未選擇</textarea>
+      <div class="downloads"><button type="button" class="copy" id="copy-preference">複製偏好文字</button></div>
+    </section>
+
+    <footer>
+      <p>六款是 2026-11-08 譜寫的原創編曲。音色來自 FluidR3 GM（Frank Wen，MIT），離線渲染使用 TinySoundFont（Bernhard Schelling，MIT）。旁白是既有數學影片乾聲，沒有新配音。</p>
+      <p><a href="licenses/FluidR3-COPYING.txt">FluidR3 授權</a> · <a href="licenses/TinySoundFont-LICENSE.txt">TinySoundFont 授權</a> · <a href="licenses/SOURCES.txt">來源說明</a> · <a href="licenses/ASSET_SHA256.txt">MP3 SHA-256</a></p>
+    </footer>
+  </div>
+  <script>
+    (function () {
+      var players = Array.prototype.slice.call(document.querySelectorAll("audio"));
+      var tracks = Array.prototype.slice.call(document.querySelectorAll(".track[data-solo]"));
+      var comparison = document.getElementById("comparison");
+      var voiceButton = document.getElementById("mode-voice");
+      var soloButton = document.getElementById("mode-solo");
+      var modeNote = document.getElementById("mode-note");
+      var preferenceText = document.getElementById("preference-text");
+      var pendingSeek = null;
+
+      function pauseOthers(current) {
+        players.forEach(function (audio) {
+          if (audio !== current) audio.pause();
+        });
+      }
+
+      function placeSeek() {
+        if (!pendingSeek) return;
+        var seconds = pendingSeek;
+        if (!comparison.seekable || !comparison.seekable.length) return;
+        var end = comparison.seekable.end(comparison.seekable.length - 1);
+        if (seconds > end + 0.2) return;
+        if (Math.abs(comparison.currentTime - seconds) > 0.35) comparison.currentTime = seconds;
+      }
+
+      comparison.addEventListener("loadedmetadata", placeSeek);
+      comparison.addEventListener("progress", placeSeek);
+      comparison.addEventListener("canplay", placeSeek);
+      comparison.addEventListener("playing", placeSeek);
+
+      document.addEventListener("play", function (event) {
+        if (!event.target || event.target.tagName !== "AUDIO") return;
+        if (event.target !== comparison) pendingSeek = null;
+        pauseOthers(event.target);
+      }, true);
+
+      function setMode(mode) {
+        var solo = mode === "solo";
+        pendingSeek = null;
+        pauseOthers(null);
+        tracks.forEach(function (track) {
+          var audio = track.querySelector("audio");
+          var next = solo ? track.getAttribute("data-solo") : track.getAttribute("data-voice");
+          if (audio.getAttribute("src") !== next) {
+            audio.pause();
+            audio.setAttribute("src", next);
+            audio.load();
+          }
+        });
+        voiceButton.setAttribute("aria-pressed", String(!solo));
+        soloButton.setAttribute("aria-pressed", String(solo));
+        modeNote.textContent = solo
+          ? "現在顯示純音樂。這個音量只供聽音色，不可直接套入影片。00 仍然是無音樂旁白。"
+          : "現在顯示配旁白。00 永遠是無音樂旁白，不受這個切換影響。切換時會停止正在播放的聲音。";
+      }
+
+      voiceButton.addEventListener("click", function () { setMode("voice"); });
+      soloButton.addEventListener("click", function () { setMode("solo"); });
+
+      document.querySelectorAll("[data-seek]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          pendingSeek = Number(button.getAttribute("data-seek"));
+          pauseOthers(comparison);
+          placeSeek();
+          var pending = comparison.play();
+          if (pending && typeof pending.then === "function") pending.then(placeSeek, function () {});
+        });
+      });
+
+      function selectedPreference() {
+        var picked = document.querySelector("input[name=preference]:checked");
+        return picked ? picked.value : "尚未選擇";
+      }
+
+      function renderPreference() {
+        var value = selectedPreference();
+        preferenceText.value = value === "尚未選擇"
+          ? "背景音樂試聽偏好：尚未選擇"
+          : "背景音樂試聽偏好：" + value + "\n我想先試這一款的純音樂和配旁白。請不要自動更改現有影片或音樂預設。";
+      }
+
+      document.getElementById("preference-choices").addEventListener("change", renderPreference);
+      document.getElementById("copy-preference").addEventListener("click", function () {
+        var text = preferenceText.value;
+        var button = document.getElementById("copy-preference");
+        var done = function () {
+          var original = button.textContent;
+          button.textContent = "已複製";
+          window.setTimeout(function () { button.textContent = original; }, 900);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, function () {
+            preferenceText.focus();
+            preferenceText.select();
+          });
+        } else {
+          preferenceText.focus();
+          preferenceText.select();
+        }
+      });
+    }());
+  </script>
+</body>
+</html>
