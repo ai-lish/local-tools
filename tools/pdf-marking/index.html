@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="只在瀏覽器本機讀取選擇題答題紙及批改默書 PDF。">
+  <title>批改 PDF｜Local Tools</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script defer src="model.js"></script>
+  <script defer src="geometry.js"></script>
+  <script defer src="omr.js"></script>
+  <script defer src="pdf-export.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../public-index.html" aria-label="返回 Local Tools">
+      <span class="brand-mark">LT</span><span><small>LOCAL TOOLS</small><strong>批改 PDF</strong></span>
+    </a>
+    <span class="privacy-badge">🔒 PDF 只在本機瀏覽器處理</span>
+  </header>
+
+  <main class="shell">
+    <section class="intro">
+      <div><p class="eyebrow">瀏覽器本機工具</p><h1>批改 PDF</h1>
+        <p>選擇題先自動讀圈，再逐題覆核；默書沿用圈、箭、漏字標記規則。成績及進度由你下載到本機。</p>
+      </div>
+      <label class="file-button primary" for="pdf-file">選擇本機 PDF<input id="pdf-file" type="file" accept="application/pdf,.pdf"></label>
+    </section>
+
+    <section class="panel file-status" aria-live="polite">
+      <span class="status-dot" id="file-dot"></span><span id="file-status">尚未載入 PDF</span>
+      <span class="muted" id="page-count"></span>
+      <button class="button compact" id="clear-pdf" type="button" disabled>清除 PDF</button>
+    </section>
+
+    <nav class="mode-tabs" aria-label="批改方式">
+      <button type="button" class="mode-tab active" data-mode="choice" aria-pressed="true">選擇題答題紙</button>
+      <button type="button" class="mode-tab" data-mode="dictation" aria-pressed="false">默書</button>
+    </nav>
+
+    <section id="choice-mode" class="mode-panel">
+      <section class="panel settings-panel">
+        <div class="section-title"><div><p class="eyebrow">01 · 讀圈及答案</p><h2>選擇題設定</h2></div>
+          <span class="hint-pill">可先輸入答案，再選 PDF</span></div>
+        <div class="form-grid">
+          <label class="field"><span>選擇題數目</span><input id="mc-count" type="number" min="0" max="60" value="60"></label>
+          <label class="field"><span>是非題數目</span><input id="tf-count" type="number" min="0" max="10" value="10"></label>
+          <label class="field wide"><span>選擇題答案（A–D，按題號順序）</span><input id="mc-key" type="text" inputmode="text" autocomplete="off" placeholder="例如 ABDC…"></label>
+          <label class="field wide"><span>是非題答案（T／F）</span><input id="tf-key" type="text" inputmode="text" autocomplete="off" placeholder="例如 TFTF…"></label>
+          <label class="field wide"><span>每題分數（留空或填一個數值即每題同分；亦可逐題以逗號分隔）</span><input id="mc-points" type="text" value="1" inputmode="decimal"></label>
+          <label class="field wide"><span>每題分數（是非題）</span><input id="tf-points" type="text" value="1" inputmode="decimal"></label>
+        </div>
+        <div class="toolbar-row">
+          <button class="button primary" id="read-omr" type="button" disabled>自動讀圈／重新讀取</button>
+          <span class="muted" id="omr-status">讀圈會比較同題選項深淺，模糊答案及班別／學號會標示覆核。</span>
+        </div>
+        <p class="privacy-note">本頁不會辨識姓名。答題紙、答案及成績不會上載或傳送；外部只載入固定版本的 PDF 顯示與編輯程式庫。</p>
+      </section>
+
+      <section class="panel review-panel">
+        <div class="section-title"><div><p class="eyebrow">02 · 人手覆核</p><h2>逐頁覆核</h2></div>
+          <div class="page-controls"><button class="button compact" id="choice-prev" type="button" disabled>上一頁</button>
+            <label class="field inline"><span>頁碼</span><select id="choice-page" disabled></select></label>
+            <button class="button compact" id="choice-next" type="button" disabled>下一頁</button></div></div>
+        <div class="review-summary">
+          <div class="metric"><span>本頁分數</span><strong id="choice-score">—</strong></div>
+          <div class="metric"><span>待覆核題目</span><strong id="choice-reviews">—</strong></div>
+          <div class="metric"><span>讀圈校正</span><strong id="choice-alignment">—</strong></div>
+        </div>
+        <div class="identity-grid">
+          <label class="field"><span>班別（自動讀取，可修改）</span><input id="choice-class" type="text" maxlength="8" autocomplete="off"></label>
+          <label class="field"><span>學號（自動讀取，可修改）</span><input id="choice-student-id" type="text" maxlength="8" inputmode="numeric" autocomplete="off"></label>
+        </div>
+        <div class="document-layout">
+          <div class="document-card"><div id="choice-stage" class="pdf-stage"><p class="empty-state">選擇 PDF 後，答題紙會顯示在這裏。</p></div></div>
+          <aside class="review-list"><h3>待覆核</h3><p class="muted small">點擊答題紙上的選項可切換答案；重點題目會以橙色標示。</p><div id="review-items" class="review-items"><p class="muted">尚未讀取。</p></div>
+            <div id="page-flags" class="page-flags"></div></aside>
+        </div>
+      </section>
+    </section>
+
+    <section id="dictation-mode" class="mode-panel" hidden>
+      <section class="panel settings-panel">
+        <div class="section-title"><div><p class="eyebrow">01 · 默書設定</p><h2>句子及格位</h2></div><span class="hint-pill">移植 GAS 版規則</span></div>
+        <div class="form-grid dictation-form">
+          <label class="field"><span>批改段落</span><select id="dictation-segment"><option value="1" selected>第一段</option><option value="2">第二段</option></select></label>
+          <label class="field wide"><span>默書句子</span><textarea id="dictation-answer" rows="2"></textarea></label>
+          <label class="field"><span>後備每行格數</span><input id="dictation-first-row" type="number" min="1" max="80" value="20"></label>
+          <label class="field wide"><span>標點索引（從 0 開始，以逗號分隔；標點不計分）</span><input id="punctuation-indexes" type="text" autocomplete="off"></label>
+        </div>
+        <div class="toolbar-row">
+          <button class="button" id="detect-punctuation" type="button">依句子找出標點</button>
+          <div class="mark-modes" role="group" aria-label="默書標記模式">
+            <button class="button mode-mark active" data-mark="circle" type="button" aria-pressed="true">紅圈</button>
+            <button class="button mode-mark" data-mark="arrow" type="button" aria-pressed="false">向上箭嘴</button>
+            <button class="button mode-mark" data-mark="miss" type="button" aria-pressed="false">漏字紅⇄黑</button>
+          </div>
+          <span class="muted" id="dictation-note">點擊 PDF 格位切換標記；標點不可圈或標成漏字，箭嘴不扣分。</span>
+        </div>
+        <div class="dictation-calibration" aria-label="默書格位校準">
+          <label class="field">左右位移 <input id="dictation-dx" type="range" min="-200" max="200" value="0" step="1"></label>
+          <label class="field">上下位移 <input id="dictation-dy" type="range" min="-200" max="200" value="0" step="1"></label>
+          <label class="field">縮放 <input id="dictation-scale" type="range" min="70" max="140" value="100" step="1"></label>
+          <button class="button" id="reset-dictation-calibration" type="button">重置校準</button>
+        </div>
+        <p class="rotation-note">PDF 依頁面 rotation 轉正；掃描格位有偏移時，可在此調整圈選、箭嘴及匯出位置。</p>
+      </section>
+
+      <section class="panel review-panel">
+        <div class="section-title"><div><p class="eyebrow">02 · 點擊批改</p><h2>默書 PDF</h2></div>
+          <div class="page-controls"><button class="button compact" id="dictation-prev" type="button" disabled>上一頁</button>
+            <label class="field inline"><span>頁碼</span><select id="dictation-page" disabled></select></label>
+            <button class="button compact" id="dictation-next" type="button" disabled>下一頁</button></div></div>
+        <div class="review-summary">
+          <div class="metric"><span>建議分數</span><strong id="dictation-score">10.0</strong></div>
+          <div class="metric"><span>扣字數 N</span><strong id="dictation-deduction">0</strong></div>
+          <label class="field student-id-field"><span>學號（可留空）</span><input id="dictation-student-id" type="text" maxlength="24" autocomplete="off" placeholder="預設空白"></label>
+        </div>
+        <div id="dictation-stage" class="pdf-stage"><p class="empty-state">選擇 PDF 後，掃描頁會顯示在這裏。</p></div>
+        <div class="dictation-grid-wrap"><h3>本頁格位</h3><div id="dictation-grid" class="dictation-grid"></div></div>
+        <p class="rule-note">N = |圈 ∪ 漏字|；分數 = max(0, min(10, 10 − 0.5N))，四捨五入到 0.5。標點（，、。）永不圈、永不當漏字紅。</p>
+      </section>
+    </section>
+
+    <section class="panel export-panel">
+      <div class="section-title"><div><p class="eyebrow">03 · 本機匯出</p><h2>匯出及進度</h2></div><span class="hint-pill">下載檔案只存於你選擇的位置</span></div>
+      <div class="toolbar-row export-actions">
+        <button class="button primary" id="export-pdf" type="button" disabled>下載已批改 PDF</button>
+        <button class="button" id="export-csv" type="button" disabled>下載分數 CSV</button>
+        <button class="button" id="download-progress" type="button" disabled>下載進度 JSON</button>
+        <label class="button file-button" for="progress-file">載入進度 JSON<input id="progress-file" type="file" accept="application/json,.json"></label>
+        <span class="muted" id="export-status" role="status"></span>
+      </div>
+    </section>
+    <footer>只在本機瀏覽器工作 · 不連接伺服器或 API · 建議桌面瀏覽器</footer>
+  </main>
+</body>
+</html>

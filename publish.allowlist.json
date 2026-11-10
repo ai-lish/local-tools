@@ -37,6 +37,48 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/pdf-marking/index.html",
+      "destination": "tools/pdf-marking/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/styles.css",
+      "destination": "tools/pdf-marking/styles.css",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/app.js",
+      "destination": "tools/pdf-marking/app.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/model.js",
+      "destination": "tools/pdf-marking/model.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/geometry.js",
+      "destination": "tools/pdf-marking/geometry.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/omr.js",
+      "destination": "tools/pdf-marking/omr.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/pdf-export.js",
+      "destination": "tools/pdf-marking/pdf-export.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/pdf-splitter/README.md",
       "destination": "tools/pdf-splitter/README.md",
       "publicMode": "cli-documentation",

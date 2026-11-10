@@ -7,6 +7,7 @@ CloudSAMS server；有外部 API 的工具只會在使用者明確啟動後傳�
 
 - `pdf-splitter`：`stable`，瀏覽器內按每 N 頁、自訂範圍或指定頁分割 PDF，支援 ZIP
   下載、解除列印限制及其他本機 PDF 操作；PDF 只在本機處理。
+- `pdf-marking`：`wip`，瀏覽器內為固定版式選擇題答題紙讀圈並人手覆核，也可按默書格位點擊批改；PDF 只在本機處理。
 - `slp-split-pdf`：`stable`，可用 browser HTML（slp-split-pdf/index.html）
   或 Python CLI 按頁或指定範圍分割 SLP PDF；PDF 只在本機處理。
 - `hkdse-question-split`：`wip`，瀏覽器內逐題確認 HKDSE PDF 題界，支援跨頁拼接
