@@ -1,8 +1,8 @@
 // Thin fx-3650P interface over the shared upstream engine.
-import { KEYS, SHELL_W, SHELL_H, PC_KEYS } from './keymap.js?v=appearance-2';
-import { FX_3650P_CONFIG } from './model.js';
-import { Machine } from '../../fx-50fh-ii/js/machine.js';
-import { LCD, GLASS } from '../../fx-50fh-ii/js/lcd.js';
+import { KEYS, SHELL_W, SHELL_H, PC_KEYS } from './keymap.js?v=fmla-20261110';
+import { FX_3650P_CONFIG } from './model.js?v=fmla-20261110';
+import { Machine } from '../../fx-50fh-ii/js/machine.js?v=fmla-20261110';
+import { LCD, GLASS } from '../../fx-50fh-ii/js/lcd.js?v=fmla-20261110';
 
 const shell = document.getElementById('shell');
 const canvas = document.getElementById('lcd');

@@ -1247,7 +1247,11 @@ export class Machine {
   // ==========================================================================
   // built-in formulas
   openFormula() {
-    this.formula = { stage: 'pick', digits: '', index: 0, values: {}, results: null, varIdx: 0, edit: [] };
+    this.formula = {
+      stage: 'pick', digits: '', index: 0, values: {}, results: null, varIdx: 0, edit: [],
+      showExtra: false, pendingSto: false, storeDisplay: null,
+      resultView: 'normal', resultImproper: false
+    };
     this.screen = 'formula';
   }
 
@@ -1266,18 +1270,21 @@ export class Machine {
     if (f.stage === 'pick') {
       const d = { N0: '0', N1: '1', N2: '2', N3: '3', N4: '4', N5: '5', N6: '6', N7: '7', N8: '8', N9: '9' }[id];
       if (d) {
-        f.digits += d;
-        if (f.digits.length === 2) {
-          const no = Number(f.digits);
-          if (no < 1 || no > 23) { f.digits = ''; this.raise('Syntax'); return; }
-          f.index = no - 1;
-          f.digits = '';
-        }
+        if (f.digits.length < 2) f.digits += d;
         return;
       }
-      if (id === 'DOWN') { f.index = (f.index + 1) % FORMULAS.length; return; }
-      if (id === 'UP') { f.index = (f.index - 1 + FORMULAS.length) % FORMULAS.length; return; }
-      if (id === 'EXE') { this.formulaStart(); return; }
+      if (id === 'DEL') { f.digits = f.digits.slice(0, -1); return; }
+      if (id === 'DOWN') { f.digits = ''; f.index = (f.index + 1) % FORMULAS.length; return; }
+      if (id === 'UP') { f.digits = ''; f.index = (f.index - 1 + FORMULAS.length) % FORMULAS.length; return; }
+      if (id === 'EXE') {
+        if (f.digits) {
+          const no = Number(f.digits);
+          if (no < 1 || no > FORMULAS.length) { this.raise('Syntax'); return; }
+          f.index = no - 1;
+        }
+        this.formulaStart();
+        return;
+      }
       return;
     }
 
@@ -1310,14 +1317,37 @@ export class Machine {
     }
 
     if (f.stage === 'result') {
+      if (f.pendingSto) {
+        const v = VAR_KEYS[id];
+        if (v) this.formulaStoreTo(v);
+        return;
+      }
+      if (id === 'RCL' && shift) {
+        f.pendingSto = true;
+        f.storeDisplay = null;
+        return;
+      }
+      if (id === 'ABC') {
+        f.storeDisplay = null;
+        return shift ? this.formulaToggleImproper() : this.formulaToggleFraction();
+      }
       if (id === 'EXE') {
-        if (FORMULAS[f.index].extra && !f.showExtra) { f.showExtra = true; return; }
+        f.storeDisplay = null;
+        if (FORMULAS[f.index].extra && !f.showExtra) {
+          f.showExtra = true;
+          f.resultView = 'normal';
+          return;
+        }
         this.formulaStart();
         return;
       }
       if (id === 'DOWN' || id === 'UP') {
         const spec = FORMULAS[f.index];
-        if (spec.extra) f.showExtra = !f.showExtra;
+        if (spec.extra) {
+          f.showExtra = !f.showExtra;
+          f.resultView = 'normal';
+          f.storeDisplay = null;
+        }
         return;
       }
     }
@@ -1333,6 +1363,42 @@ export class Machine {
     for (const v of spec.vars) f.values[v] = this.fvars[v] !== undefined ? this.fvars[v] : 0;
     f.results = null;
     f.showExtra = false;
+    f.pendingSto = false;
+    f.storeDisplay = null;
+    f.resultView = 'normal';
+    f.resultImproper = this.setup.frac === 'd/c';
+  }
+
+  formulaResultValue() {
+    const f = this.formula;
+    const spec = FORMULAS[f.index];
+    const key = f.showExtra && spec.extra ? spec.extra[0] : spec.result;
+    return r15(f.results[key]);
+  }
+
+  formulaStoreTo(v) {
+    const f = this.formula;
+    const value = C(this.formulaResultValue());
+    this.vars[v] = storeZ(value);
+    this.ans = value;
+    f.pendingSto = false;
+    f.storeDisplay = { variable: v, value: value.re };
+  }
+
+  formulaToggleFraction() {
+    const f = this.formula;
+    if (f.resultView === 'frac') { f.resultView = 'normal'; return; }
+    f.resultImproper = this.setup.frac === 'd/c';
+    if (formatFraction(this.formulaResultValue(), f.resultImproper)) f.resultView = 'frac';
+  }
+
+  formulaToggleImproper() {
+    const f = this.formula;
+    const next = f.resultView === 'frac' ? !f.resultImproper : this.setup.frac !== 'd/c';
+    if (formatFraction(this.formulaResultValue(), next)) {
+      f.resultView = 'frac';
+      f.resultImproper = next;
+    }
   }
 
   formulaRun() {
@@ -1353,6 +1419,10 @@ export class Machine {
     for (const [k, v] of Object.entries(out)) this.fvars[k] = r15(v);
     f.results = out;
     f.stage = 'result';
+    f.pendingSto = false;
+    f.storeDisplay = null;
+    f.resultView = 'normal';
+    f.resultImproper = this.setup.frac === 'd/c';
     const first = spec.result;
     this.ans = C(r15(out[first] !== undefined ? out[first] : Object.values(out)[0]));
   }
@@ -1669,6 +1739,7 @@ export class Machine {
     if (asNum(this.vars.M)) ind.add('M');
     if (this.pending === 'sto') ind.add('STO');
     if (this.pending === 'rcl') ind.add('RCL');
+    if (this.screen === 'formula' && this.formula?.stage === 'result' && this.formula.pendingSto) ind.add('STO');
     if (this.mode === 'CMPLX') ind.add('CMPLX');
     if (this.mode === 'SD') ind.add('SD');
     if (this.mode === 'REG') ind.add('REG');
@@ -1825,9 +1896,16 @@ export class Machine {
       const value = f.edit.length ? textOf(f.edit) : this.fmtPlain(f.values[name] || 0);
       return { line1: formulaTitle(spec), left: name, line2: value };
     }
+    if (f.storeDisplay) {
+      const value = formatReal(f.storeDisplay.value, this.setup);
+      return { line1: `Ans→${f.storeDisplay.variable}`, line2: value.main, exp: value.exp };
+    }
     const key = f.showExtra && spec.extra ? spec.extra[0] : spec.result;
     const val = f.results[key];
-    const l2 = formatReal(r15(val), this.setup);
+    const fraction = f.resultView === 'frac'
+      ? formatFraction(r15(val), f.resultImproper)
+      : null;
+    const l2 = fraction || formatReal(r15(val), this.setup);
     const view = { line1: formulaTitle(spec), left: key, line2: l2.main, exp: l2.exp };
     if (spec.extra) {
       if (f.showExtra) view.histUp = true;

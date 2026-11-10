@@ -86,11 +86,19 @@ export function formatEng(x, e) {
   return { main: s, exp: expField(e) };
 }
 
-/** a⌐b⌐c style fraction display, or null when it does not fit in ten cells. */
+/** a⌐b⌐c style fraction display; integers stay integers, or null when too wide. */
 export function formatFraction(x, improper) {
+  if (Number.isInteger(x)) {
+    const s = String(x);
+    return s.length <= MANT && !/[eE]/.test(s) ? { main: s, exp: '' } : null;
+  }
   const f = toFraction(x, MANT);
   if (!f) return null;
   const sign = f.sign < 0 ? '-' : '';
+  if (f.num === 0) {
+    const s = sign + String(f.int);
+    return s.length <= MANT ? { main: s, exp: '' } : null;
+  }
   if (improper || f.int === 0) {
     const s = `${sign}${f.n}⌐${f.d}`;
     return s.replace(/⌐/g, '⌐').length <= MANT ? { main: s, exp: '' } : null;

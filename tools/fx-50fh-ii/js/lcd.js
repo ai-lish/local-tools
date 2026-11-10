@@ -283,8 +283,8 @@ export class LCD {
     const c = this.ctx;
     c.fillStyle = ON;
     const t = h * 0.1;
-    c.fillRect(x + w * 0.85 - t * 0.9, y + h * 0.16, t * 0.9, h * 0.52);
-    c.fillRect(x + w * 0.15, y + h * 0.16 + h * 0.52 - t, w * 0.7, t);
+    c.fillRect(x + w * 0.85 - t * 0.9, y + h * 0.5, t * 0.9, h * 0.5);
+    c.fillRect(x + w * 0.15, y + h - t, w * 0.7, t);
   }
 
   #degree(x, y, w, h) {

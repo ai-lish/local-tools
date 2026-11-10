@@ -2,10 +2,10 @@
 // upstream hit box, a canvas laid over the glass, and the physical keyboard
 // mapped onto the same key ids.
 
-import { KEYS, SHELL_W, SHELL_H, PC_KEYS } from './keymap.js?v=appearance-2';
-import { LCD, GLASS } from './lcd.js?v=minus-adjacent';
-import { Machine } from './machine.js?v=studio-v9';
-import { setupProgramStudio } from './studio.js?v=studio-v9';
+import { KEYS, SHELL_W, SHELL_H, PC_KEYS } from './keymap.js?v=fmla-20261110';
+import { LCD, GLASS } from './lcd.js?v=fmla-20261110';
+import { Machine } from './machine.js?v=fmla-20261110';
+import { setupProgramStudio } from './studio.js?v=fmla-20261110';
 
 const shell = document.getElementById('shell');
 const canvas = document.getElementById('lcd');

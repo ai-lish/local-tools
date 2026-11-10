@@ -11,7 +11,7 @@ import { CONSTANTS } from '../js/consts.js';
 import { StatStore } from '../js/stats.js';
 import { GLASS, minusSignX, digitCellX } from '../js/lcd.js';
 import { KEYS, SHELL_W, SHELL_H } from '../js/keymap.js';
-import { glyphLayers, hasGlyph, lcdTextCells } from '../js/font.js';
+import { glyph, glyphLayers, hasGlyph, lcdTextCells } from '../js/font.js';
 import { formatProgramText, parseProgramText } from '../js/program-codec.js';
 import { PROGRAMS, PROGRAM_PACKS, PROGRAM_BY_ID } from '../js/program-catalog.generated.js';
 import { createProgramBackup, filterProgramCatalog, packBytes, parseProgramBackup } from '../js/studio.js';
@@ -461,7 +461,14 @@ t('√3²+4²', '3[SQR]+4[SQR]=[SQRT]=', '5');
 t('3 1/4 + 1 2/3', '3[ABC]1[ABC]4+1[ABC]2[ABC]3=', '4⌐11⌐12');
 t('4 − 3 1/2', '4-3[ABC]1[ABC]2=', '1⌐2');
 t('2/3 + 1/2 as d/c', '2[ABC]3+1[ABC]2=', '7⌐6', (m) => { m.setup.frac = 'd/c'; });
+t('integer fraction toggle stays integer', '1=[ABC]', '1');
+t('ten-cell integer fraction toggle stays integer', '1234567890=[ABC]', '1234567890');
+t('negative integer fraction toggle stays integer', '0-1=[ABC]', '-1');
+t('zero fraction toggle stays zero', '0=[ABC]', '0');
+t('0.5 fraction toggle', '1/2=[ABC]', '1⌐2');
 t('1.5 → fraction', '1.5=[ABC]', '1⌐1⌐2');
+t('-1.5 → fraction', '0-1.5=[ABC]', '-1⌐1⌐2');
+check('fraction separator dot matrix occupies only the lower half and bottom row', glyph('⌐').join(','), '64,64,64,64,120');
 
 // ---- percent ----------------------------------------------------------------
 t('2%', '2@(=', '0.02');
@@ -870,6 +877,125 @@ for (const [type, data, coef, yCase, xCase] of REG_MODEL_CASES) {
   const m4 = new Machine();
   send(m4, '[FMLA]07=9[EXP]99=9[EXP]99=1=');
   check('formula result overflow', m4.view().line1, 'Math ERROR');
+}
+
+// ---- FMLA selection, negative coefficient entry, and result actions --------
+{
+  const pick = new Machine();
+  send(pick, '[FMLA]0');
+  check('formula picker keeps one typed digit in number prompt', pick.view().line1, 'Formula No.?');
+  check('formula picker shows the first typed digit', pick.view().line2, '0');
+  send(pick, '1');
+  check('formula 01 remains unselected until EXE', pick.formula.stage, 'pick');
+  check('formula 01 number remains visible until EXE', pick.view().line2, '01');
+  send(pick, '[DEL]');
+  check('formula picker DEL removes one digit', pick.view().line2, '0');
+  send(pick, '1=');
+  check('formula picker EXE selects formula 01', pick.formula.index, 0);
+  check('formula picker EXE starts variable entry', pick.formula.stage, 'vars');
+  check('formula 01 starts at a', pick.view().left, 'a');
+
+  const invalid = new Machine();
+  send(invalid, '[FMLA]24');
+  check('invalid formula number waits for EXE', invalid.formula.stage, 'pick');
+  check('invalid formula number is still a prompt', invalid.view().line1, 'Formula No.?');
+  send(invalid, '=');
+  check('invalid formula number errors on EXE', invalid.view().line1, 'Syntax ERROR');
+
+  const browse = new Machine();
+  send(browse, '[FMLA]1[DOWN]');
+  check('formula browse clears typed digits', browse.view().line1, '02:CosineTheorem');
+  check('formula browse leaves number entry stage', browse.formula.stage, 'pick');
+  send(browse, '=');
+  check('formula browse selection starts on b', browse.view().left, 'b');
+}
+{
+  const negativeA = new Machine();
+  send(negativeA, '[FMLA]01=-1=3=2=');
+  check('FMLA SUB enters negative a', negativeA.formula.values.a, -1);
+  check('negative a formula completes without Syntax ERROR', negativeA.formula.stage, 'result');
+
+  const negativeB = new Machine();
+  send(negativeB, '[FMLA]01=1=-3=2=');
+  check('FMLA SUB enters negative b', negativeB.formula.values.b, -3);
+  check('negative b formula completes without Syntax ERROR', negativeB.formula.stage, 'result');
+
+  const negativeC = new Machine();
+  send(negativeC, '[FMLA]01=1=3=-2=');
+  check('FMLA SUB enters negative c', negativeC.formula.values.c, -2);
+  check('negative c formula completes without Syntax ERROR', negativeC.formula.stage, 'result');
+
+  const remembered = new Machine();
+  send(remembered, '[FMLA]01=1=3=2=[AC][FMLA]01=');
+  check('FMLA re-entry displays remembered a before editing', remembered.view().line2, '1');
+  send(remembered, '-1=3=2=');
+  check('SUB at a prefilled value starts a negative replacement', remembered.formula.values.a, -1);
+  check('negative replacement at a prefilled value completes', remembered.formula.stage, 'result');
+}
+{
+  const stored = new Machine();
+  send(stored, '[FMLA]01=1=-3=2=@[RCL]');
+  check('formula SHIFT STO waits for a variable', stored.view().indicators.has('STO'), true);
+  send(stored, '[NEG]');
+  check('formula STO shows Ans to A', stored.view().line1, 'Ans→A');
+  check('formula STO shows the stored value', stored.view().line2, '2');
+  check('formula STO writes variable A', stored.vars.A, 2);
+  check('formula STO also updates Ans', stored.ans.re, 2);
+  send(stored, '=');
+  check('EXE after storing x1 still shows x2', stored.view().left, 'x2');
+  check('EXE after storing x1 shows x2 value', stored.view().line2, '1');
+
+  const storedOther = new Machine();
+  send(storedOther, '[FMLA]03=8=5=5=@[RCL][NEG]=');
+  check('EXE after storing a single-result formula restarts at a', storedOther.view().left, 'a');
+}
+{
+  const fraction = new Machine();
+  send(fraction, '[FMLA]01=1=-2.5=1.5=');
+  check('FMLA fraction test starts at 1.5', fraction.view().line2, '1.5');
+  send(fraction, '[ABC]');
+  check('FMLA ABC shows a mixed fraction', fraction.view().line2, '1⌐1⌐2');
+  send(fraction, '[ABC]');
+  check('FMLA ABC toggles back to decimal', fraction.view().line2, '1.5');
+  send(fraction, '@[ABC]');
+  check('FMLA SHIFT ABC shows an improper fraction', fraction.view().line2, '3⌐2');
+
+  const formulaIntegerResults = [
+    ['integer', '[FMLA]01=1=-2=1=[ABC]', '1'],
+    ['zero', '[FMLA]01=1=1=0=[ABC]', '0'],
+    ['negative integer', '[FMLA]01=1=1=0=[DOWN][ABC]', '-1'],
+    ['0.5', '[FMLA]01=2=-3=1=[DOWN][ABC]', '1⌐2'],
+    ['1.5', '[FMLA]01=1=-2.5=1.5=[ABC]', '1⌐1⌐2'],
+    ['-1.5', '[FMLA]01=1=1=-0.75=[DOWN][ABC]', '-1⌐1⌐2']
+  ];
+  for (const [label, sequence, expected] of formulaIntegerResults) {
+    const machine = new Machine();
+    send(machine, sequence);
+    check(`FMLA ${label} fraction toggle`, machine.view().line2, expected);
+  }
+
+  const notRepresentable = new Machine();
+  send(notRepresentable, '[FMLA]15=1=');
+  check('FMLA ABC keeps an unrepresentable result decimal', notRepresentable.view().line2, '2.006409293');
+  send(notRepresentable, '[ABC]');
+  check('FMLA ABC leaves unrepresentable value unchanged', notRepresentable.view().line2, '2.006409293');
+}
+{
+  const version = 'fmla-20261110';
+  const fx50Html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const fx50Main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+  const fx3650Html = readFileSync(new URL('../../fx-3650p/index.html', import.meta.url), 'utf8');
+  const fx3650Main = readFileSync(new URL('../../fx-3650p/js/main.js', import.meta.url), 'utf8');
+  check('fx-50FH II entry script uses the cache version', fx50Html.includes(`js/main.js?v=${version}`), true);
+  check('fx-50FH II help shows the cache version', fx50Html.includes(`版本：${version}`), true);
+  for (const module of ['keymap.js', 'lcd.js', 'machine.js', 'studio.js']) {
+    check(`fx-50FH II imports ${module} with the shared cache version`, fx50Main.includes(`${module}?v=${version}`), true);
+  }
+  check('fx-3650P entry script uses the cache version', fx3650Html.includes(`js/main.js?v=${version}`), true);
+  check('fx-3650P help shows the cache version', fx3650Html.includes(`版本：${version}`), true);
+  for (const module of ['keymap.js', 'model.js', 'machine.js', 'lcd.js']) {
+    check(`fx-3650P imports ${module} with the shared cache version`, fx3650Main.includes(`${module}?v=${version}`), true);
+  }
 }
 
 const FORMULA_CASES = [
