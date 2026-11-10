@@ -1271,6 +1271,17 @@ export class Machine {
       const d = { N0: '0', N1: '1', N2: '2', N3: '3', N4: '4', N5: '5', N6: '6', N7: '7', N8: '8', N9: '9' }[id];
       if (d) {
         if (f.digits.length < 2) f.digits += d;
+        if (f.digits.length === 2) {
+          const no = Number(f.digits);
+          if (no < 1 || no > FORMULAS.length) {
+            f.digits = '';
+            this.raise('Syntax');
+            return;
+          }
+          f.index = no - 1;
+          f.digits = '';
+          this.formulaStart();
+        }
         return;
       }
       if (id === 'DEL') { f.digits = f.digits.slice(0, -1); return; }
@@ -1279,8 +1290,9 @@ export class Machine {
       if (id === 'EXE') {
         if (f.digits) {
           const no = Number(f.digits);
-          if (no < 1 || no > FORMULAS.length) { this.raise('Syntax'); return; }
+          if (no < 1 || no > FORMULAS.length) { f.digits = ''; this.raise('Syntax'); return; }
           f.index = no - 1;
+          f.digits = '';
         }
         this.formulaStart();
         return;

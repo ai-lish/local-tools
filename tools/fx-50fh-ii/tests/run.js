@@ -843,10 +843,10 @@ for (const [type, data, coef, yCase, xCase] of REG_MODEL_CASES) {
 // ---- built-in formulas ------------------------------------------------------
 {
   const m = new Machine();
-  send(m, '[FMLA]03=8=5=5=');
+  send(m, '[FMLA]038=5=5=');
   check('Heron 8,5,5', shown(m), '12');
   const m2 = new Machine();
-  send(m2, '[FMLA]01=1=[NEG]5=6=');
+  send(m2, '[FMLA]011=[NEG]5=6=');
   check('Quadratic x²−5x+6 first root', shown(m2), '3');
   check('Quadratic x1 view shows down arrow', m2.view().histDown, true);
   send(m2, '[DOWN]');
@@ -854,7 +854,7 @@ for (const [type, data, coef, yCase, xCase] of REG_MODEL_CASES) {
   check('Quadratic x2 view shows up arrow', m2.view().histUp, true);
   check('Quadratic x2 label', m2.view().left, 'x2');
   const m2e = new Machine();
-  send(m2e, '[FMLA]01=1=[NEG]5=6=');
+  send(m2e, '[FMLA]011=[NEG]5=6=');
   check('Quadratic EXE first root', shown(m2e), '3');
   send(m2e, '=');
   check('Quadratic EXE shows x2 label', m2e.view().left, 'x2');
@@ -866,16 +866,16 @@ for (const [type, data, coef, yCase, xCase] of REG_MODEL_CASES) {
   send(m, '=');
   check('Heron EXE on result restarts at first variable', m.view().left, 'a');
   const m2m = new Machine();
-  send(m2m, '[FMLA]01=1=-5=6=');
+  send(m2m, '[FMLA]011=-5=6=');
   check('Quadratic accepts minus key as negative sign', shown(m2m), '3');
   const m5 = new Machine();
-  send(m5, '[FMLA]03=10-2=5=5=');
+  send(m5, '[FMLA]0310-2=5=5=');
   check('Formula input minus after a number stays subtraction', shown(m5), '12');
   const m3 = new Machine();
-  send(m3, '[FMLA]15=1=');
+  send(m3, '[FMLA]151=');
   check('Pendulum of 1 m', shown(m3), '2.006409293');
   const m4 = new Machine();
-  send(m4, '[FMLA]07=9[EXP]99=9[EXP]99=1=');
+  send(m4, '[FMLA]079[EXP]99=9[EXP]99=1=');
   check('formula result overflow', m4.view().line1, 'Math ERROR');
 }
 
@@ -886,21 +886,30 @@ for (const [type, data, coef, yCase, xCase] of REG_MODEL_CASES) {
   check('formula picker keeps one typed digit in number prompt', pick.view().line1, 'Formula No.?');
   check('formula picker shows the first typed digit', pick.view().line2, '0');
   send(pick, '1');
-  check('formula 01 remains unselected until EXE', pick.formula.stage, 'pick');
-  check('formula 01 number remains visible until EXE', pick.view().line2, '01');
-  send(pick, '[DEL]');
-  check('formula picker DEL removes one digit', pick.view().line2, '0');
-  send(pick, '1=');
-  check('formula picker EXE selects formula 01', pick.formula.index, 0);
-  check('formula picker EXE starts variable entry', pick.formula.stage, 'vars');
-  check('formula 01 starts at a', pick.view().left, 'a');
+  check('formula 01 selects immediately after its second digit', pick.formula.index, 0);
+  check('formula 01 immediately starts variable entry', pick.formula.stage, 'vars');
+  check('formula 01 shows its title immediately', pick.view().line1, '01:Quadratic');
+  check('formula 01 starts at a without EXE', pick.view().left, 'a');
 
-  const invalid = new Machine();
-  send(invalid, '[FMLA]24');
-  check('invalid formula number waits for EXE', invalid.formula.stage, 'pick');
-  check('invalid formula number is still a prompt', invalid.view().line1, 'Formula No.?');
-  send(invalid, '=');
-  check('invalid formula number errors on EXE', invalid.view().line1, 'Syntax ERROR');
+  const del = new Machine();
+  send(del, '[FMLA]0[DEL]');
+  check('formula picker DEL clears the typed digit', del.view().line2, '');
+  check('formula picker DEL keeps the current formula browsable', del.view().line1, '01:Quadratic');
+
+  const oneDigitExe = new Machine();
+  send(oneDigitExe, '[FMLA]1=');
+  check('one digit plus EXE keeps selecting formula 01', oneDigitExe.formula.index, 0);
+  check('one digit plus EXE starts at a', oneDigitExe.view().left, 'a');
+
+  const invalid00 = new Machine();
+  send(invalid00, '[FMLA]00');
+  check('00 raises Syntax ERROR on the second digit', invalid00.view().line1, 'Syntax ERROR');
+  check('00 error clears formula digits', invalid00.formula.digits, '');
+
+  const invalid24 = new Machine();
+  send(invalid24, '[FMLA]24');
+  check('24 raises Syntax ERROR on the second digit', invalid24.view().line1, 'Syntax ERROR');
+  check('24 error clears formula digits', invalid24.formula.digits, '');
 
   const browse = new Machine();
   send(browse, '[FMLA]1[DOWN]');
@@ -911,22 +920,22 @@ for (const [type, data, coef, yCase, xCase] of REG_MODEL_CASES) {
 }
 {
   const negativeA = new Machine();
-  send(negativeA, '[FMLA]01=-1=3=2=');
+  send(negativeA, '[FMLA]01-1=3=2=');
   check('FMLA SUB enters negative a', negativeA.formula.values.a, -1);
   check('negative a formula completes without Syntax ERROR', negativeA.formula.stage, 'result');
 
   const negativeB = new Machine();
-  send(negativeB, '[FMLA]01=1=-3=2=');
+  send(negativeB, '[FMLA]011=-3=2=');
   check('FMLA SUB enters negative b', negativeB.formula.values.b, -3);
   check('negative b formula completes without Syntax ERROR', negativeB.formula.stage, 'result');
 
   const negativeC = new Machine();
-  send(negativeC, '[FMLA]01=1=3=-2=');
+  send(negativeC, '[FMLA]011=3=-2=');
   check('FMLA SUB enters negative c', negativeC.formula.values.c, -2);
   check('negative c formula completes without Syntax ERROR', negativeC.formula.stage, 'result');
 
   const remembered = new Machine();
-  send(remembered, '[FMLA]01=1=3=2=[AC][FMLA]01=');
+  send(remembered, '[FMLA]011=3=2=[AC][FMLA]01');
   check('FMLA re-entry displays remembered a before editing', remembered.view().line2, '1');
   send(remembered, '-1=3=2=');
   check('SUB at a prefilled value starts a negative replacement', remembered.formula.values.a, -1);
@@ -934,7 +943,7 @@ for (const [type, data, coef, yCase, xCase] of REG_MODEL_CASES) {
 }
 {
   const stored = new Machine();
-  send(stored, '[FMLA]01=1=-3=2=@[RCL]');
+  send(stored, '[FMLA]011=-3=2=@[RCL]');
   check('formula SHIFT STO waits for a variable', stored.view().indicators.has('STO'), true);
   send(stored, '[NEG]');
   check('formula STO shows Ans to A', stored.view().line1, 'Ans→A');
@@ -946,12 +955,12 @@ for (const [type, data, coef, yCase, xCase] of REG_MODEL_CASES) {
   check('EXE after storing x1 shows x2 value', stored.view().line2, '1');
 
   const storedOther = new Machine();
-  send(storedOther, '[FMLA]03=8=5=5=@[RCL][NEG]=');
+  send(storedOther, '[FMLA]038=5=5=@[RCL][NEG]=');
   check('EXE after storing a single-result formula restarts at a', storedOther.view().left, 'a');
 }
 {
   const fraction = new Machine();
-  send(fraction, '[FMLA]01=1=-2.5=1.5=');
+  send(fraction, '[FMLA]011=-2.5=1.5=');
   check('FMLA fraction test starts at 1.5', fraction.view().line2, '1.5');
   send(fraction, '[ABC]');
   check('FMLA ABC shows a mixed fraction', fraction.view().line2, '1⌐1⌐2');
@@ -961,12 +970,12 @@ for (const [type, data, coef, yCase, xCase] of REG_MODEL_CASES) {
   check('FMLA SHIFT ABC shows an improper fraction', fraction.view().line2, '3⌐2');
 
   const formulaIntegerResults = [
-    ['integer', '[FMLA]01=1=-2=1=[ABC]', '1'],
-    ['zero', '[FMLA]01=1=1=0=[ABC]', '0'],
-    ['negative integer', '[FMLA]01=1=1=0=[DOWN][ABC]', '-1'],
-    ['0.5', '[FMLA]01=2=-3=1=[DOWN][ABC]', '1⌐2'],
-    ['1.5', '[FMLA]01=1=-2.5=1.5=[ABC]', '1⌐1⌐2'],
-    ['-1.5', '[FMLA]01=1=1=-0.75=[DOWN][ABC]', '-1⌐1⌐2']
+    ['integer', '[FMLA]011=-2=1=[ABC]', '1'],
+    ['zero', '[FMLA]011=1=0=[ABC]', '0'],
+    ['negative integer', '[FMLA]011=1=0=[DOWN][ABC]', '-1'],
+    ['0.5', '[FMLA]012=-3=1=[DOWN][ABC]', '1⌐2'],
+    ['1.5', '[FMLA]011=-2.5=1.5=[ABC]', '1⌐1⌐2'],
+    ['-1.5', '[FMLA]011=1=-0.75=[DOWN][ABC]', '-1⌐1⌐2']
   ];
   for (const [label, sequence, expected] of formulaIntegerResults) {
     const machine = new Machine();
@@ -975,13 +984,13 @@ for (const [type, data, coef, yCase, xCase] of REG_MODEL_CASES) {
   }
 
   const notRepresentable = new Machine();
-  send(notRepresentable, '[FMLA]15=1=');
+  send(notRepresentable, '[FMLA]151=');
   check('FMLA ABC keeps an unrepresentable result decimal', notRepresentable.view().line2, '2.006409293');
   send(notRepresentable, '[ABC]');
   check('FMLA ABC leaves unrepresentable value unchanged', notRepresentable.view().line2, '2.006409293');
 }
 {
-  const version = 'fmla-20261110';
+  const version = 'fmla-20261110b';
   const fx50Html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const fx50Main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
   const fx3650Html = readFileSync(new URL('../../fx-3650p/index.html', import.meta.url), 'utf8');
@@ -1021,7 +1030,7 @@ const FORMULA_CASES = [
   ['23', '100=0=2=60=', '50']
 ];
 for (const [no, inputs, want] of FORMULA_CASES) {
-  t(`formula ${no} catalogue path`, `[FMLA]${no}=${inputs}`, want);
+  t(`formula ${no} catalogue path`, `[FMLA]${no}${inputs}`, want);
 }
 
 // ---- scientific constants ---------------------------------------------------
