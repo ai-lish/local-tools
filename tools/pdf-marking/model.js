@@ -99,15 +99,16 @@
     if (!Array.isArray(list)) return null;
     var seen = new Set();
     var out = [];
+    var dropped = 0;
     for (var i = 0; i < list.length; i += 1) {
       var value = list[i];
-      if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value >= length) return null;
-      if (blocked && blocked.has(value)) continue;
+      if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value >= length) { dropped += 1; continue; }
+      if (blocked && blocked.has(value)) { dropped += 1; continue; }
       if (seen.has(value)) continue;
       seen.add(value);
       out.push(value);
     }
-    return out.sort(function (a, b) { return a - b; });
+    return { values: out.sort(function (a, b) { return a - b; }), dropped: dropped };
   }
 
   function dictationRecord(page, answerLength, punctuation) {
@@ -116,15 +117,180 @@
     var arrows = normalizeIndexes(page && page.arrows, answerLength, null);
     var miss = normalizeIndexes(page && page.miss, answerLength, blocked);
     if (!circles || !arrows || !miss) return null;
-    var count = deductionCount(circles, miss);
+    var count = deductionCount(circles.values, miss.values);
     return {
       studentId: page && page.studentId != null ? String(page.studentId).slice(0, 24) : "",
-      circles: circles,
-      arrows: arrows,
-      miss: miss,
+      circles: circles.values,
+      arrows: arrows.values,
+      miss: miss.values,
+      droppedIndexes: circles.dropped + arrows.dropped + miss.dropped,
       N: count,
       score: dictationScoreFromCount(count)
     };
+  }
+
+  function sanitizeDictationPages(pages, answerLength, punctuation) {
+    var clean = {};
+    var droppedIndexes = 0;
+    Object.keys(pages || {}).forEach(function (pageNumber) {
+      var record = dictationRecord(pages[pageNumber], answerLength, punctuation);
+      if (record) {
+        clean[pageNumber] = { studentId: record.studentId, circles: record.circles,
+          arrows: record.arrows, miss: record.miss };
+        droppedIndexes += record.droppedIndexes;
+      } else {
+        clean[pageNumber] = blankDictationPage();
+      }
+    });
+    return { pages: clean, droppedIndexes: droppedIndexes };
+  }
+
+  function choiceAnswersForSettings(page, type, count) {
+    var byNumber = new Map();
+    (page && Array.isArray(page.questions) ? page.questions : []).forEach(function (question) {
+      if (question.type === type && Number.isInteger(Number(question.number)) && Number(question.number) > 0) {
+        byNumber.set(Number(question.number), String(question.answer || ""));
+      }
+    });
+    var answers = [];
+    for (var number = 1; number <= count; number += 1) answers.push(byNumber.get(number) || "");
+    return answers;
+  }
+
+  function choiceQuestionForSettings(page, type, number) {
+    return (page && Array.isArray(page.questions) ? page.questions : []).find(function (question) {
+      return question.type === type && Number(question.number) === number;
+    }) || null;
+  }
+
+  function choiceIdentityConfirmed(page) {
+    if (!page) return false;
+    var classValue = String(page.classValue || "").trim();
+    var studentId = String(page.studentId || "").replace(/\D/g, "");
+    var metadata = page.metadata || {};
+    var classRead = metadata.grade && metadata.form && metadata.grade.status === "read" && metadata.form.status === "read";
+    var idDigits = Array.isArray(metadata.idDigits) ? metadata.idDigits : [];
+    var idRead = idDigits.length === 2 && idDigits.every(function (digit) { return digit && digit.status === "read"; });
+    return Boolean(classValue && (page.classWasEdited || classRead) && /^\d{2}$/.test(studentId) &&
+      (page.studentIdWasEdited || idRead));
+  }
+
+  function choiceIdentityWarnings(pages, pageCount) {
+    var warnings = {};
+    var grouped = new Map();
+    for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      var page = (pages || {})[pageNumber] || (pages || {})[String(pageNumber)];
+      if (!page) continue;
+      var classValue = String(page.classValue || "").toUpperCase().replace(/[^0-9A-F]/g, "").slice(0, 8);
+      var studentId = String(page.studentId || "").replace(/\D/g, "").slice(0, 2);
+      if (!choiceIdentityConfirmed(page)) {
+        warnings[pageNumber] = ["班別／學號核對：第 " + pageNumber + " 頁，班別「" + (classValue || "空白") +
+          "」，學號「" + (studentId || "空白") + "」未確認"];
+      }
+      if (classValue && /^\d{2}$/.test(studentId)) {
+        var key = classValue + "|" + studentId;
+        if (!grouped.has(key)) grouped.set(key, { classValue: classValue, studentId: studentId, pages: [] });
+        grouped.get(key).pages.push(pageNumber);
+      }
+    }
+    grouped.forEach(function (entry) {
+      if (entry.pages.length < 2) return;
+      var message = "班別／學號核對：班別「" + entry.classValue + "」，學號「" + entry.studentId +
+        "」重複（第 " + entry.pages.join("、") + " 頁）";
+      entry.pages.forEach(function (pageNumber) {
+        if (!warnings[pageNumber]) warnings[pageNumber] = [];
+        warnings[pageNumber].push(message);
+      });
+    });
+    return warnings;
+  }
+
+  function choiceReviewSummary(pages, pageCount, mcCount, tfCount) {
+    var pagesPending = 0;
+    var questionsPending = 0;
+    var identityPages = 0;
+    for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      var page = (pages || {})[pageNumber] || (pages || {})[String(pageNumber)];
+      if (!page) {
+        pagesPending += 1;
+        questionsPending += mcCount + tfCount;
+        identityPages += 1;
+        continue;
+      }
+      var pending = 0;
+      for (var mc = 1; mc <= mcCount; mc += 1) {
+        var mcQuestion = choiceQuestionForSettings(page, "mc", mc);
+        if (!mcQuestion || mcQuestion.status === "review") pending += 1;
+      }
+      for (var tf = 1; tf <= tfCount; tf += 1) {
+        var tfQuestion = choiceQuestionForSettings(page, "tf", tf);
+        if (!tfQuestion || tfQuestion.status === "review") pending += 1;
+      }
+      var identityPending = !choiceIdentityConfirmed(page);
+      if (pending) questionsPending += pending;
+      if (identityPending) identityPages += 1;
+      if (pending || identityPending) pagesPending += 1;
+    }
+    return { pagesPending: pagesPending, questionsPending: questionsPending, identityPages: identityPages };
+  }
+
+  function choiceAnswerStatus(answer, key, type, questionStatus) {
+    if (type === "tf") {
+      var tfAnswer = String(answer || "").toUpperCase();
+      if (tfAnswer !== "T" && tfAnswer !== "F") return questionStatus === "review" ? "待覆核" : "未作答";
+      if (questionStatus === "review") return "待覆核";
+      return tfAnswer === String(key || "").toUpperCase() ? "對" : "錯";
+    }
+    var normalized = normalizeChoice(answer);
+    if (normalized.length > 1) return "多選";
+    if (!normalized) return questionStatus === "review" ? "待覆核" : "未作答";
+    if (questionStatus === "review") return "待覆核";
+    return normalized === String(key || "").toUpperCase() ? "對" : "錯";
+  }
+
+  function csvQuote(value) {
+    return '"' + String(value == null ? "" : value).replace(/"/g, '""') + '"';
+  }
+
+  function buildChoiceCsv(config) {
+    var settings = config.settings;
+    var rows = [["頁碼", "班別", "學號", "分數", "未作答題數", "待覆核題數", "班別／學號已確認"]];
+    for (var mc = 1; mc <= settings.mcCount; mc += 1) rows[0].push(String(mc).padStart(2, "0") + "作答", String(mc).padStart(2, "0") + "對錯");
+    for (var tf = 1; tf <= settings.tfCount; tf += 1) rows[0].push("是非" + String(tf).padStart(2, "0") + "作答", "是非" + String(tf).padStart(2, "0") + "對錯");
+    for (var pageNumber = 1; pageNumber <= config.pageCount; pageNumber += 1) {
+      var page = (config.pages || {})[pageNumber] || (config.pages || {})[String(pageNumber)] || null;
+      var answers = choiceAnswersForSettings(page, "mc", settings.mcCount);
+      var tfAnswers = choiceAnswersForSettings(page, "tf", settings.tfCount);
+      var score = page && !page.pageFailure ? scoreQuestions({ answers: answers, tfAnswers: tfAnswers },
+        settings.mcKey, settings.tfKey, settings.mcPoints, settings.tfPoints) : null;
+      var questionsPending = choiceReviewSummary({ [pageNumber]: page }, 1, settings.mcCount, settings.tfCount).questionsPending;
+      var blankCount = 0;
+      answers.forEach(function (answer, index) {
+        var question = choiceQuestionForSettings(page, "mc", index + 1);
+        if (!normalizeChoice(answer) && question && question.status === "blank") blankCount += 1;
+      });
+      tfAnswers.forEach(function (answer, index) {
+        var question = choiceQuestionForSettings(page, "tf", index + 1);
+        if (!String(answer || "").trim() && question && question.status === "blank") blankCount += 1;
+      });
+      var row = [pageNumber, page ? page.classValue || "" : "", page ? page.studentId || "" : "",
+        score ? formatCsvNumber(score.earned) : "", blankCount, questionsPending,
+        choiceIdentityConfirmed(page) ? "是" : "否"];
+      answers.forEach(function (answer, index) {
+        var question = choiceQuestionForSettings(page, "mc", index + 1);
+        row.push(answer, choiceAnswerStatus(answer, settings.mcKey[index], "mc", question ? question.status : "review"));
+      });
+      tfAnswers.forEach(function (answer, index) {
+        var question = choiceQuestionForSettings(page, "tf", index + 1);
+        row.push(answer, choiceAnswerStatus(answer, settings.tfKey[index], "tf", question ? question.status : "review"));
+      });
+      rows.push(row);
+    }
+    return "\ufeff" + rows.map(function (row) { return row.map(csvQuote).join(","); }).join("\r\n");
+  }
+
+  function formatCsvNumber(value) {
+    return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
   }
 
   function toggleDictationMark(page, index, mode, punctuation) {
@@ -173,7 +339,14 @@
     blankDictationPage: blankDictationPage,
     cloneDictationPage: cloneDictationPage,
     dictationRecord: dictationRecord,
+    sanitizeDictationPages: sanitizeDictationPages,
     toggleDictationMark: toggleDictationMark,
+    choiceAnswersForSettings: choiceAnswersForSettings,
+    choiceIdentityConfirmed: choiceIdentityConfirmed,
+    choiceIdentityWarnings: choiceIdentityWarnings,
+    choiceReviewSummary: choiceReviewSummary,
+    choiceAnswerStatus: choiceAnswerStatus,
+    buildChoiceCsv: buildChoiceCsv,
     sanitizeProgress: sanitizeProgress
   };
   if (typeof module !== "undefined" && module.exports) module.exports = root.PdfMarkingModel;

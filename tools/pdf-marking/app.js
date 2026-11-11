@@ -11,7 +11,7 @@
     choicePages: {}, dictationPages: {}, activeMark: "circle", renderToken: 0,
     dictationSegment: 1, dictationSegments: {},
     dictationAnswer: DEFAULT_DICTATION_ANSWER, firstRow: 20, punctuation: model.autoPunctuation(DEFAULT_DICTATION_ANSWER),
-    dictationCalibration: { dx: 0, dy: 0, scale: 1 }
+    dictationCalibration: { dx: 0, dy: 0, scale: 1 }, dictationAnswerEditOriginal: null
   };
   var byId = function (id) { return document.getElementById(id); };
   var els = {
@@ -74,19 +74,12 @@
 
   function currentChoicePage() { return state.choicePages[state.currentPage] || null; }
 
-  function answersFromPage(page, type) {
-    if (!page) return [];
-    return page.questions.filter(function (question) { return question.type === type; })
-      .sort(function (a, b) { return a.number - b.number; })
-      .map(function (question) { return question.answer || ""; });
-  }
-
   function currentChoiceScore(page) {
     var settings = choiceSettings();
     if (!page || page.pageFailure || !settings.valid) return null;
     return model.scoreQuestions({
-      answers: answersFromPage(page, "mc"),
-      tfAnswers: answersFromPage(page, "tf")
+      answers: model.choiceAnswersForSettings(page, "mc", settings.mcCount),
+      tfAnswers: model.choiceAnswersForSettings(page, "tf", settings.tfCount)
     }, settings.mcKey, settings.tfKey, settings.mcPoints, settings.tfPoints);
   }
 
@@ -157,8 +150,9 @@
       if (!response) return;
       var key = item.type === "mc" ? settings.mcKey[item.number - 1] : settings.tfKey[item.number - 1];
       var selected = selectedOptions(response.answer);
-      item.choices.forEach(function (bubble) {
-        var point = geometry.mapBubble(bubble, viewport.width, viewport.height, pageRecord.calibration);
+      item.choices.forEach(function (bubble, bubbleIndex) {
+        var localOffset = response.localOffsets && response.localOffsets[bubbleIndex];
+        var point = geometry.mapBubble(bubble, viewport.width, viewport.height, pageRecord.calibration, localOffset);
         var button = document.createElement("button");
         button.type = "button"; button.className = "bubble-hit";
         button.style.left = (point.x / viewport.width * 100) + "%";
@@ -212,7 +206,7 @@
         var button = document.createElement("button"); button.type = "button"; button.className = "review-item";
         var label = document.createElement("span"); label.textContent = (question.type === "mc" ? "選擇題 " : "是非題 ") + String(question.number).padStart(2, "0");
         var detail = document.createElement("span"); detail.className = "item-value";
-        detail.textContent = (question.answer || "空白") + " · " + question.reason;
+        detail.textContent = (question.answer || (question.status === "blank" ? "空白" : "待覆核")) + " · " + question.reason;
         button.append(label, detail);
         button.addEventListener("click", function () {
           var target = els.choiceStage.querySelector('[data-number="' + question.number + '"][data-type="' + question.type + '"]');
@@ -226,6 +220,60 @@
       flag.textContent = row.kind === "metadata" ? "覆核" + row.question.label + "：" + row.question.reason : row.question.reason;
       els.pageFlags.append(flag);
     });
+  }
+
+  function refreshChoiceIdentityWarnings() {
+    var warnings = model.choiceIdentityWarnings(state.choicePages, state.pageCount);
+    var prefix = "班別／學號核對：";
+    Object.keys(state.choicePages).forEach(function (pageNumber) {
+      var page = state.choicePages[pageNumber];
+      page.pageFlags = (Array.isArray(page.pageFlags) ? page.pageFlags : []).filter(function (flag) {
+        return String(flag).indexOf(prefix) !== 0;
+      }).concat(warnings[pageNumber] || []);
+    });
+    return warnings;
+  }
+
+  function confirmChoiceExport(settings) {
+    var summary = model.choiceReviewSummary(state.choicePages, state.pageCount, settings.mcCount, settings.tfCount);
+    if (!summary.pagesPending && !summary.questionsPending) return true;
+    var message = "尚有 " + summary.pagesPending + " 頁、" + summary.questionsPending + " 題待覆核";
+    if (summary.identityPages) message += "；另有 " + summary.identityPages + " 頁班別／學號未確認";
+    return window.confirm(message + "。仍要匯出嗎？");
+  }
+
+  function hasDictationMarks(pages) {
+    return Object.keys(pages || {}).some(function (pageNumber) {
+      var page = pages[pageNumber] || {};
+      return [page.circles, page.arrows, page.miss].some(function (list) { return Array.isArray(list) && list.length > 0; });
+    });
+  }
+
+  function finishDictationAnswerEdit() {
+    var original = state.dictationAnswerEditOriginal;
+    if (!original) return;
+    var nextAnswer = els.dictationAnswer.value;
+    var changed = nextAnswer !== original.answer;
+    if (changed && hasDictationMarks(state.dictationPages) &&
+        !window.confirm("所選段落已有批改標記；更改句子會按新字數保留仍有效的索引。要繼續嗎？")) {
+      state.dictationAnswer = original.answer;
+      state.punctuation = original.punctuation.slice();
+      els.dictationAnswer.value = original.answer;
+      els.punctuationIndexes.value = state.punctuation.join(", ");
+      saveActiveDictationSegment();
+      state.dictationAnswerEditOriginal = null;
+      renderCurrentMode();
+      return;
+    }
+    var config = getDictationConfig();
+    var cleaned = model.sanitizeDictationPages(state.dictationPages, config.answer.length, config.punctuation);
+    state.dictationPages = cleaned.pages;
+    saveActiveDictationSegment();
+    state.dictationAnswerEditOriginal = null;
+    if (cleaned.droppedIndexes) {
+      setStatus("句子更改後已移除 " + cleaned.droppedIndexes + " 個超出字數或屬於標點的標記索引；其他標記已保留。", els.exportStatus);
+    }
+    renderCurrentMode();
   }
 
   function renderChoiceSummary(page) {
@@ -499,8 +547,12 @@
         if ((page.metadata.grade.status !== "read") || (page.metadata.form.status !== "read") || page.metadata.idDigits.some(function (entry) { return entry.status !== "read"; })) metadataReviewPages += 1;
         rendered.canvas.width = 1; rendered.canvas.height = 1;
       }
+      var identityWarnings = refreshChoiceIdentityWarnings();
+      var identityIssuePages = Object.keys(identityWarnings).filter(function (pageNo) {
+        return identityWarnings[pageNo] && identityWarnings[pageNo].length;
+      }).length;
       els.omrStatus.textContent = "完成讀圈：" + state.pageCount + " 頁、" + totalQuestions + " 題；" + totalReviews + " 題待覆核；" +
-        pageFailureCount + " 頁整頁定位失敗；" + metadataReviewPages + " 頁班別或學號待確認。";
+        pageFailureCount + " 頁整頁定位失敗；" + metadataReviewPages + " 頁班別或學號待確認；" + identityIssuePages + " 頁需核對空白／重複班別學號。";
     } catch (error) {
       state.choicePages = {};
       els.omrStatus.textContent = "讀圈未能完成。請檢查 PDF 頁面，再重新載入。";
@@ -532,26 +584,7 @@
   function buildChoiceCsv() {
     var settings = choiceSettings();
     if (!settings.valid) throw new Error(settings.message || "請先輸入完整答案。");
-    if (Object.keys(state.choicePages).some(function (pageNo) { return state.choicePages[pageNo].pageFailure; })) {
-      throw new Error("仍有整頁定位失敗頁；請先逐題手動批改，再匯出成績。");
-    }
-    var header = ["頁碼", "班別", "學號", "分數"];
-    for (var i = 1; i <= settings.mcCount; i += 1) header.push(String(i).padStart(2, "0") + "作答", String(i).padStart(2, "0") + "對錯");
-    for (var j = 1; j <= settings.tfCount; j += 1) header.push("是非" + String(j).padStart(2, "0") + "作答", "是非" + String(j).padStart(2, "0") + "對錯");
-    var rows = [header];
-    for (var pageNo = 1; pageNo <= state.pageCount; pageNo += 1) {
-      var page = state.choicePages[pageNo] || { questions: [], classValue: "", studentId: "" };
-      var score = currentChoiceScore(page);
-      var row = [pageNo, page.classValue || "", page.studentId || "", score ? formatNumber(score.earned) : ""];
-      page.questions.slice().sort(function (a, b) {
-        return (a.type === b.type ? a.number - b.number : a.type === "mc" ? -1 : 1);
-      }).forEach(function (question, index) {
-        row.push(question.answer || "");
-        row.push(score && score.correctness[index] ? "對" : "錯");
-      });
-      rows.push(row);
-    }
-    return "\ufeff" + rows.map(function (row) { return row.map(csvQuote).join(","); }).join("\r\n");
+    return model.buildChoiceCsv({ pages: state.choicePages, pageCount: state.pageCount, settings: settings });
   }
 
   function buildDictationCsv() {
@@ -619,7 +652,12 @@
         type: entry.type === "tf" ? "tf" : "mc", number: Number(entry.number) || 0,
         answer: entry.type === "tf" ? String(entry.answer || "").toUpperCase().replace(/[^TF]+/g, "") : String(entry.answer || "").toUpperCase().replace(/[^A-D]+/g, ""),
         status: ["read", "review", "blank", "manual"].indexOf(entry.status) >= 0 ? entry.status : "review",
-        reason: String(entry.reason || ""), reviewed: Boolean(entry.reviewed), values: Array.isArray(entry.values) ? entry.values.map(Number).slice(0, 4) : []
+        reason: String(entry.reason || ""), reviewed: Boolean(entry.reviewed), values: Array.isArray(entry.values) ? entry.values.map(Number).slice(0, 4) : [],
+        localOffsets: Array.isArray(entry.localOffsets) ? entry.localOffsets.slice(0, 4).map(function (offset) {
+          var dx = Number(offset && offset.dx); var dy = Number(offset && offset.dy);
+          return { dx: Number.isFinite(dx) ? Math.max(-0.01, Math.min(0.01, dx)) : 0,
+            dy: Number.isFinite(dy) ? Math.max(-0.01, Math.min(0.01, dy)) : 0 };
+        }) : []
       };
     }) : [];
     var cal = source.calibration || {};
@@ -648,7 +686,8 @@
         allPale: Boolean(source.thresholds && source.thresholds.allPale)
       },
       pageFlags: Array.isArray(source.pageFlags) ? source.pageFlags.filter(function (flag) {
-        return ["定位校正幅度較大，請檢查整頁對齊", "班別讀取未確認", "學號讀取未確認", "整頁定位失敗，所有答案需逐頁核對"].indexOf(flag) >= 0;
+        return ["定位校正幅度較大，請檢查整頁對齊", "班別讀取未確認", "學號讀取未確認",
+          "整頁定位失敗：可能是空白頁、方向錯誤或分組位置不符，請核對本頁"].indexOf(flag) >= 0;
       }) : [],
       classWasEdited: Boolean(source.classWasEdited), studentIdWasEdited: Boolean(source.studentIdWasEdited)
     };
@@ -669,6 +708,7 @@
       Object.keys(checked.value.pages).forEach(function (key) {
         if (/^\d+$/.test(key) && Number(key) <= state.pageCount) state.choicePages[Number(key)] = cleanChoicePage(checked.value.pages[key]);
       });
+      refreshChoiceIdentityWarnings();
     } else {
       var config = checked.value.settings || {};
       state.dictationSegments = {};
@@ -723,15 +763,17 @@
 
   async function exportCurrentPdf() {
     if (!state.pdfBytes) return;
+    if (state.mode === "choice") {
+      var choiceSettingsForExport = choiceSettings();
+      if (!choiceSettingsForExport.valid) { setStatus(choiceSettingsForExport.message || "請先輸入答案。"); return; }
+      if (!confirmChoiceExport(choiceSettingsForExport)) return;
+    }
     els.exportPdf.disabled = true; setStatus("正在本機製作已批改 PDF…");
     try {
       var bytes;
       if (state.mode === "choice") {
         var settings = choiceSettings();
         if (!settings.valid) throw new Error(settings.message || "請先輸入答案。");
-        if (Object.keys(state.choicePages).some(function (pageNo) { return state.choicePages[pageNo].pageFailure; })) {
-          throw new Error("仍有整頁定位失敗頁；請先逐題手動批改，再匯出 PDF。");
-        }
         bytes = await pdfExport.exportChoicePdf(state.pdfBytes, { settings: settings, pages: state.choicePages });
         createDownload("pdf-marking-choice-reviewed.pdf", new Blob([bytes], { type: "application/pdf" }));
       } else {
@@ -750,6 +792,11 @@
   }
 
   function exportCsv() {
+    if (state.mode === "choice") {
+      var choiceSettingsForExport = choiceSettings();
+      if (!choiceSettingsForExport.valid) { setStatus(choiceSettingsForExport.message || "請先輸入完整答案。"); return; }
+      if (!confirmChoiceExport(choiceSettingsForExport)) return;
+    }
     try {
       var csv = state.mode === "choice" ? buildChoiceCsv() : buildDictationCsv();
       var name = state.mode === "choice" ? "pdf-marking-choice-scores.csv" : "pdf-marking-dictation-scores.csv";
@@ -811,10 +858,16 @@
         page.studentId = input.value; page.studentIdWasEdited = true;
         (page.metadata.idDigits || []).forEach(function (digit) { digit.status = "manual"; });
       }
+      refreshChoiceIdentityWarnings();
       renderChoiceSummary(page);
     });
   });
-  [els.dictationAnswer, els.firstRow, els.punctuationIndexes].forEach(function (input) {
+  els.dictationAnswer.addEventListener("focus", function () {
+    state.dictationAnswerEditOriginal = { answer: state.dictationAnswer, punctuation: state.punctuation.slice() };
+  });
+  els.dictationAnswer.addEventListener("input", function () { getDictationConfig(); renderCurrentMode(); });
+  els.dictationAnswer.addEventListener("change", finishDictationAnswerEdit);
+  [els.firstRow, els.punctuationIndexes].forEach(function (input) {
     input.addEventListener("input", function () { getDictationConfig(); renderCurrentMode(); });
   });
   els.dictationSegment.addEventListener("change", function () {

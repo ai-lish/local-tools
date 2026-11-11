@@ -443,7 +443,7 @@
     return { bubbles: bubbles, items: items, classGrade: gradeOptions, classForm: formOptions, studentNumber: idColumns };
   }
 
-  function mapBubble(bubble, width, height, calibration) {
+  function mapBubble(bubble, width, height, calibration, localOffset) {
     var cal = calibration || { dx: 0, dy: 0, angle: 0, scale: 1 };
     var x = bubble.x * width; var y = bubble.y * height;
     var cx = width / 2; var cy = height / 2;
@@ -451,8 +451,8 @@
     var angle = (Number(cal.angle) || 0) * Math.PI / 180;
     var sx = (x - cx) * scale; var sy = (y - cy) * scale;
     return {
-      x: cx + sx * Math.cos(angle) - sy * Math.sin(angle) + (Number(cal.dx) || 0) * width,
-      y: cy + sx * Math.sin(angle) + sy * Math.cos(angle) + (Number(cal.dy) || 0) * height
+      x: cx + sx * Math.cos(angle) - sy * Math.sin(angle) + (Number(cal.dx) || 0) * width + (Number(localOffset && localOffset.dx) || 0) * width,
+      y: cy + sx * Math.sin(angle) + sy * Math.cos(angle) + (Number(cal.dy) || 0) * height + (Number(localOffset && localOffset.dy) || 0) * height
     };
   }
 

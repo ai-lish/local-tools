@@ -139,25 +139,41 @@
       var key = item.type === "mc" ? settings.mcKey[item.number - 1] : settings.tfKey[item.number - 1];
       if (!key) return;
       var answer = item.type === "mc" ? responses.answers[item.number - 1] : responses.tfAnswers[item.number - 1];
+      var question = (pageRecord.questions || []).find(function (entry) {
+        return entry.type === item.type && Number(entry.number) === item.number;
+      });
+      var localOffsets = question && Array.isArray(question.localOffsets) ? question.localOffsets : [];
       var options = answer ? Array.from(answer) : [];
       var points = item.choices;
+      if (!answer) {
+        var lastBubble = geometry.mapBubble(points[points.length - 1], viewport.width, viewport.height, calibration,
+          localOffsets[points.length - 1]);
+        ctx.fillStyle = RED; ctx.font = "700 " + Math.max(14, width / viewport.width * 12) + "px sans-serif";
+        ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillText(question && question.status === "review" ? "待覆核" : "未答",
+          lastBubble.x * width / viewport.width + width / viewport.width * 8,
+          lastBubble.y * height / viewport.height);
+        ctx.textAlign = "center";
+      }
       options.forEach(function (option) {
         if (option === key) return;
         var bubble = points.find(function (entry) { return entry.option === option; });
         if (!bubble) return;
-        var mapped = geometry.mapBubble(bubble, viewport.width, viewport.height, calibration);
+        var mapped = geometry.mapBubble(bubble, viewport.width, viewport.height, calibration, localOffsets[points.indexOf(bubble)]);
         drawCross(ctx, mapped.x * width / viewport.width, mapped.y * height / viewport.height,
           Math.max(4, width / viewport.width * 3.3));
       });
       if (options.length !== 1 || options[0] !== key) {
         var target = points.find(function (entry) { return entry.option === key; });
-        var mappedTarget = geometry.mapBubble(target, viewport.width, viewport.height, calibration);
+        var mappedTarget = geometry.mapBubble(target, viewport.width, viewport.height, calibration,
+          localOffsets[points.indexOf(target)]);
         drawCheck(ctx, mappedTarget.x * width / viewport.width, mappedTarget.y * height / viewport.height,
           Math.max(4, width / viewport.width * 3.0));
       }
     });
     var summary = model.scoreQuestions(responses, settings.mcKey, settings.tfKey, settings.mcPoints, settings.tfPoints);
-    var line = "第 " + pageNumber + " 頁　得分 " + summary.earned + " / " + summary.maximum;
+    var line = "第 " + pageNumber + " 頁　班別 " + (pageRecord.classValue || "未確認") +
+      "　學號 " + (pageRecord.studentId || "未確認") + "　得分 " + summary.earned + " / " + summary.maximum;
     ctx.font = "700 " + Math.max(17, width * 0.018) + "px sans-serif";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     var labelWidth = ctx.measureText(line).width + width * 0.025;
