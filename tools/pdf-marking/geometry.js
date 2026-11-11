@@ -1,6 +1,9 @@
 (function (root) {
   "use strict";
 
+  var templates = root.PdfMarkingTemplates;
+  if (!templates && typeof module !== "undefined" && module.exports) templates = require("./templates.js");
+
   function normalizeRotation(rotation) {
     var value = Number(rotation) || 0;
     value %= 360;
@@ -93,7 +96,7 @@
     return selected.sort(function (left, right) { return left.position - right.position; });
   }
 
-  function fitDictationRow(imageData, top, bottom) {
+  function fitDictationRow(imageData, top, bottom, rowParams) {
     var imageWidth = imageData.width;
     var imageHeight = imageData.height;
     var pixels = imageData.data;
@@ -101,21 +104,24 @@
     var yStart = Math.max(0, Math.ceil(top + 2));
     var yEnd = Math.min(imageHeight, Math.floor(bottom - 2));
     if (yEnd - yStart < 8) return null;
-    for (var x = Math.floor(imageWidth * 0.04); x < Math.floor(imageWidth * 0.94); x += 1) {
+    var scanX = rowParams.scanX || [0.04, 0.94];
+    for (var x = Math.floor(imageWidth * scanX[0]); x < Math.floor(imageWidth * scanX[1]); x += 1) {
       for (var y = yStart; y < yEnd; y += 1) {
         var offset = (y * imageWidth + x) * 4;
         if ((pixels[offset] + pixels[offset + 1] + pixels[offset + 2]) / 3 < 220) vertical[x] += 1;
       }
     }
-    var peaks = projectionPeaks(vertical, Math.floor(imageWidth * 0.04), Math.floor(imageWidth * 0.94),
+    var peaks = projectionPeaks(vertical, Math.floor(imageWidth * scanX[0]), Math.floor(imageWidth * scanX[1]),
       2, (yEnd - yStart) * 0.22);
     var best = null;
+    var startX = rowParams.startX || [0.05, 0.11];
+    var stepRange = rowParams.step || [0.035, 0.044];
     peaks.forEach(function (start) {
-      if (start.position < imageWidth * 0.05 || start.position > imageWidth * 0.11) return;
-      for (var step = imageWidth * 0.035; step <= imageWidth * 0.044; step += 0.35) {
+      if (start.position < imageWidth * startX[0] || start.position > imageWidth * startX[1]) return;
+      for (var step = imageWidth * stepRange[0]; step <= imageWidth * stepRange[1]; step += 0.35) {
         var observations = [[0, start.position]];
         var misses = 0;
-        for (var boundary = 1; boundary <= 20; boundary += 1) {
+        for (var boundary = 1; boundary <= rowParams.cellsPerRow; boundary += 1) {
           var expected = start.position + boundary * step;
           var nearest = null;
           peaks.forEach(function (candidate) {
@@ -152,7 +158,7 @@
         var meanResidual = residuals.reduce(function (sum, value) { return sum + value; }, 0) / residuals.length;
         if (maxResidual > fittedStep * 0.18) continue;
         var score = last * 100 + matched * 12 - meanResidual * 12 -
-          Math.abs(fittedStart - imageWidth * 0.076) * 0.025 - Math.abs(fittedStep - imageWidth * 0.04) * 0.02;
+          Math.abs(fittedStart - imageWidth * rowParams.fallbackX) * 0.025 - Math.abs(fittedStep - imageWidth * rowParams.expectedStep) * 0.02;
         if (!best || score > best.score) {
           best = { x: fittedStart, step: fittedStep, physicalCount: last, score: score,
             confidence: matched / (last + 1), residual: maxResidual };
@@ -181,15 +187,24 @@
     return best.count >= 5 ? best : null;
   }
 
-  function fitDictationGrid(imageData, pageWidth, pageHeight, segmentNumber) {
+  function fitDictationGrid(imageData, pageWidth, pageHeight, segmentNumber, params) {
     if (!imageData || !imageData.data || !imageData.width || !imageData.height) return null;
     var imageWidth = imageData.width;
     var imageHeight = imageData.height;
     var pixels = imageData.data;
-    var xStart = Math.floor(imageWidth * 0.04);
-    var xEnd = Math.floor(imageWidth * 0.96);
-    var yStart = Math.floor(imageHeight * 0.13);
-    var yEnd = Math.floor(imageHeight * 0.76);
+    var configuration = params || templates.dictationParams();
+    var grid = configuration.grid || configuration;
+    var scanX = grid.scan && grid.scan.x || [0.04, 0.96];
+    var scanY = grid.scan && grid.scan.y || [0.13, 0.76];
+    var rowParams = Object.assign({}, grid.row || {}, {
+      scanX: grid.row && grid.row.scanX || [0.04, 0.94],
+      fallbackX: grid.fallback ? grid.fallback.x : 0.076,
+      expectedStep: grid.fallback ? grid.fallback.cellWidth : 0.04
+    });
+    var xStart = Math.floor(imageWidth * scanX[0]);
+    var xEnd = Math.floor(imageWidth * scanX[1]);
+    var yStart = Math.floor(imageHeight * scanY[0]);
+    var yEnd = Math.floor(imageHeight * scanY[1]);
     var horizontal = new Array(imageHeight).fill(0);
     for (var y = yStart; y < yEnd; y += 1) {
       var rowOffset = y * imageWidth * 4;
@@ -207,7 +222,7 @@
         var gap = bottom.position - top.position;
         if (gap < imageHeight * 0.022) continue;
         if (gap > imageHeight * 0.052) break;
-        var rowFit = fitDictationRow(imageData, top.position, bottom.position);
+        var rowFit = fitDictationRow(imageData, top.position, bottom.position, rowParams);
         if (!rowFit) continue;
         candidates.push({ topIndex: topIndex, bottomIndex: bottomIndex, top: top.position,
           bottom: bottom.position, height: gap, x: rowFit.x, step: rowFit.step,
@@ -234,17 +249,19 @@
     });
     if (!groups.length) return null;
     var selectedSegment = Number(segmentNumber) === 2 ? 2 : 1;
-    // The upright two-stanza sheet prints its grids in separate vertical bands; fit lines and shaded cells within the selected band.
-    var segmentTop = imageHeight * (selectedSegment === 1 ? 0.19 : 0.38);
-    var segmentBottom = imageHeight * (selectedSegment === 1 ? 0.38 : 0.70);
-    var expectedRowHeight = imageHeight * 0.034;
+    var segmentDefinition = (configuration.segments || []).find(function (segment) { return segment.id === selectedSegment; });
+    var segmentBand = segmentDefinition ? segmentDefinition.band : (selectedSegment === 1 ? [0.19, 0.38] : [0.38, 0.70]);
+    var segmentTop = imageHeight * segmentBand[0];
+    var segmentBottom = imageHeight * segmentBand[1];
+    var rowHeightRange = grid.row && grid.row.height || [0.028, 0.041];
+    var expectedRowHeight = imageHeight * (grid.row && grid.row.expectedHeight || 0.034);
     var segmentGroups = groups.filter(function (group) {
       if (group.rows.length < 2 || group.rows[0].top < segmentTop || group.rows[0].top > segmentBottom) return false;
       var heights = group.rows.map(function (row) { return row.height; });
       var shortest = Math.min.apply(Math, heights);
       var tallest = Math.max.apply(Math, heights);
       return heights.every(function (height) {
-        return height >= imageHeight * 0.028 && height <= imageHeight * 0.041;
+        return height >= imageHeight * rowHeightRange[0] && height <= imageHeight * rowHeightRange[1];
       }) && tallest - shortest <= imageHeight * 0.008;
     });
     if (!segmentGroups.length) return null;
@@ -258,7 +275,7 @@
       }, 0);
       if (leftHeightError !== rightHeightError) return leftHeightError - rightHeightError;
       if (left.score !== right.score) return right.score - left.score;
-      var targetTop = imageHeight * (selectedSegment === 1 ? 0.267 : 0.50);
+      var targetTop = imageHeight * (segmentDefinition ? segmentDefinition.targetTop : (selectedSegment === 1 ? 0.267 : 0.50));
       return Math.abs(left.rows[0].top - targetTop) - Math.abs(right.rows[0].top - targetTop);
     });
     var selected = segmentGroups[0];
@@ -308,10 +325,15 @@
     };
   }
 
-  function dictationLayout(width, height, answerLength, firstRow, calibration, fittedGrid) {
+  function dictationLayout(width, height, answerLength, firstRow, calibration, fittedGrid, params, segmentNumber) {
     var answerCount = Number.isFinite(Number(answerLength)) ? Math.max(0, Math.floor(Number(answerLength))) : 0;
     var fallbackCount = Math.max(1, Math.min(firstRow, answerCount || 1));
     var calibrationValue = calibration || { dx: 0, dy: 0, scale: 1 };
+    var configuration = params || templates.dictationParams();
+    var grid = configuration.grid || configuration;
+    var segmentDefinition = (configuration.segments || []).find(function (segment) { return segment.id === (Number(segmentNumber) === 2 ? 2 : 1); });
+    var fallback = grid.fallback || { x: 0.076, y: 0.267, cellWidth: 0.04, rowHeight: 0.034 };
+    var fallbackY = segmentDefinition ? segmentDefinition.targetTop : fallback.y;
     function mapRect(rect) {
       var cx = width / 2; var cy = height / 2; var scale = calibrationValue.scale || 1;
       return {
@@ -330,8 +352,8 @@
       var fallbackRows = Math.max(1, Math.ceil((answerCount || 1) / fallbackCount));
       for (var rowIndex = 0; rowIndex < fallbackRows; rowIndex += 1) {
         var rowCount = Math.min(fallbackCount, Math.max(0, answerCount - rowIndex * fallbackCount));
-        rows.push({ x: 0.076 * width, y: (0.267 + rowIndex * 0.034) * height,
-          cellWidth: 0.04 * width, count: rowCount, height: 0.034 * height });
+        rows.push({ x: fallback.x * width, y: (fallbackY + rowIndex * fallback.rowHeight) * height,
+          cellWidth: fallback.cellWidth * width, count: rowCount, height: fallback.rowHeight * height });
       }
     }
     var availableCellCount = rows.reduce(function (sum, row) { return sum + row.count; }, 0);
@@ -372,75 +394,9 @@
     };
   }
 
-  // Rebased to the printed circle centers; preserve the visible five-row group gaps.
-  var QUESTION_GROUP_Y = [
-    [0.3751, 0.3960, 0.4169, 0.4384, 0.4593],
-    [0.5016, 0.5231, 0.5436, 0.5655, 0.5870],
-    [0.6288, 0.6491, 0.6711, 0.6915, 0.7135],
-    [0.7553, 0.7757, 0.7977, 0.8186, 0.8401],
-    [0.8816, 0.9033, 0.9248, 0.9463, 0.9672]
-  ];
-  var QUESTION_X = [
-    [0.1413, 0.1786, 0.2151, 0.2516],
-    [0.4405, 0.4762, 0.5127, 0.5492],
-    [0.7389, 0.7754, 0.8119, 0.8484]
-  ];
-
-  function boundedCount(value, maximum, fallback) {
-    if (value == null) return fallback;
-    var count = Number(value);
-    if (!Number.isFinite(count)) return fallback;
-    return Math.max(0, Math.min(maximum, Math.floor(count)));
-  }
-
   function omrTemplate(mcCount, tfCount) {
-    var bubbles = [];
-    var items = [];
-    var choices = ["A", "B", "C", "D"];
-    var mcTotal = boundedCount(mcCount, 60, 60);
-    var tfTotal = boundedCount(tfCount, 10, 10);
-    for (var number = 1; number <= mcTotal; number += 1) {
-      var zero = number - 1;
-      var column = Math.floor(zero / 25);
-      var group = Math.floor((zero % 25) / 5);
-      var row = zero % 5;
-      var values = [];
-      for (var option = 0; option < 4; option += 1) {
-        var bubble = { x: QUESTION_X[column][option], y: QUESTION_GROUP_Y[group][row], type: "mc", number: number, option: choices[option] };
-        bubbles.push(bubble); values.push(bubble);
-      }
-      items.push({ type: "mc", number: number, choices: values });
-    }
-    var tfX = [0.7381, 0.8119];
-    for (var tfNumber = 1; tfNumber <= tfTotal; tfNumber += 1) {
-      var tfY = 0.7446 + (tfNumber - 1) * 0.0214;
-      var tfValues = [
-        { x: tfX[0], y: tfY, type: "tf", number: tfNumber, option: "T" },
-        { x: tfX[1], y: tfY, type: "tf", number: tfNumber, option: "F" }
-      ];
-      bubbles.push.apply(bubbles, tfValues);
-      items.push({ type: "tf", number: tfNumber, choices: tfValues });
-    }
-    var gradeOptions = [];
-    var formOptions = [];
-    var classX = [0.5893, 0.6665];
-    for (var grade = 1; grade <= 6; grade += 1) {
-      var classY = 0.0774 + (grade - 1) * 0.0213;
-      var gradeBubble = { x: classX[0], y: classY, type: "class-grade", option: String(grade) };
-      var formBubble = { x: classX[1], y: classY, type: "class-form", option: String.fromCharCode(64 + grade) };
-      bubbles.push(gradeBubble, formBubble); gradeOptions.push(gradeBubble); formOptions.push(formBubble);
-    }
-    var idColumns = [];
-    var idX = [0.8115, 0.8504];
-    for (var digitColumn = 0; digitColumn < 2; digitColumn += 1) {
-      var digitOptions = [];
-      for (var digit = 0; digit <= 9; digit += 1) {
-        var digitBubble = { x: idX[digitColumn], y: 0.0774 + digit * 0.02135, type: "student-number", column: digitColumn, option: String(digit) };
-        bubbles.push(digitBubble); digitOptions.push(digitBubble);
-      }
-      idColumns.push(digitOptions);
-    }
-    return { bubbles: bubbles, items: items, classGrade: gradeOptions, classForm: formOptions, studentNumber: idColumns };
+    var definition = templates.BUILTIN_TEMPLATES[0];
+    return templates.expandChoiceTemplate(definition, { mcCount: mcCount, tfCount: tfCount });
   }
 
   function mapBubble(bubble, width, height, calibration, localOffset) {
@@ -465,6 +421,9 @@
     mediaRasterBlitMatrix: mediaRasterBlitMatrix,
     dictationLayout: dictationLayout,
     fitDictationGrid: fitDictationGrid,
+    expandChoiceTemplate: templates.expandChoiceTemplate,
+    dictationParams: templates.dictationParams,
+    identityMaskRects: templates.identityMaskRects,
     omrTemplate: omrTemplate,
     mapBubble: mapBubble
   };

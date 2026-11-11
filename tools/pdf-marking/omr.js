@@ -2,12 +2,11 @@
   "use strict";
 
   var geometry = root.PdfMarkingGeometry;
-  var CHOICES = ["A", "B", "C", "D"];
-  var MIN_GRID_SCORE = 0.22;
-  var MAX_GROUP_GAP_INK = 0.14;
-  var MIN_LOCAL_CIRCLE_INK = 0.24;
-  var LOCAL_SEARCH_RADIUS = 0.0065;
-  var MAX_LOCAL_CORRECTION_RATIO = 0.0062;
+  var BUILTIN_PARAMS = geometry.omrTemplate(0, 0).params;
+  var MIN_GRID_SCORE = BUILTIN_PARAMS.minGridScore;
+  var MAX_GROUP_GAP_INK = BUILTIN_PARAMS.maxGroupGapInk;
+  var MIN_LOCAL_CIRCLE_INK = BUILTIN_PARAMS.minLocalCircleInk;
+  var MAX_LOCAL_CORRECTION_RATIO = BUILTIN_PARAMS.maxLocalCorrection;
 
   function clamp(value, low, high) { return Math.max(low, Math.min(high, value)); }
 
@@ -25,8 +24,8 @@
     return top * (1 - fy) + bottom * fy;
   }
 
-  function ringInkAtCenter(data, width, height, center) {
-    var radius = width * 0.0077;
+  function ringInkAtCenter(data, width, height, center, params) {
+    var radius = width * ((params || BUILTIN_PARAMS).radius);
     var total = 0;
     for (var i = 0; i < 8; i += 1) {
       var angle = i * Math.PI / 4;
@@ -37,13 +36,14 @@
     return total / 8;
   }
 
-  function ringInk(data, width, height, bubble, calibration) {
-    return ringInkAtCenter(data, width, height, geometry.mapBubble(bubble, width, height, calibration));
+  function ringInk(data, width, height, bubble, calibration, params) {
+    return ringInkAtCenter(data, width, height, geometry.mapBubble(bubble, width, height, calibration), params);
   }
 
-  function refineBubbleCenter(data, width, height, bubble, calibration) {
+  function refineBubbleCenter(data, width, height, bubble, calibration, params) {
+    var configuration = params || BUILTIN_PARAMS;
     var expected = geometry.mapBubble(bubble, width, height, calibration);
-    var searchRadius = width * LOCAL_SEARCH_RADIUS;
+    var searchRadius = width * configuration.localSearch;
     var step = Math.max(1, width * 0.0008);
     var steps = Math.ceil(searchRadius / step);
     var best = { score: -1, dx: 0, dy: 0 };
@@ -52,7 +52,7 @@
       for (var xStep = -steps; xStep <= steps; xStep += 1) {
         var dx = xStep * step;
         if (dx * dx + dy * dy > searchRadius * searchRadius) continue;
-        var score = ringInkAtCenter(data, width, height, { x: expected.x + dx, y: expected.y + dy });
+        var score = ringInkAtCenter(data, width, height, { x: expected.x + dx, y: expected.y + dy }, configuration);
         var offsetSquared = dx * dx + dy * dy;
         var bestOffsetSquared = best.dx * best.dx + best.dy * best.dy;
         if (score > best.score || (score === best.score && offsetSquared < bestOffsetSquared)) {
@@ -61,9 +61,9 @@
       }
     }
     var offset = Math.hypot(best.dx, best.dy);
-    var found = best.score >= MIN_LOCAL_CIRCLE_INK;
+    var found = best.score >= configuration.minLocalCircleInk;
     var nearSearchBoundary = offset >= searchRadius - step * 0.25;
-    var uncertain = !found || offset > width * MAX_LOCAL_CORRECTION_RATIO || nearSearchBoundary;
+    var uncertain = !found || offset > width * configuration.maxLocalCorrection || nearSearchBoundary;
     return {
       center: { x: expected.x + best.dx, y: expected.y + best.dy },
       offsetX: best.dx / width,
@@ -74,45 +74,36 @@
     };
   }
 
-  function questionGroupGaps() {
-    var physicalTemplate = geometry.omrTemplate(60, 0);
-    var items = physicalTemplate.items;
-    var gaps = [];
-    for (var i = 0; i < items.length - 1; i += 1) {
-      var before = items[i]; var after = items[i + 1];
-      var left = before.choices[0]; var right = after.choices[0];
-      if (Math.abs(left.x - right.x) > 0.03 || right.y - left.y < 0.03) continue;
-      var y = (left.y + right.y) / 2;
-      before.choices.forEach(function (bubble) { gaps.push({ x: bubble.x, y: y, type: "group-gap" }); });
-    }
-    return gaps;
+  function questionGroupGaps(template) {
+    return (template && template.params || BUILTIN_PARAMS).groupGapPoints;
   }
 
-  function groupGapInk(data, width, height, calibration) {
-    var gaps = questionGroupGaps();
+  function groupGapInk(data, width, height, calibration, template, params) {
+    var gaps = questionGroupGaps(template);
     if (!gaps.length) return 0;
     return gaps.reduce(function (total, point) {
-      return total + ringInk(data, width, height, point, calibration);
+      return total + ringInk(data, width, height, point, calibration, params);
     }, 0) / gaps.length;
   }
 
   function gridFit(data, width, height, template) {
     var points = template.bubbles;
+    var params = template.params || BUILTIN_PARAMS;
     var best = { score: -1, dx: 0, dy: 0, angle: 0, scale: 1 };
     var evaluations = 0;
     function evaluate(dx, dy, angle, scale) {
       var calibration = { dx: dx, dy: dy, angle: angle, scale: scale };
       var score = 0;
-      for (var i = 0; i < points.length; i += 1) score += ringInk(data, width, height, points[i], calibration);
+      for (var i = 0; i < points.length; i += 1) score += ringInk(data, width, height, points[i], calibration, params);
       score /= Math.max(1, points.length);
       evaluations += 1;
       if (score > best.score) best = { score: score, dx: dx, dy: dy, angle: angle, scale: scale };
     }
-    var xShifts = [-0.012, -0.006, 0, 0.006, 0.012];
+    var xShifts = [-params.search.dx, -params.search.dx / 2, 0, params.search.dx / 2, params.search.dx];
     // The printed five-row group gaps break the periodic row pattern.
-    var yShifts = [-0.008, -0.004, 0, 0.004, 0.008];
-    var angles = [-0.8, -0.4, 0, 0.4, 0.8];
-    var scales = [0.985, 0.9925, 1, 1.0075, 1.015];
+    var yShifts = [-params.search.dy, -params.search.dy / 2, 0, params.search.dy / 2, params.search.dy];
+    var angles = [-params.search.angle, -params.search.angle / 2, 0, params.search.angle / 2, params.search.angle];
+    var scales = [1 - params.search.scale, 1 - params.search.scale / 2, 1, 1 + params.search.scale / 2, 1 + params.search.scale];
     for (var xi = 0; xi < xShifts.length; xi += 1) {
       for (var yi = 0; yi < yShifts.length; yi += 1) {
         for (var ai = 0; ai < angles.length; ai += 1) {
@@ -132,54 +123,54 @@
       }
     }
     var centerSeed = { dx: best.dx, dy: best.dy, angle: best.angle, scale: best.scale };
-    var centerBest = { score: questionCenterScore(data, width, height, template, centerSeed), calibration: centerSeed };
+    var centerBest = { score: questionCenterScore(data, width, height, template, centerSeed, params), calibration: centerSeed };
     for (var centerDx = -4; centerDx <= 4; centerDx += 1) {
       for (var centerDy = -6; centerDy <= 6; centerDy += 1) {
         var candidate = {
           dx: centerSeed.dx + centerDx / width,
-          dy: clamp(centerSeed.dy + centerDy / height, -0.012, 0.012),
+          dy: clamp(centerSeed.dy + centerDy / height, -params.limits.dy, params.limits.dy),
           angle: centerSeed.angle,
           scale: centerSeed.scale
         };
-        var centerScore = questionCenterScore(data, width, height, template, candidate);
+        var centerScore = questionCenterScore(data, width, height, template, candidate, params);
         if (centerScore > centerBest.score) centerBest = { score: centerScore, calibration: candidate };
       }
     }
     var finalCalibration = centerBest.calibration;
     finalCalibration.fitScore = centerBest.score;
     finalCalibration.gridScore = best.score;
-    finalCalibration.groupGapInk = groupGapInk(data, width, height, finalCalibration);
-    finalCalibration.alignmentBoundary = Math.abs(finalCalibration.dx) > 0.012 || Math.abs(finalCalibration.dy) >= 0.0115 ||
-      finalCalibration.groupGapInk >= MAX_GROUP_GAP_INK || best.score < MIN_GRID_SCORE;
-    var metadataFit = fitMetadata(data, width, height, template, finalCalibration);
+    finalCalibration.groupGapInk = groupGapInk(data, width, height, finalCalibration, template, params);
+    finalCalibration.alignmentBoundary = Math.abs(finalCalibration.dx) > params.limits.dx || Math.abs(finalCalibration.dy) >= params.limits.dy - 0.0005 ||
+      finalCalibration.groupGapInk >= params.maxGroupGapInk || best.score < params.minGridScore;
+    var metadataFit = fitMetadata(data, width, height, template, finalCalibration, params);
     return {
       calibration: finalCalibration,
       metadataCalibration: metadataFit.calibration,
       score: best.score,
-      improvement: Math.max(0, best.score - ringInkBaseline(data, width, height, points)),
+      improvement: Math.max(0, best.score - ringInkBaseline(data, width, height, points, params)),
       evaluations: evaluations
     };
   }
 
-  function questionCenterScore(data, width, height, template, calibration) {
+  function questionCenterScore(data, width, height, template, calibration, params) {
     var total = 0;
     template.items.forEach(function (item) {
       var values = item.choices.map(function (bubble) {
-        return measureBubble(data, width, height, bubble, calibration);
+        return measureBubble(data, width, height, bubble, calibration, params);
       });
       total += Math.max.apply(null, values);
     });
     return total / Math.max(1, template.items.length);
   }
 
-  function fitMetadata(data, width, height, template, baseCalibration) {
+  function fitMetadata(data, width, height, template, baseCalibration, params) {
     var points = template.classGrade.concat(template.classForm, template.studentNumber.reduce(function (all, column) {
       return all.concat(column);
     }, []));
     var best = { score: -1, calibration: baseCalibration };
     // The header grid has its own printed offset from the question area.
-    for (var dxStep = -15; dxStep <= 15; dxStep += 1) {
-      for (var dyStep = -15; dyStep <= 15; dyStep += 1) {
+    for (var dxStep = -params.metadataSearchPixels; dxStep <= params.metadataSearchPixels; dxStep += 1) {
+      for (var dyStep = -params.metadataSearchPixels; dyStep <= params.metadataSearchPixels; dyStep += 1) {
         var calibration = {
           dx: baseCalibration.dx + dxStep / width,
           dy: baseCalibration.dy + dyStep / height,
@@ -188,7 +179,7 @@
         };
         var score = 0;
         for (var i = 0; i < points.length; i += 1) {
-          score += ringInk(data, width, height, points[i], calibration);
+          score += ringInk(data, width, height, points[i], calibration, params);
         }
         score /= Math.max(1, points.length);
         if (score > best.score) best = { score: score, calibration: calibration };
@@ -198,14 +189,14 @@
     return best;
   }
 
-  function ringInkBaseline(data, width, height, points) {
+  function ringInkBaseline(data, width, height, points, params) {
     var score = 0;
-    for (var i = 0; i < points.length; i += 1) score += ringInk(data, width, height, points[i], null);
+    for (var i = 0; i < points.length; i += 1) score += ringInk(data, width, height, points[i], null, params);
     return score / Math.max(1, points.length);
   }
 
-  function measureBubbleAtCenter(data, width, height, center) {
-    var radius = width * 0.0077;
+  function measureBubbleAtCenter(data, width, height, center, params) {
+    var radius = width * ((params || BUILTIN_PARAMS).radius);
     var centerTotal = 0; var centerCount = 0;
     for (var y = -4; y <= 4; y += 1) {
       for (var x = -4; x <= 4; x += 1) {
@@ -226,8 +217,8 @@
     return clamp((paperGray - centerGray) / Math.max(85, paperGray), 0, 1);
   }
 
-  function measureBubble(data, width, height, bubble, calibration) {
-    return measureBubbleAtCenter(data, width, height, geometry.mapBubble(bubble, width, height, calibration));
+  function measureBubble(data, width, height, bubble, calibration, params) {
+    return measureBubbleAtCenter(data, width, height, geometry.mapBubble(bubble, width, height, calibration), params);
   }
 
   function mean(values) {
@@ -310,24 +301,25 @@
     return result;
   }
 
-  function detectPage(data, width, height, mcCount, tfCount, calibration, metadataCalibration) {
-    var template = geometry.omrTemplate(mcCount, tfCount);
+  function detectPage(data, width, height, mcCount, tfCount, calibration, metadataCalibration, expandedTemplate) {
+    var template = expandedTemplate || geometry.omrTemplate(mcCount, tfCount);
+    var params = template.params || BUILTIN_PARAMS;
     var applied = calibration || { dx: 0, dy: 0, angle: 0, scale: 1 };
     var metadataApplied = metadataCalibration || applied;
     var itemLocations = template.items.map(function (item) {
-      return item.choices.map(function (bubble) { return refineBubbleCenter(data, width, height, bubble, applied); });
+      return item.choices.map(function (bubble) { return refineBubbleCenter(data, width, height, bubble, applied, params); });
     });
     var itemValues = template.items.map(function (item, itemIndex) {
       return item.choices.map(function (bubble, bubbleIndex) {
-        return measureBubbleAtCenter(data, width, height, itemLocations[itemIndex][bubbleIndex].center);
+        return measureBubbleAtCenter(data, width, height, itemLocations[itemIndex][bubbleIndex].center, params);
       });
     });
     var thresholdCircleValues = template.items.reduce(function (all, item) {
-      return all.concat(item.choices.map(function (bubble) { return measureBubble(data, width, height, bubble, applied); }));
+      return all.concat(item.choices.map(function (bubble) { return measureBubble(data, width, height, bubble, applied, params); }));
     }, []);
     var thresholdInfo = deriveThreshold(thresholdCircleValues);
     var questions = template.items.map(function (item, index) {
-      var options = item.type === "mc" ? CHOICES : ["T", "F"];
+      var options = item.choices.map(function (bubble) { return bubble.option; });
       var result = classifyItem(options, itemValues[index], thresholdInfo);
       result.number = item.number;
       result.type = item.type;
@@ -342,23 +334,26 @@
       return result;
     });
     var multipleCount = questions.filter(function (item) { return item.reason === "多於一個深圈"; }).length;
-    var lowGridScore = Number.isFinite(Number(applied.gridScore)) && Number(applied.gridScore) < MIN_GRID_SCORE;
-    var unexpectedGroupGapInk = Number.isFinite(Number(applied.groupGapInk)) && Number(applied.groupGapInk) >= MAX_GROUP_GAP_INK;
+    var lowGridScore = Number.isFinite(Number(applied.gridScore)) && Number(applied.gridScore) < params.minGridScore;
+    var unexpectedGroupGapInk = Number.isFinite(Number(applied.groupGapInk)) && Number(applied.groupGapInk) >= params.maxGroupGapInk;
     var pageFailure = Boolean(applied.alignmentBoundary) || lowGridScore || unexpectedGroupGapInk ||
       (questions.length > 0 && multipleCount / questions.length >= 0.6);
     var pageFlags = [];
     if (!pageFailure && (Math.abs(applied.dx) > 0.008 || Math.abs(applied.dy) > 0.008 || Math.abs(applied.angle) > 0.55 || Math.abs(applied.scale - 1) > 0.012)) {
       pageFlags.push("定位校正幅度較大，請檢查整頁對齊");
     }
-    var grade = classifySingle(template.classGrade, template.classGrade.map(function (bubble) {
-      return measureBubble(data, width, height, bubble, metadataApplied);
-    }), thresholdInfo, "班別年級");
-    var form = classifySingle(template.classForm, template.classForm.map(function (bubble) {
-      return measureBubble(data, width, height, bubble, metadataApplied);
-    }), thresholdInfo, "班別字母");
+    var requiresGrade = template.classGrade.length > 0;
+    var requiresForm = template.classForm.length > 0;
+    var identityRequirements = { grade: requiresGrade, form: requiresForm, studentDigits: template.studentNumber.length };
+    var grade = requiresGrade ? classifySingle(template.classGrade, template.classGrade.map(function (bubble) {
+      return measureBubble(data, width, height, bubble, metadataApplied, params);
+    }), thresholdInfo, "班別年級") : { status: "read", reason: "", value: "", label: "班別年級", values: [] };
+    var form = requiresForm ? classifySingle(template.classForm, template.classForm.map(function (bubble) {
+      return measureBubble(data, width, height, bubble, metadataApplied, params);
+    }), thresholdInfo, "班別字母") : { status: "read", reason: "", value: "", label: "班別字母", values: [] };
     var idDigits = template.studentNumber.map(function (options, index) {
       return classifySingle(options, options.map(function (bubble) {
-        return measureBubble(data, width, height, bubble, metadataApplied);
+        return measureBubble(data, width, height, bubble, metadataApplied, params);
       }), thresholdInfo, "學號第 " + (index + 1) + " 位");
     });
     if (pageFailure) {
@@ -370,13 +365,16 @@
       });
       pageFlags.push("整頁定位失敗：可能是空白頁、方向錯誤或分組位置不符，請核對本頁");
     }
-    if (grade.status !== "read" || form.status !== "read") pageFlags.push("班別讀取未確認");
+    if ((requiresGrade && grade.status !== "read") || (requiresForm && form.status !== "read")) pageFlags.push("班別讀取未確認");
     if (idDigits.some(function (digit) { return digit.status !== "read"; })) pageFlags.push("學號讀取未確認");
+    var classRequired = requiresGrade || requiresForm;
+    var classFieldsRead = (!requiresGrade || grade.status === "read") && (!requiresForm || form.status === "read");
     return {
       questions: questions,
-      classValue: grade.status === "read" && form.status === "read" ? grade.value + form.value : "",
+      classValue: classRequired && classFieldsRead ? (requiresGrade ? grade.value : "") + (requiresForm ? form.value : "") : "",
       studentId: idDigits.every(function (digit) { return digit.status === "read"; }) ? idDigits.map(function (digit) { return digit.value; }).join("") : "",
       metadata: { grade: grade, form: form, idDigits: idDigits },
+      identityRequirements: identityRequirements,
       calibration: applied,
       metadataCalibration: metadataApplied,
       pageFailure: pageFailure,

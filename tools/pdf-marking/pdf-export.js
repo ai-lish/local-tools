@@ -130,7 +130,7 @@
     pageRecord = pageRecord || {};
     var ctx = canvas.getContext("2d");
     var width = canvas.width; var height = canvas.height;
-    var template = geometry.omrTemplate(settings.mcCount, settings.tfCount);
+    var template = settings.template || geometry.omrTemplate(settings.mcCount, settings.tfCount);
     var calibration = pageRecord.calibration || { dx: 0, dy: 0, angle: 0, scale: 1 };
     var responses = choiceAnswers(pageRecord, settings.mcCount, settings.tfCount);
     ctx.save(); ctx.strokeStyle = RED; ctx.fillStyle = RED;
@@ -297,9 +297,9 @@
       var sourceContext = source.getContext("2d", { willReadFrequently: true });
       await jsPage.render({ canvasContext: sourceContext, viewport: viewport }).promise;
       var sourceData = sourceContext.getImageData(0, 0, source.width, source.height);
-      var fittedGrid = geometry.fitDictationGrid(sourceData, baseViewport.width, baseViewport.height, state.segment);
+      var fittedGrid = geometry.fitDictationGrid(sourceData, baseViewport.width, baseViewport.height, state.segment, state.templateParams);
       var layout = geometry.dictationLayout(baseViewport.width, baseViewport.height, state.answer.length,
-        state.firstRow, state.calibration || { dx: 0, dy: 0, scale: 1 }, fittedGrid);
+        state.firstRow, state.calibration || { dx: 0, dy: 0, scale: 1 }, fittedGrid, state.templateParams, state.segment);
       var annotation = root.document.createElement("canvas");
       annotation.width = Math.ceil(viewport.width); annotation.height = Math.ceil(viewport.height);
       drawDictationAnnotations(annotation, layout, record, state.answer, sourceData);

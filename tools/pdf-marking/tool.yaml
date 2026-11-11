@@ -1,0 +1,5 @@
+name: pdf-marking
+summary: Browser-only PDF marking with reusable choice templates and dictation grids
+status: wip
+runtime: browser
+entry: index.html

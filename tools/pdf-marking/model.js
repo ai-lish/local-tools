@@ -168,11 +168,18 @@
     var classValue = String(page.classValue || "").trim();
     var studentId = String(page.studentId || "").replace(/\D/g, "");
     var metadata = page.metadata || {};
-    var classRead = metadata.grade && metadata.form && metadata.grade.status === "read" && metadata.form.status === "read";
+    var requirements = page.identityRequirements || { grade: true, form: true, studentDigits: 2 };
+    var gradeRequired = requirements.grade !== false;
+    var formRequired = requirements.form !== false;
+    var classRequired = gradeRequired || formRequired;
+    var classRead = !classRequired || (Boolean(classValue) && (page.classWasEdited ||
+      ((!gradeRequired || metadata.grade && metadata.grade.status === "read") &&
+        (!formRequired || metadata.form && metadata.form.status === "read"))));
     var idDigits = Array.isArray(metadata.idDigits) ? metadata.idDigits : [];
-    var idRead = idDigits.length === 2 && idDigits.every(function (digit) { return digit && digit.status === "read"; });
-    return Boolean(classValue && (page.classWasEdited || classRead) && /^\d{2}$/.test(studentId) &&
-      (page.studentIdWasEdited || idRead));
+    var digitCount = Number.isInteger(requirements.studentDigits) ? requirements.studentDigits : 2;
+    var idRead = digitCount === 0 || (idDigits.length === digitCount && idDigits.every(function (digit) { return digit && digit.status === "read"; }));
+    var studentRead = digitCount === 0 || (studentId.length === digitCount && /^\d+$/.test(studentId) && (page.studentIdWasEdited || idRead));
+    return Boolean(classRead && studentRead);
   }
 
   function choiceIdentityWarnings(pages, pageCount) {
@@ -181,13 +188,17 @@
     for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
       var page = (pages || {})[pageNumber] || (pages || {})[String(pageNumber)];
       if (!page) continue;
+      var requirements = page.identityRequirements || { grade: true, form: true, studentDigits: 2 };
+      var digitCount = Number.isInteger(requirements.studentDigits) ? requirements.studentDigits : 2;
+      var needsClass = requirements.grade !== false || requirements.form !== false;
       var classValue = String(page.classValue || "").toUpperCase().replace(/[^0-9A-F]/g, "").slice(0, 8);
-      var studentId = String(page.studentId || "").replace(/\D/g, "").slice(0, 2);
+      var studentId = String(page.studentId || "").replace(/\D/g, "").slice(0, digitCount || 12);
+      var studentMatches = digitCount === 0 || studentId.length === digitCount && /^\d+$/.test(studentId);
       if (!choiceIdentityConfirmed(page)) {
         warnings[pageNumber] = ["班別／學號核對：第 " + pageNumber + " 頁，班別「" + (classValue || "空白") +
           "」，學號「" + (studentId || "空白") + "」未確認"];
       }
-      if (classValue && /^\d{2}$/.test(studentId)) {
+      if (studentMatches && digitCount > 0 && (classValue || !needsClass)) {
         var key = classValue + "|" + studentId;
         if (!grouped.has(key)) grouped.set(key, { classValue: classValue, studentId: studentId, pages: [] });
         grouped.get(key).pages.push(pageNumber);
@@ -209,6 +220,7 @@
     var pagesPending = 0;
     var questionsPending = 0;
     var identityPages = 0;
+    var pageFailures = 0;
     for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
       var page = (pages || {})[pageNumber] || (pages || {})[String(pageNumber)];
       if (!page) {
@@ -218,20 +230,23 @@
         continue;
       }
       var pending = 0;
-      for (var mc = 1; mc <= mcCount; mc += 1) {
-        var mcQuestion = choiceQuestionForSettings(page, "mc", mc);
-        if (!mcQuestion || mcQuestion.status === "review") pending += 1;
-      }
-      for (var tf = 1; tf <= tfCount; tf += 1) {
-        var tfQuestion = choiceQuestionForSettings(page, "tf", tf);
-        if (!tfQuestion || tfQuestion.status === "review") pending += 1;
+      if (page.pageFailure) pageFailures += 1;
+      else {
+        for (var mc = 1; mc <= mcCount; mc += 1) {
+          var mcQuestion = choiceQuestionForSettings(page, "mc", mc);
+          if (!mcQuestion || mcQuestion.status === "review") pending += 1;
+        }
+        for (var tf = 1; tf <= tfCount; tf += 1) {
+          var tfQuestion = choiceQuestionForSettings(page, "tf", tf);
+          if (!tfQuestion || tfQuestion.status === "review") pending += 1;
+        }
       }
       var identityPending = !choiceIdentityConfirmed(page);
       if (pending) questionsPending += pending;
       if (identityPending) identityPages += 1;
-      if (pending || identityPending) pagesPending += 1;
+      if (page.pageFailure || pending || identityPending) pagesPending += 1;
     }
-    return { pagesPending: pagesPending, questionsPending: questionsPending, identityPages: identityPages };
+    return { pagesPending: pagesPending, questionsPending: questionsPending, identityPages: identityPages, pageFailures: pageFailures };
   }
 
   function choiceAnswerStatus(answer, key, type, questionStatus) {
@@ -311,14 +326,17 @@
     if (!progress || typeof progress !== "object" || Array.isArray(progress)) {
       return { ok: false, message: "進度檔格式不正確。" };
     }
-    if ((progress.version !== 1 && progress.version !== 2) || (progress.mode !== "choice" && progress.mode !== "dictation") ||
+    if (![1, 2, 3].includes(progress.version) || (progress.mode !== "choice" && progress.mode !== "dictation") ||
         (progress.version === 2 && progress.mode !== "dictation")) {
       return { ok: false, message: "進度檔版本或批改模式不支援。" };
+    }
+    if (progress.version === 3 && (typeof progress.templateId !== "string" || !/^(builtin|custom):[a-z0-9][a-z0-9._-]{0,60}$/i.test(progress.templateId))) {
+      return { ok: false, message: "進度檔缺少有效的範本 ID。" };
     }
     if (!progress.pages || typeof progress.pages !== "object" || Array.isArray(progress.pages)) {
       return { ok: false, message: "進度檔缺少頁面資料。" };
     }
-    if (progress.version === 2 && (!progress.segments || typeof progress.segments !== "object" ||
+    if ((progress.version === 2 || progress.version === 3 && progress.mode === "dictation") && (!progress.segments || typeof progress.segments !== "object" ||
         (Number(progress.selectedSegment || progress["段落"]) !== 1 && Number(progress.selectedSegment || progress["段落"]) !== 2))) {
       return { ok: false, message: "進度檔缺少默書段落資料。" };
     }

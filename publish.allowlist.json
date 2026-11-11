@@ -55,6 +55,30 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/pdf-marking/templates.js",
+      "destination": "tools/pdf-marking/templates.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/template-store.js",
+      "destination": "tools/pdf-marking/template-store.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/review.js",
+      "destination": "tools/pdf-marking/review.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/demo.js",
+      "destination": "tools/pdf-marking/demo.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/pdf-marking/model.js",
       "destination": "tools/pdf-marking/model.js",
       "publicMode": "cli-source",
@@ -75,6 +99,18 @@
     {
       "source": "tools/pdf-marking/pdf-export.js",
       "destination": "tools/pdf-marking/pdf-export.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/README.md",
+      "destination": "tools/pdf-marking/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/tool.yaml",
+      "destination": "tools/pdf-marking/tool.yaml",
       "publicMode": "cli-source",
       "managedBy": "math-lish/local-tools"
     },
