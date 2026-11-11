@@ -103,7 +103,27 @@ for (const file of files) {
       (content.match(/\bindexedDB\b/g) || []).length === 2 &&
       (content.match(/\bindexedDB\.open\s*\(\s*LIFE_EDU_DB_NAME\s*,\s*1\s*\)/g) || []).length === 1 &&
       !/\bsessionStorage\b/i.test(content);
-    if (!namespacedCalculatorStorage && !namespacedThankTeacherStorage) {
+    const pdfMarkingStorageCalls = [...content.matchAll(
+      /\b[A-Za-z_$][\w$]*\s*(?:\?\.|\.)\s*(getItem|setItem)\s*\(/g
+    )];
+    const bracketPdfMarkingStorageCalls = [...content.matchAll(
+      /\b[A-Za-z_$][\w$]*\s*\[\s*['"](?:getItem|setItem)['"]\s*\]\s*\(/g
+    )];
+    const approvedPdfMarkingStorageCalls = [...content.matchAll(
+      /\bstorage\.(getItem|setItem)\s*\(\s*(TEMPLATE_STORAGE_KEY|PREFERENCE_STORAGE_KEY)\s*(?=[,)])/g
+    )];
+    const namespacedPdfMarkingStorage = file.relative === 'tools/pdf-marking/template-store.js' &&
+      content.includes('var TEMPLATE_STORAGE_KEY = "pdf-marking.templates.v1";') &&
+      content.includes('var PREFERENCE_STORAGE_KEY = "pdf-marking.preferences.v1";') &&
+      content.includes('var storage = host && host.localStorage;') &&
+      (content.match(/\blocalStorage\b/gi) || []).length === 1 &&
+      pdfMarkingStorageCalls.length === 4 &&
+      bracketPdfMarkingStorageCalls.length === 0 &&
+      approvedPdfMarkingStorageCalls.length === pdfMarkingStorageCalls.length &&
+      approvedPdfMarkingStorageCalls.filter((match) => match[1] === 'getItem').length === 2 &&
+      approvedPdfMarkingStorageCalls.filter((match) => match[1] === 'setItem').length === 2 &&
+      !/\b(?:sessionStorage|indexedDB)\b/i.test(content);
+    if (!namespacedCalculatorStorage && !namespacedThankTeacherStorage && !namespacedPdfMarkingStorage) {
       throw new Error('unapproved browser storage in public file: ' + file.relative);
     }
   }
