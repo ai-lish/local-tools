@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "packages": {
+    "image-upscaler": {
+      "version": "2026.11.12",
+      "contentHash": "eb2ca70eb83d",
+      "fileCount": 1,
+      "byteLength": 65369
+    },
+    "photo-merge": {
+      "version": "2026.11.12",
+      "contentHash": "3cbae7beca69",
+      "fileCount": 1,
+      "byteLength": 24162
+    },
+    "core-all": {
+      "version": "2026.11.12",
+      "contentHash": "6d600b8846a5",
+      "fileCount": 2,
+      "byteLength": 89531
+    }
+  }
+}

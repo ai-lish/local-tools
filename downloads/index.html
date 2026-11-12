@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="下載 Local Tools 離線套件；解壓後可在本機使用。">
+  <title>下載離線版｜Local Tools</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #18334b; background: #f3f7fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { width: min(100% - 28px, 920px); margin: 32px auto; }
+    header, article { background: #fff; border: 1px solid #d7e1e9; border-radius: 16px; box-shadow: 0 8px 24px #18334b0d; }
+    header { padding: 28px; color: #fff; background: #18334b; }
+    h1 { margin: 0; font-size: clamp(28px, 5vw, 42px); }
+    header p { color: #d2e1ec; line-height: 1.6; }
+    nav { margin-top: 18px; }
+    nav a, .download { display: inline-flex; align-items: center; min-height: 42px; padding: 9px 15px; border-radius: 10px; color: #18334b; background: #ffe09a; font-weight: 800; text-decoration: none; }
+    .packages { display: grid; gap: 14px; margin: 18px 0; }
+    article { padding: 22px; }
+    article h2 { margin: 0 0 8px; }
+    article p { line-height: 1.55; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; overflow-wrap: anywhere; font-size: 14px; }
+    dt { font-weight: 750; }
+    dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .steps { padding: 20px 24px; background: #e8f0f5; border-radius: 14px; line-height: 1.7; }
+    .error { color: #9e2424; font-weight: 700; }
+    footer { padding: 14px 2px; color: #526779; font-size: 13px; }
+    @media (max-width: 540px) { main { width: min(100% - 18px, 920px); margin: 10px auto; } header, article { padding: 20px; } dl { grid-template-columns: 1fr; gap: 2px; } dd { margin-bottom: 7px; } }
+  </style>
+  <script src="./index.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Local Tools 離線套件</h1>
+      <p>下載後請先完整解壓，再雙擊套件內的 <code>START-HERE.html</code> 或工具的 <code>index.html</code>。工具在本機瀏覽器執行，不需連線或安裝。</p>
+      <nav><a href="../index.html">返回工具首頁</a></nav>
+    </header>
+    <section id="packages" class="packages" aria-live="polite"><p>正在載入套件清單…</p></section>
+    <section class="steps">
+      <h2>開啟方法</h2>
+      <ol>
+        <li>下載所需 ZIP，並完整解壓到本機資料夾。</li>
+        <li>雙擊 <code>START-HERE.html</code>，再選擇工具；也可直接雙擊工具的 <code>index.html</code>。</li>
+        <li>資料會由本機瀏覽器處理。請以工具內的匯出／備份功能保留重要記錄；公用電腦使用後請清除瀏覽器網站資料。</li>
+      </ol>
+      <p>請勿在 ZIP 預覽畫面內直接開啟 HTML；未完整解壓時，所需檔案可能無法載入。</p>
+    </section>
+    <footer>版本與 SHA-256 由同一次建置產生，可用本機 SHA-256 工具核對下載檔。</footer>
+  </main>
+  <script>
+    const root = document.getElementById('packages');
+    const packages = window.LT_DOWNLOADS;
+    if (!Array.isArray(packages)) {
+      root.innerHTML = '<p class="error">套件清單未能載入，請重新整理頁面。</p>';
+    } else {
+      root.replaceChildren(...packages.map((item) => {
+        const card = document.createElement('article');
+        const heading = document.createElement('h2');
+        heading.textContent = item.title;
+        const details = document.createElement('dl');
+        for (const [label, value] of [['版本', item.version], ['大小', item.sizeText], ['SHA-256', item.sha256]]) {
+          const term = document.createElement('dt');
+          const description = document.createElement('dd');
+          term.textContent = label;
+          description.textContent = value;
+          details.append(term, description);
+        }
+        const link = document.createElement('a');
+        link.className = 'download';
+        link.href = `./${encodeURIComponent(item.id)}.zip`;
+        link.download = `${item.id}.zip`;
+        link.textContent = '下載 ZIP';
+        card.append(heading, details, link);
+        return card;
+      }));
+    }
+  </script>
+</body>
+</html>
