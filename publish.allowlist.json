@@ -1379,10 +1379,80 @@
       "destination": "tools/bgm-auditions/licenses/TinySoundFont-LICENSE.txt",
       "publicMode": "cli-source",
       "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "vendor.lock.json",
+      "destination": "vendor.lock.json",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "offline.lock.json",
+      "destination": "offline.lock.json",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "downloads/index.html",
+      "destination": "downloads/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
     }
   ],
   "generatedFiles": [
     ".nojekyll"
   ],
-  "allowedExternalHosts": []
+  "allowedExternalHosts": [],
+  "offlinePackages": [
+    {
+      "id": "image-upscaler",
+      "title": "圖片像素提升工具",
+      "version": "2026.11.12",
+      "entry": "tools/image-upscaler/index.html",
+      "entries": [
+        "tools/image-upscaler/index.html"
+      ],
+      "files": [
+        "tools/image-upscaler/index.html"
+      ],
+      "transforms": {
+        "injectOfflineHead": true
+      },
+      "allowedTextUrls": []
+    },
+    {
+      "id": "photo-merge",
+      "title": "相機圖片合併工具",
+      "version": "2026.11.12",
+      "entry": "tools/photo-merge/index.html",
+      "entries": [
+        "tools/photo-merge/index.html"
+      ],
+      "files": [
+        "tools/photo-merge/index.html"
+      ],
+      "transforms": {
+        "injectOfflineHead": true
+      },
+      "allowedTextUrls": []
+    },
+    {
+      "id": "core-all",
+      "title": "核心工具全套",
+      "version": "2026.11.12",
+      "entry": "START-HERE.html",
+      "entries": [
+        "tools/image-upscaler/index.html",
+        "tools/photo-merge/index.html"
+      ],
+      "files": [
+        "tools/image-upscaler/index.html",
+        "tools/photo-merge/index.html"
+      ],
+      "transforms": {
+        "injectOfflineHead": true
+      },
+      "allowedTextUrls": []
+    }
+  ]
 }
