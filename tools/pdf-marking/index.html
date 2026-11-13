@@ -6,8 +6,9 @@
   <meta name="description" content="只在瀏覽器本機讀取及批改 PDF。">
   <title>批改 PDF｜Local Tools</title>
   <link rel="stylesheet" href="styles.css">
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script defer src="../_vendor/pdfjs-3.11.174/pdf.min.js"></script>
+  <script defer src="../_vendor/pdfjs-3.11.174/pdf.worker.embedded.js"></script>
+  <script defer src="../_vendor/pdf-lib-1.17.1/pdf-lib.min.js"></script>
   <script defer src="model.js"></script>
   <script defer src="templates.js"></script>
   <script defer src="geometry.js"></script>
@@ -210,5 +211,16 @@
     </section>
     <footer>只在本機瀏覽器工作 · 不連接伺服器或 AI 服務 · 建議桌面瀏覽器</footer>
   </main>
+<script>
+window.addEventListener("load", function () {
+  if (window.pdfjsLib && window.PDFLib && window.LT_PDF_WORKER_SRC) return;
+  var warning = document.createElement("p");
+  warning.setAttribute("role", "alert");
+  warning.textContent = window.LT_OFFLINE
+    ? "套件不完整：請先把 zip 完整解壓，再開啟 START-HERE.html"
+    : "PDF 程式庫未載入；請連線後重新整理頁面。";
+  document.body.insertBefore(warning, document.body.firstChild);
+});
+</script>
 </body>
 </html>

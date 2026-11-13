@@ -51,6 +51,44 @@ function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
+function sha384(bytes) {
+  return createHash('sha384').update(bytes).digest('hex');
+}
+
+function applyOfflineRewrites(source, packageInfo, filename) {
+  for (const rewrite of packageInfo.offlineRewrites || []) {
+    if (rewrite.file !== filename) continue;
+    const occurrences = source.split(rewrite.from).length - 1;
+    if (occurrences !== 1) throw new Error('offline rewrite must match exactly once: ' + packageInfo.id + ':' + filename);
+    source = source.replace(rewrite.from, rewrite.to);
+  }
+  return source;
+}
+
+async function verifyVendorFiles(vendorLock, fileMap) {
+  const locked = [...vendorLock.files, ...vendorLock.generatedFiles];
+  const expected = new Set(locked.map((item) => `tools/_vendor/${item.path}`));
+  const actual = [...fileMap.keys()].filter((name) => name.startsWith('tools/_vendor/'));
+  if (actual.length !== expected.size || actual.some((name) => !expected.has(name))) {
+    throw new Error('vendor output differs from vendor.lock.json');
+  }
+  for (const item of locked) {
+    const file = fileMap.get(`tools/_vendor/${item.path}`);
+    if (!file) throw new Error('locked vendor file is missing: ' + item.path);
+    const bytes = await readFile(file.fullPath);
+    if (bytes.length !== item.bytes || sha256(bytes) !== item.sha256 || sha384(bytes) !== item.sha384) {
+      throw new Error('locked vendor file size/SHA mismatch: ' + item.path);
+    }
+    if (item.generator) {
+      const sourceFile = fileMap.get(`tools/_vendor/${item.sourcePath}`);
+      if (!sourceFile || sha256(await readFile(sourceFile.fullPath)) !== item.inputSha256 ||
+          !bytes.toString('utf8').startsWith(`// Generated from ${item.sourcePath} SHA-256: ${item.inputSha256}\n`)) {
+        throw new Error('generated vendor source digest mismatch: ' + item.path);
+      }
+    }
+  }
+}
+
 function crc32(bytes) {
   let crc = 0xffffffff;
   for (const byte of bytes) {
@@ -127,12 +165,15 @@ function assertZipPath(name, mode, label) {
 }
 
 function injectOfflineHead(source, packageInfo, contentHash) {
-  if (source.includes('window.LT_OFFLINE') || /http-equiv\s*=\s*["']Content-Security-Policy/i.test(source)) {
+  if (/\bwindow\.LT_OFFLINE\s*=/.test(source) || source.includes('LT_OFFLINE_FOOTER') || /http-equiv\s*=\s*["']Content-Security-Policy/i.test(source)) {
     throw new Error('source already contains offline metadata or CSP: ' + packageInfo.id);
   }
   const metadata = `<meta http-equiv="Content-Security-Policy" content="${OFFLINE_CSP}">\n<script>window.LT_OFFLINE=${JSON.stringify({ id: packageInfo.id, version: packageInfo.version, hash: contentHash })};</script>\n`;
   if (!/<head(?:\s[^>]*)?>/i.test(source) || !/<\/head\s*>/i.test(source)) throw new Error('offline entry has no head element: ' + packageInfo.id);
-  return Buffer.from(source.replace(/<\/head\s*>/i, `${metadata}</head>`), 'utf8');
+  if (!/<\/body\s*>/i.test(source)) throw new Error('offline entry has no body element: ' + packageInfo.id);
+  const footer = `<script>/* LT_OFFLINE_FOOTER */(function(){var info=window.LT_OFFLINE;if(!info)return;var footer=document.createElement("footer");footer.style.cssText="margin:1rem auto;padding:.75rem;color:#526779;font:12px system-ui,sans-serif;text-align:center;position:relative;z-index:9999";footer.appendChild(document.createTextNode("離線版 "+info.version+"（"+info.hash+"） "));var link=document.createElement("a");link.href="https://ai-lish.github.io/local-tools/downloads/index.html#"+encodeURIComponent(info.id)+"="+encodeURIComponent(info.version);link.textContent="檢查更新";footer.appendChild(link);document.body.appendChild(footer);}());</script>`;
+  const withHead = source.replace(/<\/head\s*>/i, `${metadata}</head>`);
+  return Buffer.from(withHead.replace(/<\/body\s*>/i, `${footer}</body>`), 'utf8');
 }
 
 function assertStorageAllowed(relative, content) {
@@ -222,11 +263,15 @@ if (!Array.isArray(manifest.offlinePackages)) throw new Error('offlinePackages m
 const fileMap = new Map(files.map((file) => [file.relative, file]));
 const offlineLock = JSON.parse(await readFile(path.join(siteRoot, 'offline.lock.json'), 'utf8'));
 if (offlineLock.version !== 1 || !offlineLock.packages || typeof offlineLock.packages !== 'object') throw new Error('invalid offline.lock.json');
+const vendorLock = JSON.parse(await readFile(path.join(siteRoot, 'vendor.lock.json'), 'utf8'));
+if (vendorLock.version !== 2 || !Array.isArray(vendorLock.packages) || !Array.isArray(vendorLock.files) || !Array.isArray(vendorLock.generatedFiles)) throw new Error('invalid vendor.lock.json');
+await verifyVendorFiles(vendorLock, fileMap);
 const zipDigests = new Map();
 for (const packageInfo of manifest.offlinePackages) {
   const lock = offlineLock.packages[packageInfo.id];
   if (!lock || lock.version !== packageInfo.version || !Array.isArray(packageInfo.entries) || !packageInfo.entries.length ||
       !Array.isArray(packageInfo.files) || !packageInfo.files.length ||
+      (packageInfo.libraries !== undefined && !Array.isArray(packageInfo.libraries)) ||
       packageInfo.transforms?.injectOfflineHead !== true || Object.keys(packageInfo.transforms || {}).some((key) => key !== 'injectOfflineHead')) {
     throw new Error('invalid offline package or lock entry: ' + packageInfo.id);
   }
@@ -252,7 +297,14 @@ for (const packageInfo of manifest.offlinePackages) {
     assertZipPath(member.name, member.mode, packageInfo.id);
     memberMap.set(member.name, member);
   }
-  const expectedMembers = new Set([...packageInfo.files, ...generatedMemberNames]);
+  const licenseMembers = [];
+  for (const libraryName of packageInfo.libraries || []) {
+    const library = vendorLock.packages.find((item) => item.name === libraryName);
+    const license = vendorLock.files.find((item) => item.packageName === libraryName && item.role === 'license');
+    if (!library || !license || !library.files.includes(license.path)) throw new Error('unlocked vendor license for ' + packageInfo.id + ':' + libraryName);
+    licenseMembers.push({ name: `LICENSES/${libraryName}/${path.posix.basename(license.path)}`, license });
+  }
+  const expectedMembers = new Set([...packageInfo.files, ...generatedMemberNames, ...licenseMembers.map((item) => item.name)]);
   if (memberMap.size !== expectedMembers.size || [...expectedMembers].some((name) => !memberMap.has(name))) {
     throw new Error('ZIP member set mismatch for ' + packageInfo.id + '; expected=' + [...expectedMembers].join(',') + ' actual=' + [...memberMap.keys()].join(','));
   }
@@ -263,8 +315,14 @@ for (const packageInfo of manifest.offlinePackages) {
     const member = memberMap.get(name);
     const source = await readFile(fileMap.get(name).fullPath);
     const expectedBytes = packageInfo.transforms.injectOfflineHead && packageInfo.entries.includes(name)
-      ? injectOfflineHead(source.toString('utf8'), packageInfo, contentHash) : source;
+      ? injectOfflineHead(applyOfflineRewrites(source.toString('utf8'), packageInfo, name), packageInfo, contentHash) : source;
     if (sha256(member.bytes) !== sha256(expectedBytes)) throw new Error('ZIP member differs from site source/approved transform: ' + packageInfo.id + ':' + name);
+  }
+  for (const { name, license } of licenseMembers) {
+    const source = await readFile(fileMap.get(`tools/_vendor/${license.path}`).fullPath);
+    if (sha256(source) !== license.sha256 || sha256(memberMap.get(name).bytes) !== license.sha256) {
+      throw new Error('ZIP license differs from locked vendor source: ' + packageInfo.id + ':' + name);
+    }
   }
   for (const member of members) {
     if (forbiddenPath.test(member.name)) throw new Error('forbidden public path in ZIP: ' + packageInfo.id + ':' + member.name);

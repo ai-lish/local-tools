@@ -260,8 +260,12 @@
   }
 
   async function exportChoicePdf(bytes, state) {
-    if (!root.pdfjsLib || !root.PDFLib) throw new Error("PDF 元件未能載入。請檢查網絡後重試。");
-    var pdfjs = await root.pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+    if (!root.pdfjsLib || !root.PDFLib || !root.LT_PDF_WORKER_SRC) {
+      throw new Error(root.LT_OFFLINE
+        ? "套件不完整：請先把 zip 完整解壓，再開啟 START-HERE.html"
+        : "PDF 元件未能載入。請檢查網絡後重試。");
+    }
+    var pdfjs = await root.pdfjsLib.getDocument({ data: bytes.slice(0), isEvalSupported: false }).promise;
     var pdfLib = await root.PDFLib.PDFDocument.load(bytes.slice(0));
     var count = Math.min(pdfjs.numPages, pdfLib.getPageCount());
     for (var index = 0; index < count; index += 1) {
@@ -282,8 +286,12 @@
   }
 
   async function exportDictationPdf(bytes, state) {
-    if (!root.pdfjsLib || !root.PDFLib) throw new Error("PDF 元件未能載入。請檢查網絡後重試。");
-    var pdfjs = await root.pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+    if (!root.pdfjsLib || !root.PDFLib || !root.LT_PDF_WORKER_SRC) {
+      throw new Error(root.LT_OFFLINE
+        ? "套件不完整：請先把 zip 完整解壓，再開啟 START-HERE.html"
+        : "PDF 元件未能載入。請檢查網絡後重試。");
+    }
+    var pdfjs = await root.pdfjsLib.getDocument({ data: bytes.slice(0), isEvalSupported: false }).promise;
     var pdfLib = await root.PDFLib.PDFDocument.load(bytes.slice(0));
     var count = Math.min(pdfjs.numPages, pdfLib.getPageCount());
     for (var index = 0; index < count; index += 1) {

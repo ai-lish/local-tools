@@ -11,7 +11,7 @@ const siteRoot = path.resolve(root, manifest.publicRoot);
 const OFFLINE_CSP = "default-src 'self' file: data: blob: 'unsafe-inline'; connect-src 'none'; worker-src blob:; form-action 'none'";
 
 function assertRelative(value, label) {
-  if (typeof value !== 'string' || value.length === 0 || value.includes('\\') ||
+  if (typeof value !== 'string' || value.length === 0 || value.includes('..') || value.includes('\\') ||
       path.posix.isAbsolute(value) || value.split('/').some((part) => part === '' || part === '.' || part === '..')) {
     throw new Error(label + ' is not a safe relative path: ' + value);
   }
@@ -101,6 +101,9 @@ function htmlEscape(value) {
 function toolTitle(file) {
   if (file.startsWith('tools/image-upscaler/')) return '圖片像素提升工具';
   if (file.startsWith('tools/photo-merge/')) return '相機圖片合併工具';
+  if (file.startsWith('tools/pdf-marking/')) return 'PDF 閱卷及批改工具';
+  if (file.startsWith('tools/pdf-splitter/')) return 'PDF 分割及處理工具';
+  if (file.startsWith('tools/hkdse-question-split/')) return 'HKDSE 試卷逐題切圖工具';
   return file;
 }
 
@@ -115,19 +118,39 @@ function readmeOffline(packageInfo) {
   return `LOCAL TOOLS OFFLINE PACKAGE\n\nPackage: ${packageInfo.id}\nVersion: ${packageInfo.version}\nContent hash: ${packageInfo.contentHash}\n\nOPENING\n1. Extract the complete ZIP to a local folder. Do not open HTML inside the ZIP preview.\n2. Double-click START-HERE.html, then open the listed tool. You may also double-click a tool index.html directly.\n3. The offline pages use a Content Security Policy that blocks network connections.\n\nPRIVATE DATA\n- Files are processed by your local browser; no network connection is required.\n- Chrome may share file:// browser storage between local HTML pages. Do not open untrusted local HTML in a browser profile that contains sensitive records.\n- Use each tool's export or backup function as the authoritative copy of important records.\n- On a shared computer, clear browser site data when finished.\n\n繁體中文\n1. 請先把整個 ZIP 完整解壓到本機資料夾，不要在 ZIP 預覽畫面直接開啟 HTML。\n2. 雙擊 START-HERE.html，再開啟清單中的工具；亦可直接雙擊工具 index.html。\n3. 離線頁面使用內容安全政策封鎖網絡連線，不需登入或安裝。\n4. Chrome 的 file:// 頁面可能共用瀏覽器儲存空間；不要在存有敏感記錄的瀏覽器設定檔開啟來歷不明的本機 HTML。\n5. 重要記錄請以工具匯出／備份為準；公用電腦使用後請清除瀏覽器網站資料。\n`;
 }
 
-function notices() {
-  return 'Third-party notices\n\nThis Stage 0 package contains no third-party runtime libraries.\n';
+function notices(packageInfo, vendorLock) {
+  const included = packageInfo.libraries || [];
+  if (!included.length) return 'Third-party notices\n\nThis package contains no third-party runtime libraries.\n';
+  const rows = included.map((name) => {
+    const item = vendorLock.packages.find((pkg) => pkg.name === name);
+    if (!item) throw new Error(`vendor package is missing from vendor.lock.json: ${name}`);
+    return `- ${item.name} ${item.version} (${item.license})\n  Source: ${item.sourceUrl}\n`;
+  });
+  return `Third-party notices\n\n${rows.join('')}\nThe upstream license text for each included library is in the matching LICENSES/<package>/ directory.\n`;
 }
 
-function injectOfflineHead(source, packageInfo) {
+function applyOfflineRewrites(source, packageInfo, filename) {
+  for (const rewrite of packageInfo.offlineRewrites || []) {
+    if (rewrite.file !== filename) continue;
+    const occurrences = source.split(rewrite.from).length - 1;
+    if (occurrences !== 1) throw new Error(`offline rewrite must match exactly once: ${packageInfo.id}:${filename}`);
+    source = source.replace(rewrite.from, rewrite.to);
+  }
+  return source;
+}
+
+function injectOfflineHead(source, packageInfo, contentHash) {
   if (!/<head(?:\s[^>]*)?>/i.test(source) || !/<\/head\s*>/i.test(source)) {
     throw new Error(`offline entry has no complete head element: ${packageInfo.id}`);
   }
-  if (source.includes('window.LT_OFFLINE') || /http-equiv\s*=\s*["']Content-Security-Policy/i.test(source)) {
+  if (/\bwindow\.LT_OFFLINE\s*=/.test(source) || source.includes('LT_OFFLINE_FOOTER') || /http-equiv\s*=\s*["']Content-Security-Policy/i.test(source)) {
     throw new Error(`offline entry already contains offline metadata or CSP: ${packageInfo.id}`);
   }
-  const metadata = `<meta http-equiv="Content-Security-Policy" content="${OFFLINE_CSP}">\n<script>window.LT_OFFLINE=${JSON.stringify({ id: packageInfo.id, version: packageInfo.version, hash: packageInfo.contentHash })};</script>\n`;
-  return source.replace(/<\/head\s*>/i, `${metadata}</head>`);
+  if (!/<\/body\s*>/i.test(source)) throw new Error(`offline entry has no body element: ${packageInfo.id}`);
+  const metadata = `<meta http-equiv="Content-Security-Policy" content="${OFFLINE_CSP}">\n<script>window.LT_OFFLINE=${JSON.stringify({ id: packageInfo.id, version: packageInfo.version, hash: contentHash })};</script>\n`;
+  const footer = `<script>/* LT_OFFLINE_FOOTER */(function(){var info=window.LT_OFFLINE;if(!info)return;var footer=document.createElement("footer");footer.style.cssText="margin:1rem auto;padding:.75rem;color:#526779;font:12px system-ui,sans-serif;text-align:center;position:relative;z-index:9999";footer.appendChild(document.createTextNode("離線版 "+info.version+"（"+info.hash+"） "));var link=document.createElement("a");link.href="https://ai-lish.github.io/local-tools/downloads/index.html#"+encodeURIComponent(info.id)+"="+encodeURIComponent(info.version);link.textContent="檢查更新";footer.appendChild(link);document.body.appendChild(footer);}());</script>`;
+  const withHead = source.replace(/<\/head\s*>/i, `${metadata}</head>`);
+  return withHead.replace(/<\/body\s*>/i, `${footer}</body>`);
 }
 
 if (manifest.version !== 1 || manifest.publicRoot !== 'site' ||
@@ -159,6 +182,10 @@ const offlineLock = JSON.parse(await readFile(path.join(root, 'offline.lock.json
 if (offlineLock.version !== 1 || !offlineLock.packages || typeof offlineLock.packages !== 'object') {
   throw new Error('invalid offline.lock.json');
 }
+const vendorLock = JSON.parse(await readFile(path.join(root, 'vendor.lock.json'), 'utf8'));
+if (vendorLock.version !== 2 || !Array.isArray(vendorLock.packages) || !Array.isArray(vendorLock.files)) {
+  throw new Error('vendor.lock.json is invalid or out of date.');
+}
 const downloads = [];
 for (const packageInfo of manifest.offlinePackages) {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(packageInfo.id) || !Array.isArray(packageInfo.entries) ||
@@ -182,7 +209,8 @@ for (const packageInfo of manifest.offlinePackages) {
     rows.push(`${filename}\t${sha256(source)}\n`);
     sourceBytes += source.length;
     if (packageInfo.entries.includes(filename) && packageInfo.transforms.injectOfflineHead) {
-      const output = injectOfflineHead(source.toString('utf8'), { ...packageInfo, contentHash: lockEntry.contentHash });
+      const rewritten = applyOfflineRewrites(source.toString('utf8'), packageInfo, filename);
+      const output = injectOfflineHead(rewritten, packageInfo, lockEntry.contentHash);
       members.set(filename, Buffer.from(output, 'utf8'));
     } else {
       members.set(filename, source);
@@ -200,8 +228,19 @@ for (const packageInfo of manifest.offlinePackages) {
   const generated = new Map([
     ['START-HERE.html', Buffer.from(startHere({ ...packageInfo, contentHash: sourceHash }), 'utf8')],
     ['README-OFFLINE.txt', Buffer.from(readmeOffline({ ...packageInfo, contentHash: sourceHash }), 'utf8')],
-    ['LICENSES/THIRD-PARTY-NOTICES.md', Buffer.from(notices(), 'utf8')]
+    ['LICENSES/THIRD-PARTY-NOTICES.md', Buffer.from(notices(packageInfo, vendorLock), 'utf8')]
   ]);
+  for (const libraryName of packageInfo.libraries || []) {
+    const library = vendorLock.packages.find((pkg) => pkg.name === libraryName);
+    if (!library) throw new Error(`offline package references unknown vendor library: ${packageInfo.id}:${libraryName}`);
+    const license = vendorLock.files.find((file) => file.packageName === libraryName && file.role === 'license');
+    if (!license || !library.files.includes(license.path)) {
+      throw new Error(`vendor license is not locked for ${libraryName}`);
+    }
+    const licenseBytes = await readFile(path.join(siteRoot, 'tools/_vendor', license.path));
+    if (sha256(licenseBytes) !== license.sha256) throw new Error(`vendor license SHA-256 mismatch: ${license.path}`);
+    generated.set(`LICENSES/${libraryName}/${path.basename(license.path)}`, licenseBytes);
+  }
   generated.set('index.html', generated.get('START-HERE.html'));
   for (const [filename, bytes] of generated) members.set(filename, bytes);
   const inventory = [...members.entries()].sort(([a], [b]) => a.localeCompare(b, 'en'))

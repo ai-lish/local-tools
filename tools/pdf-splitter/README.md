@@ -16,7 +16,7 @@
 - 📦 **ZIP 打包下載** — 多份 PDF 自動 zip
 - 🎯 **拖拽操作** — Drag & drop 載入
 - 📱 **響應式** — 桌面、平板、手機都可用
-- 🌐 **零依賴** — 純 HTML + JS（CDN: pdf-lib + jszip）
+- 📦 **本機依賴** — 固定版本 pdf-lib、JSZip 及 PDF.js 由 repo 內鎖定的本機副本載入
 
 ## 🚀 使用方法
 

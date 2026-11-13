@@ -445,9 +445,10 @@
   PDF 工具箱 · 純前端實作 · 由 <a href="https://github.com/ai-lish/pdf-splitter" target="_blank" rel="noopener noreferrer">ai-lish/pdf-splitter</a> 提供
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="../_vendor/pdf-lib-1.17.1/pdf-lib.min.js"></script>
+<script src="../_vendor/jszip-3.10.1/jszip.min.js"></script>
+<script src="../_vendor/pdfjs-3.11.174/pdf.min.js"></script>
+<script src="../_vendor/pdfjs-3.11.174/pdf.worker.embedded.js"></script>
 <script>
 (() => {
   const { PDFDocument, StandardFonts, rgb, degrees } = PDFLib;
@@ -1045,7 +1046,7 @@
   }
 
   // ========== PDF.js / raster helpers ==========
-  const PDFJS_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const PDFJS_WORKER_SRC = window.LT_PDF_WORKER_SRC;
 
   function ensurePdfJsWorker() {
     if (!pdfjsLib || typeof pdfjsLib.getDocument !== 'function') {
@@ -1058,7 +1059,7 @@
 
   async function loadPdfJsDocument(password) {
     ensurePdfJsWorker();
-    const options = { data: new Uint8Array(pdfBytes) };
+    const options = { data: new Uint8Array(pdfBytes), isEvalSupported: false };
     if (password) options.password = password;
     return pdfjsLib.getDocument(options).promise;
   }
@@ -1295,6 +1296,18 @@
   // ========== Init ==========
   renderToolConfig();
 })();
+</script>
+
+<script>
+window.addEventListener('load', function () {
+  if (window['pdfjs-dist/build/pdf'] && window.PDFLib && window.JSZip && window.LT_PDF_WORKER_SRC) return;
+  const warning = document.createElement('p');
+  warning.setAttribute('role', 'alert');
+  warning.textContent = window.LT_OFFLINE
+    ? '套件不完整：請先把 zip 完整解壓，再開啟 START-HERE.html'
+    : 'PDF.js 載入失敗，請重新整理頁面後再試';
+  document.body.insertBefore(warning, document.body.firstChild);
+});
 </script>
 
 </body>

@@ -601,8 +601,9 @@
     <p class="footnote"><strong>本階段範圍：</strong>只做本機 PDF 渲染、上下／左右裁切、跨頁拼接及改檔名；不連接 Google Drive，不寫入 HKDSE 主表，不進行正式 OCR、課題分類或 SVG 處理。P1 試題答題簿可作正式題目來源，但答題線是否保留由裁切界線決定。</p>
   </main>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="../_vendor/pdfjs-3.11.174/pdf.min.js"></script>
+  <script src="../_vendor/pdfjs-3.11.174/pdf.worker.embedded.js"></script>
+  <script src="../_vendor/jszip-3.10.1/jszip.min.js"></script>
   <script>
     (function () {
       "use strict";
@@ -635,7 +636,7 @@
 
       if (window.pdfjsLib) {
         window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+          window.LT_PDF_WORKER_SRC;
       }
 
       function value(id) {
@@ -779,7 +780,7 @@
         try {
           setStatus("正在讀取 PDF...", "warn");
           var data = await file.arrayBuffer();
-          var pdf = await window.pdfjsLib.getDocument({ data: data }).promise;
+          var pdf = await window.pdfjsLib.getDocument({ data: data, isEvalSupported: false }).promise;
           if (token !== state.loadingToken) return;
           state.file = file;
           state.pdf = pdf;
@@ -1282,6 +1283,17 @@
       updateSelection();
       validate(false);
     }());
+  </script>
+  <script>
+      window.addEventListener("load", function () {
+        if (window.pdfjsLib && window.JSZip && window.LT_PDF_WORKER_SRC) return;
+        var warning = document.createElement("p");
+        warning.setAttribute("role", "alert");
+        warning.textContent = window.LT_OFFLINE
+          ? "套件不完整：請先把 zip 完整解壓，再開啟 START-HERE.html"
+          : "PDF.js 未能載入；請檢查網絡連線後重新整理。";
+        document.body.insertBefore(warning, document.body.firstChild);
+      });
   </script>
 </body>
 </html>

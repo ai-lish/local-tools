@@ -1397,6 +1397,60 @@
       "destination": "downloads/index.html",
       "publicMode": "offline-single-file",
       "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "THIRD-PARTY-NOTICES.md",
+      "destination": "THIRD-PARTY-NOTICES.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
+      "destination": "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/_vendor/pdfjs-3.11.174/pdf.worker.min.js",
+      "destination": "tools/_vendor/pdfjs-3.11.174/pdf.worker.min.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/_vendor/pdfjs-3.11.174/LICENSE",
+      "destination": "tools/_vendor/pdfjs-3.11.174/LICENSE",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/_vendor/pdf-lib-1.17.1/pdf-lib.min.js",
+      "destination": "tools/_vendor/pdf-lib-1.17.1/pdf-lib.min.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/_vendor/pdf-lib-1.17.1/LICENSE.md",
+      "destination": "tools/_vendor/pdf-lib-1.17.1/LICENSE.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/_vendor/jszip-3.10.1/jszip.min.js",
+      "destination": "tools/_vendor/jszip-3.10.1/jszip.min.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/_vendor/jszip-3.10.1/LICENSE.markdown",
+      "destination": "tools/_vendor/jszip-3.10.1/LICENSE.markdown",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",
+      "destination": "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
     }
   ],
   "generatedFiles": [
@@ -1407,7 +1461,7 @@
     {
       "id": "image-upscaler",
       "title": "圖片像素提升工具",
-      "version": "2026.11.12",
+      "version": "2026.11.13",
       "entry": "tools/image-upscaler/index.html",
       "entries": [
         "tools/image-upscaler/index.html"
@@ -1418,12 +1472,18 @@
       "transforms": {
         "injectOfflineHead": true
       },
-      "allowedTextUrls": []
+      "allowedTextUrls": [
+        {
+          "value": "https://ai-lish.github.io/local-tools/downloads/index.html#",
+          "kind": "hyperlink"
+        }
+      ],
+      "libraries": []
     },
     {
       "id": "photo-merge",
       "title": "相機圖片合併工具",
-      "version": "2026.11.12",
+      "version": "2026.11.13",
       "entry": "tools/photo-merge/index.html",
       "entries": [
         "tools/photo-merge/index.html"
@@ -1434,25 +1494,645 @@
       "transforms": {
         "injectOfflineHead": true
       },
-      "allowedTextUrls": []
+      "allowedTextUrls": [
+        {
+          "value": "https://ai-lish.github.io/local-tools/downloads/index.html#",
+          "kind": "hyperlink"
+        }
+      ],
+      "libraries": []
     },
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.12",
+      "version": "2026.11.13.2",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
-        "tools/photo-merge/index.html"
+        "tools/photo-merge/index.html",
+        "tools/pdf-marking/index.html",
+        "tools/pdf-splitter/index.html",
+        "tools/hkdse-question-split/index.html"
       ],
       "files": [
         "tools/image-upscaler/index.html",
-        "tools/photo-merge/index.html"
+        "tools/photo-merge/index.html",
+        "tools/pdf-marking/index.html",
+        "tools/pdf-marking/styles.css",
+        "tools/pdf-marking/app.js",
+        "tools/pdf-marking/templates.js",
+        "tools/pdf-marking/template-store.js",
+        "tools/pdf-marking/review.js",
+        "tools/pdf-marking/demo.js",
+        "tools/pdf-marking/model.js",
+        "tools/pdf-marking/geometry.js",
+        "tools/pdf-marking/omr.js",
+        "tools/pdf-marking/pdf-export.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.worker.min.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",
+        "tools/_vendor/pdfjs-3.11.174/LICENSE",
+        "tools/_vendor/pdf-lib-1.17.1/pdf-lib.min.js",
+        "tools/_vendor/pdf-lib-1.17.1/LICENSE.md",
+        "tools/pdf-splitter/index.html",
+        "tools/_vendor/jszip-3.10.1/jszip.min.js",
+        "tools/_vendor/jszip-3.10.1/LICENSE.markdown",
+        "tools/hkdse-question-split/index.html"
       ],
       "transforms": {
         "injectOfflineHead": true
       },
-      "allowedTextUrls": []
+      "allowedTextUrls": [
+        {
+          "value": "https://ai-lish.github.io/local-tools/downloads/index.html#",
+          "kind": "hyperlink"
+        },
+        {
+          "value": "https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-3.11.174.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://www.apache.org/licenses/LICENSE-2.0",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://${t}",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://${e}",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/2000/svg",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/XML/1998/namespace",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/xlink",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xci/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-connection-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-data/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-form/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-locale-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-source-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-template/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xdc/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xdp/pdf/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xdp/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xfdf/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xmpmeta/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/2000/09/xmldsig#",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/XSL/Transform",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/xhtml",
+          "kind": "namespace"
+        },
+        {
+          "value": "https://registry.npmjs.org/pdf-lib/-/pdf-lib-1.17.1.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/Hopding/pdf-lib",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://stuartk.com/jszip",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://raw.github.com/Stuk/jszip/main/LICENSE.markdown",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/nodeca/pako/blob/main/LICENSE",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://stuk.github.io/jszip/documentation/howto/read_zip.html",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/ai-lish/pdf-splitter",
+          "kind": "hyperlink"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-data/1.0/",
+          "kind": "namespace"
+        }
+      ],
+      "libraries": [
+        "pdfjs-dist",
+        "pdf-lib",
+        "jszip"
+      ],
+      "offlineRewrites": [
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "href=\"../../public-index.html\"",
+          "to": "href=\"../../START-HERE.html\""
+        }
+      ]
+    },
+    {
+      "id": "pdf-marking",
+      "title": "PDF 閱卷及批改工具",
+      "version": "2026.11.13.2",
+      "entry": "tools/pdf-marking/index.html",
+      "entries": [
+        "tools/pdf-marking/index.html"
+      ],
+      "files": [
+        "tools/pdf-marking/index.html",
+        "tools/pdf-marking/styles.css",
+        "tools/pdf-marking/app.js",
+        "tools/pdf-marking/templates.js",
+        "tools/pdf-marking/template-store.js",
+        "tools/pdf-marking/review.js",
+        "tools/pdf-marking/demo.js",
+        "tools/pdf-marking/model.js",
+        "tools/pdf-marking/geometry.js",
+        "tools/pdf-marking/omr.js",
+        "tools/pdf-marking/pdf-export.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.worker.min.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",
+        "tools/_vendor/pdfjs-3.11.174/LICENSE",
+        "tools/_vendor/pdf-lib-1.17.1/pdf-lib.min.js",
+        "tools/_vendor/pdf-lib-1.17.1/LICENSE.md"
+      ],
+      "transforms": {
+        "injectOfflineHead": true
+      },
+      "allowedTextUrls": [
+        {
+          "value": "https://ai-lish.github.io/local-tools/downloads/index.html#",
+          "kind": "hyperlink"
+        },
+        {
+          "value": "https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-3.11.174.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://www.apache.org/licenses/LICENSE-2.0",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://${t}",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://${e}",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/2000/svg",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/XML/1998/namespace",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/xlink",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xci/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-connection-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-data/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-form/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-locale-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-source-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-template/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xdc/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xdp/pdf/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xdp/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xfdf/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xmpmeta/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/2000/09/xmldsig#",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/XSL/Transform",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/xhtml",
+          "kind": "namespace"
+        },
+        {
+          "value": "https://registry.npmjs.org/pdf-lib/-/pdf-lib-1.17.1.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/Hopding/pdf-lib",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-data/1.0/",
+          "kind": "namespace"
+        }
+      ],
+      "libraries": [
+        "pdfjs-dist",
+        "pdf-lib"
+      ],
+      "offlineRewrites": [
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "href=\"../../public-index.html\"",
+          "to": "href=\"../../START-HERE.html\""
+        }
+      ]
+    },
+    {
+      "id": "pdf-splitter",
+      "title": "PDF 分割及處理工具",
+      "version": "2026.11.13.2",
+      "entry": "tools/pdf-splitter/index.html",
+      "entries": [
+        "tools/pdf-splitter/index.html"
+      ],
+      "files": [
+        "tools/pdf-splitter/index.html",
+        "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.worker.min.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",
+        "tools/_vendor/pdfjs-3.11.174/LICENSE",
+        "tools/_vendor/pdf-lib-1.17.1/pdf-lib.min.js",
+        "tools/_vendor/pdf-lib-1.17.1/LICENSE.md",
+        "tools/_vendor/jszip-3.10.1/jszip.min.js",
+        "tools/_vendor/jszip-3.10.1/LICENSE.markdown"
+      ],
+      "transforms": {
+        "injectOfflineHead": true
+      },
+      "allowedTextUrls": [
+        {
+          "value": "https://ai-lish.github.io/local-tools/downloads/index.html#",
+          "kind": "hyperlink"
+        },
+        {
+          "value": "https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-3.11.174.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://www.apache.org/licenses/LICENSE-2.0",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://${t}",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://${e}",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/2000/svg",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/XML/1998/namespace",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/xlink",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xci/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-connection-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-data/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-form/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-locale-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-source-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-template/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xdc/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xdp/pdf/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xdp/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xfdf/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xmpmeta/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/2000/09/xmldsig#",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/XSL/Transform",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/xhtml",
+          "kind": "namespace"
+        },
+        {
+          "value": "https://registry.npmjs.org/pdf-lib/-/pdf-lib-1.17.1.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/Hopding/pdf-lib",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://stuartk.com/jszip",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://raw.github.com/Stuk/jszip/main/LICENSE.markdown",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/nodeca/pako/blob/main/LICENSE",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://stuk.github.io/jszip/documentation/howto/read_zip.html",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/ai-lish/pdf-splitter",
+          "kind": "hyperlink"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-data/1.0/",
+          "kind": "namespace"
+        }
+      ],
+      "libraries": [
+        "pdfjs-dist",
+        "pdf-lib",
+        "jszip"
+      ]
+    },
+    {
+      "id": "hkdse-question-split",
+      "title": "HKDSE 試卷逐題切圖工具",
+      "version": "2026.11.13.2",
+      "entry": "tools/hkdse-question-split/index.html",
+      "entries": [
+        "tools/hkdse-question-split/index.html"
+      ],
+      "files": [
+        "tools/hkdse-question-split/index.html",
+        "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.worker.min.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",
+        "tools/_vendor/pdfjs-3.11.174/LICENSE",
+        "tools/_vendor/jszip-3.10.1/jszip.min.js",
+        "tools/_vendor/jszip-3.10.1/LICENSE.markdown"
+      ],
+      "transforms": {
+        "injectOfflineHead": true
+      },
+      "allowedTextUrls": [
+        {
+          "value": "https://ai-lish.github.io/local-tools/downloads/index.html#",
+          "kind": "hyperlink"
+        },
+        {
+          "value": "https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-3.11.174.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://www.apache.org/licenses/LICENSE-2.0",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://${t}",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://${e}",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/2000/svg",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/XML/1998/namespace",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/xlink",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xci/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-connection-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-data/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-form/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-locale-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-source-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-template/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xdc/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xdp/pdf/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xdp/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xfdf/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xmpmeta/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/2000/09/xmldsig#",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/XSL/Transform",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/xhtml",
+          "kind": "namespace"
+        },
+        {
+          "value": "https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://stuartk.com/jszip",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://raw.github.com/Stuk/jszip/main/LICENSE.markdown",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/nodeca/pako/blob/main/LICENSE",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://stuk.github.io/jszip/documentation/howto/read_zip.html",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-data/1.0/",
+          "kind": "namespace"
+        }
+      ],
+      "libraries": [
+        "pdfjs-dist",
+        "jszip"
+      ]
     }
   ]
 }

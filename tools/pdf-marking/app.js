@@ -58,7 +58,7 @@
   };
 
   if (window.pdfjsLib) {
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.LT_PDF_WORKER_SRC;
   }
   els.dictationAnswer.value = DEFAULT_DICTATION_ANSWER;
   els.dictationAnswer.placeholder = "請輸入第一段默書句子";
@@ -702,13 +702,16 @@
     if (!file || !/\.pdf$/i.test(file.name) && file.type !== "application/pdf") {
       setStatus("請選擇 PDF 檔案。", els.fileStatus); return;
     }
-    if (!window.pdfjsLib || !window.PDFLib) {
-      setStatus("PDF 程式庫未載入；請連線後重新整理頁面。", els.fileStatus); return;
+    if (!window.pdfjsLib || !window.PDFLib || !window.LT_PDF_WORKER_SRC) {
+      var missingLibraryMessage = window.LT_OFFLINE
+        ? "套件不完整：請先把 zip 完整解壓，再開啟 START-HERE.html"
+        : "PDF 程式庫未載入；請連線後重新整理頁面。";
+      setStatus(missingLibraryMessage, els.fileStatus); return;
     }
     try {
       setStatus("正在本機開啟 PDF…", els.fileStatus);
       var bytes = new Uint8Array(await file.arrayBuffer());
-      var pdf = await window.pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+      var pdf = await window.pdfjsLib.getDocument({ data: bytes.slice(), isEvalSupported: false }).promise;
       var digest = await window.crypto.subtle.digest("SHA-256", bytes);
       var fingerprint = Array.from(new Uint8Array(digest)).map(function (value) { return value.toString(16).padStart(2, "0"); }).join("");
       state.pdfBytes = bytes; state.pdfDoc = pdf; state.pdfFingerprint = fingerprint; state.pageCount = pdf.numPages; state.currentPage = 1;
