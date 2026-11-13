@@ -17,6 +17,8 @@
     nav { margin-top: 18px; }
     nav a, .download { display: inline-flex; align-items: center; min-height: 42px; padding: 9px 15px; border-radius: 10px; color: #18334b; background: #ffe09a; font-weight: 800; text-decoration: none; }
     .packages { display: grid; gap: 14px; margin: 18px 0; }
+    .update-status { margin: 8px 0 0; color: #146b3a; font-weight: 700; }
+    .update-status.outdated { color: #9a4c00; }
     article { padding: 22px; }
     article h2 { margin: 0 0 8px; }
     article p { line-height: 1.55; }
@@ -55,8 +57,10 @@
     if (!Array.isArray(packages)) {
       root.innerHTML = '<p class="error">套件清單未能載入，請重新整理頁面。</p>';
     } else {
+      const requestedVersions = new URLSearchParams(location.hash.slice(1));
       root.replaceChildren(...packages.map((item) => {
         const card = document.createElement('article');
+        card.dataset.packageId = item.id;
         const heading = document.createElement('h2');
         heading.textContent = item.title;
         const details = document.createElement('dl');
@@ -73,6 +77,14 @@
         link.download = `${item.id}.zip`;
         link.textContent = '下載 ZIP';
         card.append(heading, details, link);
+        const requestedVersion = requestedVersions.get(item.id);
+        if (requestedVersion !== null) {
+          const status = document.createElement('p');
+          status.className = 'update-status' + (requestedVersion === item.version ? '' : ' outdated');
+          status.textContent = requestedVersion === item.version ? '已是最新' : '有新版本';
+          status.setAttribute('aria-live', 'polite');
+          card.append(status);
+        }
         return card;
       }));
     }

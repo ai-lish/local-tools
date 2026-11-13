@@ -2,22 +2,40 @@
   "version": 1,
   "packages": {
     "image-upscaler": {
-      "version": "2026.11.12",
+      "version": "2026.11.13",
       "contentHash": "eb2ca70eb83d",
       "fileCount": 1,
       "byteLength": 65369
     },
     "photo-merge": {
-      "version": "2026.11.12",
+      "version": "2026.11.13",
       "contentHash": "3cbae7beca69",
       "fileCount": 1,
       "byteLength": 24162
     },
     "core-all": {
-      "version": "2026.11.12",
-      "contentHash": "6d600b8846a5",
-      "fileCount": 2,
-      "byteLength": 89531
+      "version": "2026.11.13.2",
+      "contentHash": "93507faf8e03",
+      "fileCount": 23,
+      "byteLength": 3944582
+    },
+    "pdf-marking": {
+      "version": "2026.11.13.2",
+      "contentHash": "28128e671b5d",
+      "fileCount": 17,
+      "byteLength": 3629004
+    },
+    "pdf-splitter": {
+      "version": "2026.11.13.2",
+      "contentHash": "f5536e3b5446",
+      "fileCount": 9,
+      "byteLength": 3572053
+    },
+    "hkdse-question-split": {
+      "version": "2026.11.13.2",
+      "contentHash": "5ff6bb1b350c",
+      "fileCount": 7,
+      "byteLength": 3047402
     }
   }
 }
