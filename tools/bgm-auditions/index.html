@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="逐款試聽六款數學影片背景音樂，可切換純音樂或配旁白。">
+  <meta name="description" content="逐款試聽六款數學影片背景音樂，可切換純音樂或配旁白；另附 MiniMax-Music3 AI 生成試驗版本。">
   <title>背景音樂試聽｜Local Tools</title>
   <style>
     :root { color-scheme: light; --ink:#162537; --muted:#68798a; --navy:#102a43; --blue:#2367a8; --gold:#d99b22; --gold-soft:#fff7df; --green:#2b7a65; --green-soft:#eaf6f1; --line:#dce5eb; --canvas:#f4f7f9; --surface:#fff; --shadow:0 16px 42px rgba(16,42,67,.08); }
@@ -43,6 +43,10 @@
     .facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
     .facts li, .tag { padding: 3px 7px; color: #506678; background: #f1f5f7; border-radius: 6px; font-size: 12px; font-weight: 700; }
     .tag-drum { color: #8b6312; background: var(--gold-soft); }
+    .tag-ai { color: #5b3a9e; background: #f1ecfb; }
+    .panel-ai { border-left: 4px solid #7b5cc4; }
+    .track-ai { margin-top: 13px; border-top: 4px solid #7b5cc4; }
+    .grid .track-ai { margin-top: 0; }
     .preference { margin-top: 18px; padding: 16px 18px; }
     fieldset { margin: 12px 0 0; padding: 0; border: 0; }
     legend { font-weight: 800; }
@@ -62,7 +66,7 @@
       <span class="privacy">只在瀏覽器播放</span>
     </header>
     <h1>背景音樂試聽</h1>
-    <p class="intro">六款原創編曲，每款 30 秒。可以先聽比較合集，再逐款切換純音樂或配旁白。頁面沒有自動播放，一次只播一首。</p>
+    <p class="intro">六款原創編曲，每款 30 秒。可以先聽比較合集，再逐款切換純音樂或配旁白。頁面下方另有 AI 生成的試驗版本。頁面沒有自動播放，一次只播一首。</p>
     <section class="notice" aria-label="音量與使用範圍">
       <p><strong>純音樂的音量只供聽音色，不可直接套入影片。</strong>純音樂約 −23.3 LUFS。配旁白時，旁白約 −18.3 LUFS；有聲區的旁白與音樂相差 23.50 dB。選定之後，仍要按那條影片的旁白再混，目標大約低 22–25 dB。</p>
       <p>這頁不會改任何現有影片，也不會把任何一款設成音樂預設。請自己播放比較。</p>
@@ -90,6 +94,7 @@
       <div class="downloads"><a download="comparison_00_to_06.mp3" href="audio/comparison_00_to_06.mp3">下載比較合集</a></div>
     </section>
 
+    <div class="original-set">
     <div class="mode">
       <div class="mode-row">
         <div>
@@ -162,6 +167,81 @@
         <div class="downloads"><a download="06_soft_mallet_solo.mp3" href="audio/06_soft_mallet_solo.mp3">下載純音樂</a><a download="06_soft_mallet_with_voice.mp3" href="audio/06_soft_mallet_with_voice.mp3">下載配旁白</a></div>
       </article>
     </div>
+    </div>
+
+    <section class="panel panel-ai" aria-labelledby="ai-title">
+      <div class="panel-head">
+        <div>
+          <p class="kicker">試驗 · 機器生成</p>
+          <h2 id="ai-title">MiniMax-Music3 AI 生成版本</h2>
+        </div>
+        <span class="tag tag-ai">AI 生成</span>
+      </div>
+      <p><strong>以下全部由 AI 模型 MiniMax-Music3 生成，不是人手編曲。</strong>模型在本機電腦離線運行，沒有使用雲端服務、參考音樂或歌詞。風格大致對應上面六款，但旋律與編曲由模型產生，與上面的原創編曲無關。</p>
+      <p>每段都要求 30 秒，但模型會自行提早收尾，所以長度不一；標籤顯示實際長度。全部只有純音樂，音量約 −23 LUFS，與上面純音樂相若。</p>
+    </section>
+
+    <div class="grid">
+      <article class="track track-ai">
+        <div class="track-head"><div><p class="num">AI01</p><h3>稀疏柔和鋼琴</h3></div><span class="tag tag-ai">AI 生成 · 15.6 秒</span></div>
+        <p>極簡毛氈鋼琴，低音稀疏，留白多。</p>
+        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>純音樂</li></ul>
+        <audio controls preload="none" src="audio/ai01_sparse_piano.mp3"></audio>
+        <div class="downloads"><a download="ai01_sparse_piano.mp3" href="audio/ai01_sparse_piano.mp3">下載</a></div>
+      </article>
+      <article class="track track-ai">
+        <div class="track-head"><div><p class="num">AI02</p><h3>暖電鋼琴</h3></div><span class="tag tag-ai">AI 生成 · 24.6 秒</span></div>
+        <p>Rhodes 電鋼琴長和弦，輕補拍。</p>
+        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>純音樂</li></ul>
+        <audio controls preload="none" src="audio/ai02_warm_epiano.mp3"></audio>
+        <div class="downloads"><a download="ai02_warm_epiano.mp3" href="audio/ai02_warm_epiano.mp3">下載</a></div>
+      </article>
+      <article class="track track-ai">
+        <div class="track-head"><div><p class="num">AI03</p><h3>尼龍木結他</h3></div><span class="tag tag-ai">AI 生成 · 14.1 秒</span></div>
+        <p>尼龍弦指彈分解和弦，安靜貼近。</p>
+        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>純音樂</li></ul>
+        <audio controls preload="none" src="audio/ai03_nylon_guitar.mp3"></audio>
+        <div class="downloads"><a download="ai03_nylon_guitar.mp3" href="audio/ai03_nylon_guitar.mp3">下載</a></div>
+      </article>
+      <article class="track track-ai">
+        <div class="track-head"><div><p class="num">AI04</p><h3>氛圍 pad</h3></div><span class="tag tag-ai">AI 生成 · 11.4 秒</span></div>
+        <p>暖色合成器 pad，沒有鼓，沒有主旋律。</p>
+        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>純音樂</li></ul>
+        <audio controls preload="none" src="audio/ai04_ambient_pad.mp3"></audio>
+        <div class="downloads"><a download="ai04_ambient_pad.mp3" href="audio/ai04_ambient_pad.mp3">下載</a></div>
+      </article>
+      <article class="track track-ai">
+        <div class="track-head"><div><p class="num">AI05</p><h3>輕電子節拍</h3></div><span class="tag tag-ai">AI 生成 · 11.1 秒</span></div>
+        <p>輕 kick、rim 及 hat，加電鋼琴和弦。</p>
+        <ul class="facts"><li>80 BPM</li><li>鼓：有，輕</li><li>純音樂</li></ul>
+        <audio controls preload="none" src="audio/ai05_light_electronic.mp3"></audio>
+        <div class="downloads"><a download="ai05_light_electronic.mp3" href="audio/ai05_light_electronic.mp3">下載</a></div>
+      </article>
+      <article class="track track-ai">
+        <div class="track-head"><div><p class="num">AI06</p><h3>柔和顫音琴</h3></div><span class="tag tag-ai">AI 生成 · 30.0 秒</span></div>
+        <p>低中音域顫音琴，軟槌，輕顫音。</p>
+        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>純音樂</li></ul>
+        <audio controls preload="none" src="audio/ai06_soft_mallet.mp3"></audio>
+        <div class="downloads"><a download="ai06_soft_mallet.mp3" href="audio/ai06_soft_mallet.mp3">下載</a></div>
+      </article>
+      <article class="track track-ai">
+        <div class="track-head"><div><p class="num">AI07</p><h3>明亮開場（原試行提示語）</h3></div><span class="tag tag-ai">AI 生成 · 25.6 秒</span></div>
+        <p>鋼琴、馬林巴、撥弦及沙槌，較明亮，作片頭用。</p>
+        <ul class="facts"><li>100 BPM</li><li>鼓：沙槌</li><li>純音樂</li></ul>
+        <audio controls preload="none" src="audio/ai07_bright_intro.mp3"></audio>
+        <div class="downloads"><a download="ai07_bright_intro.mp3" href="audio/ai07_bright_intro.mp3">下載</a></div>
+      </article>
+    </div>
+
+    <section class="track track-ai" aria-labelledby="ai-cmp-title">
+      <div class="track-head"><div><p class="num">對照</p><h3 id="ai-cmp-title">壓縮方式對照（同一提示語、同一 seed，10 秒）</h3></div><span class="tag tag-ai">AI 生成</span></div>
+      <p>同一段提示語，用兩種模型壓縮方式生成。A 是語言模型 4-bit、其餘元件不壓縮；B 再把擴散模型壓縮成 8-bit，全部放進顯示卡，佔用的系統記憶體少很多。上面 AI01–AI07 全部用 B。聽聽音質有沒有明顯差別。</p>
+      <p class="fine">A：4-bit 語言模型</p>
+      <audio controls preload="none" src="audio/ai_cmp_4bit.mp3"></audio>
+      <p class="fine">B：4-bit 語言模型＋8-bit 擴散模型（全部在顯示卡）</p>
+      <audio controls preload="none" src="audio/ai_cmp_allgpu.mp3"></audio>
+      <div class="downloads"><a download="ai_cmp_4bit.mp3" href="audio/ai_cmp_4bit.mp3">下載 A</a><a download="ai_cmp_allgpu.mp3" href="audio/ai_cmp_allgpu.mp3">下載 B</a></div>
+    </section>
 
     <section class="preference" aria-labelledby="preference-title">
       <h2 id="preference-title">記下想先試的一款</h2>
@@ -176,6 +256,16 @@
           <label><input type="radio" name="preference" value="04 氛圍 pad"> 04 氛圍 pad</label>
           <label><input type="radio" name="preference" value="05 輕電子節拍"> 05 輕電子節拍</label>
           <label><input type="radio" name="preference" value="06 柔和顫音琴"> 06 柔和顫音琴</label>
+          <label><input type="radio" name="preference" value="AI01 稀疏柔和鋼琴（AI 生成）"> AI01 稀疏柔和鋼琴（AI）</label>
+          <label><input type="radio" name="preference" value="AI02 暖電鋼琴（AI 生成）"> AI02 暖電鋼琴（AI）</label>
+          <label><input type="radio" name="preference" value="AI03 尼龍木結他（AI 生成）"> AI03 尼龍木結他（AI）</label>
+          <label><input type="radio" name="preference" value="AI04 氛圍 pad（AI 生成）"> AI04 氛圍 pad（AI）</label>
+          <label><input type="radio" name="preference" value="AI05 輕電子節拍（AI 生成）"> AI05 輕電子節拍（AI）</label>
+          <label><input type="radio" name="preference" value="AI06 柔和顫音琴（AI 生成）"> AI06 柔和顫音琴（AI）</label>
+          <label><input type="radio" name="preference" value="AI07 明亮開場（原試行提示語）（AI 生成）"> AI07 明亮開場（AI）</label>
+          <label><input type="radio" name="preference" value="AI 對照：A 較好"> AI 對照：A 較好</label>
+          <label><input type="radio" name="preference" value="AI 對照：B 較好"> AI 對照：B 較好</label>
+          <label><input type="radio" name="preference" value="AI 對照：聽不出分別"> AI 對照：聽不出分別</label>
         </div>
       </fieldset>
       <textarea id="preference-text" readonly>背景音樂試聽偏好：尚未選擇</textarea>
@@ -184,7 +274,8 @@
 
     <footer>
       <p>六款是 2026-11-08 譜寫的原創編曲。音色來自 FluidR3 GM（Frank Wen，MIT），離線渲染使用 TinySoundFont（Bernhard Schelling，MIT）。旁白是既有數學影片乾聲，沒有新配音。</p>
-      <p><a href="licenses/FluidR3-COPYING.txt">FluidR3 授權</a> · <a href="licenses/TinySoundFont-LICENSE.txt">TinySoundFont 授權</a> · <a href="licenses/SOURCES.txt">來源說明</a> · <a href="licenses/ASSET_SHA256.txt">MP3 SHA-256</a></p>
+      <p>AI01–AI07 及對照 A／B 由 MiniMax-Music3 模型於 2026-11-13 及 2026-11-15 在本機生成，屬機器生成內容；模型授權見 MiniMax-Music3 Community License。</p>
+      <p><a href="licenses/FluidR3-COPYING.txt">FluidR3 授權</a> · <a href="licenses/TinySoundFont-LICENSE.txt">TinySoundFont 授權</a> · <a href="licenses/MiniMax-Music3-LICENSE.txt">MiniMax-Music3 授權</a> · <a href="licenses/SOURCES.txt">來源說明</a> · <a href="licenses/ASSET_SHA256.txt">MP3 SHA-256</a></p>
     </footer>
   </div>
   <script>

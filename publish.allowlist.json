@@ -1357,6 +1357,60 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/bgm-auditions/audio/ai01_sparse_piano.mp3",
+      "destination": "tools/bgm-auditions/audio/ai01_sparse_piano.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/ai02_warm_epiano.mp3",
+      "destination": "tools/bgm-auditions/audio/ai02_warm_epiano.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/ai03_nylon_guitar.mp3",
+      "destination": "tools/bgm-auditions/audio/ai03_nylon_guitar.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/ai04_ambient_pad.mp3",
+      "destination": "tools/bgm-auditions/audio/ai04_ambient_pad.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/ai05_light_electronic.mp3",
+      "destination": "tools/bgm-auditions/audio/ai05_light_electronic.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/ai06_soft_mallet.mp3",
+      "destination": "tools/bgm-auditions/audio/ai06_soft_mallet.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/ai07_bright_intro.mp3",
+      "destination": "tools/bgm-auditions/audio/ai07_bright_intro.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/ai_cmp_4bit.mp3",
+      "destination": "tools/bgm-auditions/audio/ai_cmp_4bit.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/audio/ai_cmp_allgpu.mp3",
+      "destination": "tools/bgm-auditions/audio/ai_cmp_allgpu.mp3",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/bgm-auditions/licenses/ASSET_SHA256.txt",
       "destination": "tools/bgm-auditions/licenses/ASSET_SHA256.txt",
       "publicMode": "cli-source",
@@ -1365,6 +1419,12 @@
     {
       "source": "tools/bgm-auditions/licenses/FluidR3-COPYING.txt",
       "destination": "tools/bgm-auditions/licenses/FluidR3-COPYING.txt",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/bgm-auditions/licenses/MiniMax-Music3-LICENSE.txt",
+      "destination": "tools/bgm-auditions/licenses/MiniMax-Music3-LICENSE.txt",
       "publicMode": "cli-source",
       "managedBy": "math-lish/local-tools"
     },
