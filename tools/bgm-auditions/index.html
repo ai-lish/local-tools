@@ -6,155 +6,154 @@
   <meta name="description" content="試聽由 MiniMax-Music3 在本機生成的純音樂，逐首播放或下載。">
   <title>AI 純音樂試聽｜Local Tools</title>
   <style>
-    :root { color-scheme: light; --ink:#162537; --muted:#68798a; --navy:#102a43; --blue:#2367a8; --gold:#d99b22; --gold-soft:#fff7df; --green:#2b7a65; --green-soft:#eaf6f1; --line:#dce5eb; --canvas:#f4f7f9; --surface:#fff; --shadow:0 16px 42px rgba(16,42,67,.08); }
+    :root { color-scheme: light; --bg:#F5F6F8; --ink:#15202B; --muted:#44515E; --soft:#5B6875; --blue:#2453C8; --blue-soft:#F3F6FD; --line:#DDE2E8; --line-soft:#EDF0F3; --card:#FFFFFF; --warn-ink:#8A3A0C; --warn-bg:#FCEBDD; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; color: var(--ink); background: var(--canvas); font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; line-height: 1.55; }
-    a { color: inherit; }
-    .page { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 58px; }
-    .topbar { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
-    .brand { display: inline-flex; align-items: center; gap: 11px; color: var(--navy); text-decoration: none; }
-    .brand-mark { display: grid; place-items: center; width: 42px; height: 42px; color: var(--navy); background: var(--gold); border-radius: 12px; font-size: 14px; font-weight: 900; }
-    .brand small { display: block; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .16em; }
-    .brand strong { display: block; margin-top: 1px; font-size: 16px; }
-    .privacy { margin-left: auto; padding: 6px 10px; color: #27664f; background: var(--green-soft); border-radius: 999px; font-size: 12px; font-weight: 800; }
-    h1 { margin: 0; font-size: clamp(28px, 4vw, 40px); line-height: 1.2; letter-spacing: -.02em; }
-    h2 { margin: 0; font-size: 22px; }
-    h3 { margin: 0; font-size: 18px; line-height: 1.3; }
-    .intro { max-width: 760px; margin: 10px 0 0; color: var(--muted); }
-    .notice, .panel, .track, .preference { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 18px rgba(16,42,67,.04); }
-    .notice { margin-top: 18px; padding: 16px 18px; border-left: 4px solid var(--gold); }
-    .notice p, .panel p, .track p { margin: 8px 0 0; }
-    .notice strong { color: var(--navy); }
-    .panel { margin-top: 18px; padding: 18px; }
-    .panel-head, .track-head, .mode-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-    .kicker { margin: 0; color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
-    audio { display: block; width: 100%; margin-top: 12px; }
-    .seek, .downloads, .choice { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-    button, .downloads a, .choice label { font: inherit; }
-    .seek button, .mode-row button, .downloads a, .copy { min-height: 44px; padding: 8px 12px; color: var(--navy); background: #f4f8fb; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; }
-    .seek button:hover, .mode-row button:hover, .downloads a:hover, .copy:hover, .seek button:focus-visible, .mode-row button:focus-visible, .downloads a:focus-visible, .copy:focus-visible { border-color: #9abbd4; outline: 3px solid rgba(35,103,168,.12); outline-offset: 2px; }
-    .mode { position: sticky; top: 0; z-index: 2; margin-top: 18px; padding: 12px; background: rgba(244,247,249,.94); border: 1px solid var(--line); border-radius: 14px; }
-    .mode p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
-    .mode-row button[aria-pressed="true"] { color: #18334b; background: var(--gold); border-color: var(--gold); }
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; margin-top: 13px; }
-    .track { display: flex; flex-direction: column; padding: 16px; }
-    .track-baseline { border-top: 4px solid var(--green); }
-    .num { margin: 0; color: var(--blue); font-size: 12px; font-weight: 800; }
-    .facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
-    .facts li, .tag { padding: 3px 7px; color: #506678; background: #f1f5f7; border-radius: 6px; font-size: 12px; font-weight: 700; }
-    .tag-drum { color: #8b6312; background: var(--gold-soft); }
-    .tag-ai { color: #5b3a9e; background: #f1ecfb; }
-    .panel-ai { border-left: 4px solid #7b5cc4; }
-    .track-ai { margin-top: 13px; border-top: 4px solid #7b5cc4; }
-    .grid .track-ai { margin-top: 0; }
-    .preference { margin-top: 18px; padding: 16px 18px; }
-    fieldset { margin: 12px 0 0; padding: 0; border: 0; }
-    legend { font-weight: 800; }
-    .choice label { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 6px 10px; background: #f4f8fb; border: 1px solid var(--line); border-radius: 10px; }
-    textarea { width: 100%; min-height: 88px; margin-top: 12px; padding: 10px 12px; color: var(--ink); background: #f8fbfc; border: 1px solid var(--line); border-radius: 10px; font: inherit; resize: vertical; }
-    .fine { color: var(--muted); font-size: 13px; }
-    footer { margin-top: 22px; color: var(--muted); font-size: 13px; }
-    footer a { color: var(--blue); font-weight: 700; }
-    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } .panel-head, .track-head { flex-direction: column; } }
-    @media (max-width: 560px) { .page { width: min(100% - 20px, 1120px); padding-top: 12px; } .topbar { align-items: flex-start; } .privacy { display: none; } h1 { font-size: 30px; } }
+    body { margin: 0; min-height: 100vh; color: var(--ink); background: var(--bg); font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; line-height: 1.55; }
+    a { color: var(--blue); }
+    button, input, textarea { font: inherit; }
+    .page { max-width: 1040px; margin: 0 auto; padding: 24px 16px 56px; display: flex; flex-direction: column; gap: 24px; }
+    .back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--ink); font-size: 14px; font-weight: 700; text-decoration: none; }
+    .back:hover { color: var(--blue); }
+    h1 { margin: 0; font-size: clamp(28px, 5vw, 40px); line-height: 1.2; letter-spacing: -.01em; }
+    h2 { margin: 0; font-size: 22px; line-height: 1.3; }
+    .intro { margin: 10px 0 0; max-width: 680px; color: var(--muted); }
+    .notice { padding: 16px 18px; background: #FFF8EC; border: 1px solid #F0D9B0; border-left: 4px solid #B45309; border-radius: 12px; }
+    .notice p { margin: 0; }
+    .notice p + p { margin-top: 8px; font-size: 14px; color: var(--muted); }
+    .notice strong { color: var(--warn-ink); }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; }
+    .filters button { min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 22px; background: var(--card); color: var(--ink); font-size: 15px; cursor: pointer; }
+    .filters button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 700; }
+    .section-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+    .section-head p { margin: 6px 0 0; max-width: 640px; font-size: 14px; color: var(--muted); }
+    .badge { padding: 4px 8px; border-radius: 6px; background: var(--warn-bg); color: var(--warn-ink); font-size: 12px; font-weight: 700; }
+    .list { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 14px 16px; border-bottom: 1px solid var(--line-soft); }
+    .list .row:last-child { border-bottom: 0; }
+    .row.active { background: var(--blue-soft); }
+    .play { flex: none; width: 48px; height: 48px; border: 0; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; cursor: pointer; }
+    .row.active .play { background: var(--blue); }
+    .play svg { width: 18px; height: 18px; fill: currentColor; }
+    .play .i-pause { display: none; }
+    .play[aria-pressed="true"] .i-play { display: none; }
+    .play[aria-pressed="true"] .i-pause { display: block; }
+    .play:disabled { background: #8A94A0; cursor: not-allowed; }
+    .main { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .title { display: flex; align-items: baseline; gap: 10px; }
+    .num { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; font-weight: 700; color: var(--blue); }
+    .name { font-size: 16px; font-weight: 700; }
+    .desc { font-size: 13px; color: var(--soft); }
+    .prog { display: none; align-items: center; gap: 10px; margin-top: 4px; }
+    .row.active .prog, .row.started .prog { display: flex; }
+    .time { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--soft); min-width: 34px; }
+    .time.end { text-align: right; }
+    .seek { flex: 1; min-width: 0; height: 44px; margin: 0; accent-color: var(--blue); cursor: pointer; background: transparent; }
+    .err { display: none; margin-top: 2px; font-size: 13px; font-weight: 700; color: #B42318; }
+    .row.failed .err { display: block; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--muted); }
+    .tags span { padding: 3px 7px; background: var(--bg); border-radius: 6px; font-variant-numeric: tabular-nums; }
+    .row.active .tags span { background: #fff; border: 1px solid var(--line); padding: 2px 6px; }
+    .pick, .dl { flex: none; min-width: 44px; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; cursor: pointer; }
+    .pick { padding: 0 12px; font-size: 14px; }
+    .pick[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 700; }
+    .dl svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .panel > .section-head { margin: 0; }
+    .ab-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    .ab-grid .row { border: 1px solid var(--line); border-radius: 14px; }
+    .ab-grid .row .num { font-size: 20px; }
+    .ab-grid .row.active { border-color: #B6C6F0; }
+    fieldset { margin: 0; padding: 0; border: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+    legend { padding: 0; margin-bottom: 8px; font-size: 14px; font-weight: 700; }
+    .vote { min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
+    .vote input { width: 20px; height: 20px; margin: 0; accent-color: var(--blue); }
+    .vote:has(input:checked) { border-color: var(--blue); background: var(--blue-soft); font-weight: 700; }
+    .picked { background: var(--ink); color: #fff; border-radius: 16px; padding: 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+    .picked h2 { font-size: 20px; overflow-wrap: anywhere; }
+    .picked p { margin: 4px 0 0; font-size: 14px; color: #C9D1DA; }
+    .picked .info { flex: 1 1 260px; min-width: 0; }
+    .copy { min-height: 48px; padding: 0 18px; border: 0; border-radius: 12px; background: #fff; color: var(--ink); font-size: 15px; font-weight: 700; cursor: pointer; }
+    .copy:disabled { background: #5B6875; color: #E5E9EE; cursor: not-allowed; }
+    .fallback { display: none; flex: 1 1 100%; }
+    .fallback.show { display: block; }
+    .fallback label { display: block; font-size: 13px; color: #C9D1DA; margin-bottom: 6px; }
+    .fallback textarea { width: 100%; min-height: 72px; padding: 10px 12px; border: 1px solid #5B6875; border-radius: 10px; background: #0E1620; color: #fff; resize: vertical; }
+    footer { font-size: 13px; color: var(--soft); line-height: 1.7; }
+    footer p { margin: 0; }
+    footer p + p { margin-top: 4px; }
+    :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+    .picked :focus-visible, .row.active .play:focus-visible { outline-color: #fff; }
+    .row.active .play:focus-visible { outline-color: var(--ink); }
+    [hidden] { display: none !important; }
+    @media (max-width: 560px) {
+      .page { padding-top: 12px; gap: 20px; }
+      .row { padding: 12px; }
+      .tags { order: 5; }
+      .panel, .picked { padding: 16px; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
   </style>
 </head>
 <body>
   <div class="page">
-    <header class="topbar">
-      <a class="brand" href="../../index.html"><span class="brand-mark">LT</span><span><small>LOCAL TOOLS</small><strong>返回工具入口</strong></span></a>
-      <span class="privacy">只在瀏覽器播放</span>
+    <a class="back" href="../../index.html"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>返回工具入口</a>
+
+    <header>
+      <h1>AI 純音樂試聽</h1>
+      <p class="intro">七首由 AI 生成、有主旋律的純音樂，可以逐首播放或下載。頁面沒有自動播放，一次只播一首。</p>
     </header>
-    <h1>AI 純音樂試聽</h1>
-    <p class="intro">七首由 AI 生成、有主旋律的純音樂，可以逐首播放或下載。頁面沒有自動播放，一次只播一首。</p>
+
     <section class="notice" aria-label="AI 生成說明">
       <p><strong>以下全部由 AI 模型 MiniMax-Music3 生成，不是人手編曲。</strong>模型在本機電腦離線運行，沒有使用雲端服務、參考音樂或歌詞。</p>
       <p>每首都要求 30 秒，但模型會自行提早收尾，所以長度不一；標籤顯示實際長度。音量約 −23 LUFS，只供試聽，用於影片前仍要按需要再混音。</p>
     </section>
 
-    <div class="grid">
-      <article class="track track-ai">
-        <div class="track-head"><div><p class="num">AI01</p><h3>稀疏柔和鋼琴</h3></div><span class="tag tag-ai">AI 生成 · 30.0 秒</span></div>
-        <p>鋼琴獨奏，右手旋律清楚，左手輕和弦。</p>
-        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>純音樂</li></ul>
-        <audio controls preload="none" src="audio/ai01_sparse_piano.mp3"></audio>
-        <div class="downloads"><a download="ai01_sparse_piano.mp3" href="audio/ai01_sparse_piano.mp3">下載</a></div>
-      </article>
-      <article class="track track-ai">
-        <div class="track-head"><div><p class="num">AI02</p><h3>暖電鋼琴</h3></div><span class="tag tag-ai">AI 生成 · 26.6 秒</span></div>
-        <p>Rhodes 電鋼琴主奏旋律，輕貝斯及刷鼓律動。</p>
-        <ul class="facts"><li>80 BPM</li><li>鼓：有，輕</li><li>純音樂</li></ul>
-        <audio controls preload="none" src="audio/ai02_warm_epiano.mp3"></audio>
-        <div class="downloads"><a download="ai02_warm_epiano.mp3" href="audio/ai02_warm_epiano.mp3">下載</a></div>
-      </article>
-      <article class="track track-ai">
-        <div class="track-head"><div><p class="num">AI03</p><h3>尼龍木結他</h3></div><span class="tag tag-ai">AI 生成 · 28.4 秒</span></div>
-        <p>尼龍弦指彈主旋律，配分解和弦伴奏。</p>
-        <ul class="facts"><li>84 BPM</li><li>鼓：無</li><li>純音樂</li></ul>
-        <audio controls preload="none" src="audio/ai03_nylon_guitar.mp3"></audio>
-        <div class="downloads"><a download="ai03_nylon_guitar.mp3" href="audio/ai03_nylon_guitar.mp3">下載</a></div>
-      </article>
-      <article class="track track-ai">
-        <div class="track-head"><div><p class="num">AI04</p><h3>氛圍 pad</h3></div><span class="tag tag-ai">AI 生成 · 30.0 秒</span></div>
-        <p>暖色合成器 pad，上面有緩慢的鐘聲旋律，開揚。</p>
-        <ul class="facts"><li>70 BPM</li><li>鼓：無</li><li>純音樂</li></ul>
-        <audio controls preload="none" src="audio/ai04_ambient_pad.mp3"></audio>
-        <div class="downloads"><a download="ai04_ambient_pad.mp3" href="audio/ai04_ambient_pad.mp3">下載</a></div>
-      </article>
-      <article class="track track-ai">
-        <div class="track-head"><div><p class="num">AI05</p><h3>輕電子節拍</h3></div><span class="tag tag-ai">AI 生成 · 22.9 秒</span></div>
-        <p>合成器主旋律，配電鋼琴和弦及輕 kick、rim、hat。</p>
-        <ul class="facts"><li>96 BPM</li><li>鼓：有，輕</li><li>純音樂</li></ul>
-        <audio controls preload="none" src="audio/ai05_light_electronic.mp3"></audio>
-        <div class="downloads"><a download="ai05_light_electronic.mp3" href="audio/ai05_light_electronic.mp3">下載</a></div>
-      </article>
-      <article class="track track-ai">
-        <div class="track-head"><div><p class="num">AI06</p><h3>柔和顫音琴</h3></div><span class="tag tag-ai">AI 生成 · 12.7 秒</span></div>
-        <p>顫音琴及馬林巴奏出明快旋律，底下有柔和弦樂。</p>
-        <ul class="facts"><li>88 BPM</li><li>鼓：無</li><li>純音樂</li></ul>
-        <audio controls preload="none" src="audio/ai06_soft_mallet.mp3"></audio>
-        <div class="downloads"><a download="ai06_soft_mallet.mp3" href="audio/ai06_soft_mallet.mp3">下載</a></div>
-      </article>
-      <article class="track track-ai">
-        <div class="track-head"><div><p class="num">AI07</p><h3>明亮開場</h3></div><span class="tag tag-ai">AI 生成 · 20.5 秒</span></div>
-        <p>鋼琴主旋律配馬林巴、撥弦及沙槌，明亮輕快，以解決和弦收尾。</p>
-        <ul class="facts"><li>108 BPM</li><li>鼓：沙槌</li><li>純音樂</li></ul>
-        <audio controls preload="none" src="audio/ai07_bright_intro.mp3"></audio>
-        <div class="downloads"><a download="ai07_bright_intro.mp3" href="audio/ai07_bright_intro.mp3">下載</a></div>
-      </article>
-    </div>
+    <nav class="filters" aria-label="分類">
+      <button type="button" data-filter="all" aria-pressed="true">全部</button>
+      <button type="button" data-filter="ai" aria-pressed="false">AI 生成 · 7</button>
+      <button type="button" data-filter="ab" aria-pressed="false">A／B 對照</button>
+    </nav>
 
-    <section class="track track-ai" aria-labelledby="ai-cmp-title">
-      <div class="track-head"><div><p class="num">對照</p><h3 id="ai-cmp-title">壓縮方式對照（同一提示語、同一 seed，10 秒）</h3></div><span class="tag tag-ai">AI 生成</span></div>
-      <p>同一段提示語，用兩種模型壓縮方式生成。A 是語言模型 4-bit、其餘元件不壓縮；B 再把擴散模型壓縮成 8-bit，全部放進顯示卡，佔用的系統記憶體少很多。上面 AI01–AI07 全部用 B。這組對照沿用最初的試行提示語。聽聽音質有沒有明顯差別。</p>
-      <p class="fine">A：4-bit 語言模型</p>
-      <audio controls preload="none" src="audio/ai_cmp_4bit.mp3"></audio>
-      <p class="fine">B：4-bit 語言模型＋8-bit 擴散模型（全部在顯示卡）</p>
-      <audio controls preload="none" src="audio/ai_cmp_allgpu.mp3"></audio>
-      <div class="downloads"><a download="ai_cmp_4bit.mp3" href="audio/ai_cmp_4bit.mp3">下載 A</a><a download="ai_cmp_allgpu.mp3" href="audio/ai_cmp_allgpu.mp3">下載 B</a></div>
-    </section>
-
-    <section class="preference" aria-labelledby="preference-title">
-      <h2 id="preference-title">記下想先試的一首</h2>
-      <p class="fine">選擇只留在這個頁面，重新整理後會清空。複製文字要由你自己貼上；頁面不會自動送出，也不會更改任何影片或音樂預設。</p>
-      <fieldset>
-        <legend>偏好</legend>
-        <div class="choice" id="preference-choices">
-          <label><input type="radio" name="preference" value="尚未選擇" checked> 尚未選擇</label>
-          <label><input type="radio" name="preference" value="AI01 稀疏柔和鋼琴（AI 生成）"> AI01 稀疏柔和鋼琴（AI）</label>
-          <label><input type="radio" name="preference" value="AI02 暖電鋼琴（AI 生成）"> AI02 暖電鋼琴（AI）</label>
-          <label><input type="radio" name="preference" value="AI03 尼龍木結他（AI 生成）"> AI03 尼龍木結他（AI）</label>
-          <label><input type="radio" name="preference" value="AI04 氛圍 pad（AI 生成）"> AI04 氛圍 pad（AI）</label>
-          <label><input type="radio" name="preference" value="AI05 輕電子節拍（AI 生成）"> AI05 輕電子節拍（AI）</label>
-          <label><input type="radio" name="preference" value="AI06 柔和顫音琴（AI 生成）"> AI06 柔和顫音琴（AI）</label>
-          <label><input type="radio" name="preference" value="AI07 明亮開場（AI 生成）"> AI07 明亮開場（AI）</label>
-          <label><input type="radio" name="preference" value="AI 對照：A 較好"> AI 對照：A 較好</label>
-          <label><input type="radio" name="preference" value="AI 對照：B 較好"> AI 對照：B 較好</label>
-          <label><input type="radio" name="preference" value="AI 對照：聽不出分別"> AI 對照：聽不出分別</label>
+    <main style="display:contents">
+      <section id="sec-ai" aria-labelledby="ai-h">
+        <div class="section-head">
+          <div>
+            <h2 id="ai-h">AI 生成的純音樂</h2>
+            <p>由 MiniMax-Music3 模型在本機生成，不是人手編曲。每首都有主旋律，可以單獨聆聽。</p>
+          </div>
+          <span class="badge">機器生成內容</span>
         </div>
-      </fieldset>
-      <textarea id="preference-text" readonly>AI 純音樂試聽偏好：尚未選擇</textarea>
-      <div class="downloads"><button type="button" class="copy" id="copy-preference">複製偏好文字</button></div>
+        <div class="list" id="ai-list" role="list"></div>
+      </section>
+
+      <section id="sec-ab" class="panel" aria-labelledby="ab-h">
+        <div class="section-head">
+          <div>
+            <h2 id="ab-h">壓縮方式對照（同一提示語、同一 seed，10 秒）</h2>
+            <p>同一段提示語，用兩種模型壓縮方式生成。A 是語言模型 4-bit、其餘元件不壓縮；B 再把擴散模型壓縮成 8-bit，全部放進顯示卡，佔用的系統記憶體少很多。上面 AI01–AI07 全部用 B。這組對照沿用最初的試行提示語。聽聽音質有沒有明顯差別。</p>
+          </div>
+          <span class="badge">機器生成內容</span>
+        </div>
+        <div class="ab-grid" id="ab-list" role="list"></div>
+        <fieldset id="ab-votes">
+          <legend>邊個較好？</legend>
+          <label class="vote"><input type="radio" name="ab" value="A 較好"> A 較好</label>
+          <label class="vote"><input type="radio" name="ab" value="B 較好"> B 較好</label>
+          <label class="vote"><input type="radio" name="ab" value="聽不出分別"> 聽不出分別</label>
+        </fieldset>
+      </section>
+    </main>
+
+    <section class="picked" aria-labelledby="pick-h">
+      <div class="info">
+        <h2 id="pick-h" aria-live="polite">尚未選擇</h2>
+        <p>選擇只留在這個頁面，重新整理後會清空。複製文字後自己貼上；頁面不會自動送出，也不會更改任何影片或音樂預設。</p>
+      </div>
+      <button type="button" class="copy" id="copy-btn" disabled>複製選擇</button>
+      <div class="fallback" id="fallback">
+        <label for="fallback-text">無法自動複製，文字已選取，請按 Ctrl+C（Mac 按 Cmd+C）複製。</label>
+        <textarea id="fallback-text" readonly></textarea>
+      </div>
     </section>
 
     <footer>
@@ -162,48 +161,238 @@
       <p><a href="licenses/MiniMax-Music3-LICENSE.txt">MiniMax-Music3 授權</a> · <a href="licenses/SOURCES.txt">來源說明</a> · <a href="licenses/ASSET_SHA256.txt">MP3 SHA-256</a></p>
     </footer>
   </div>
+
   <script>
     (function () {
-      var players = Array.prototype.slice.call(document.querySelectorAll("audio"));
-      var preferenceText = document.getElementById("preference-text");
+      var TRACKS = [
+        { num: "AI01", name: "稀疏柔和鋼琴", file: "ai01_sparse_piano", bpm: 72, drum: "鼓：無", dur: 30.0, desc: "鋼琴獨奏，右手旋律清楚，左手輕和弦。" },
+        { num: "AI02", name: "暖電鋼琴", file: "ai02_warm_epiano", bpm: 80, drum: "鼓：有，輕", dur: 26.6, desc: "Rhodes 電鋼琴主奏旋律，輕貝斯及刷鼓律動。" },
+        { num: "AI03", name: "尼龍木結他", file: "ai03_nylon_guitar", bpm: 84, drum: "鼓：無", dur: 28.4, desc: "尼龍弦指彈主旋律，配分解和弦伴奏。" },
+        { num: "AI04", name: "氛圍 pad", file: "ai04_ambient_pad", bpm: 70, drum: "鼓：無", dur: 30.0, desc: "暖色合成器 pad，上面有緩慢的鐘聲旋律，開揚。" },
+        { num: "AI05", name: "輕電子節拍", file: "ai05_light_electronic", bpm: 96, drum: "鼓：有，輕", dur: 22.9, desc: "合成器主旋律，配電鋼琴和弦及輕 kick、rim、hat。" },
+        { num: "AI06", name: "柔和顫音琴", file: "ai06_soft_mallet", bpm: 88, drum: "鼓：無", dur: 12.7, desc: "顫音琴及馬林巴奏出明快旋律，底下有柔和弦樂。" },
+        { num: "AI07", name: "明亮開場", file: "ai07_bright_intro", bpm: 108, drum: "鼓：沙槌", dur: 20.5, desc: "鋼琴主旋律配馬林巴、撥弦及沙槌，明亮輕快，以解決和弦收尾。" }
+      ];
+      var AB = [
+        { num: "A", name: "4-bit 語言模型", file: "ai_cmp_4bit", dur: 10 },
+        { num: "B", name: "4-bit 語言模型＋8-bit 擴散模型（全部在顯示卡）", file: "ai_cmp_allgpu", dur: 10 }
+      ];
+      var SVG_PLAY = '<svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg><svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"></path></svg>';
+      var SVG_DL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"></path><path d="M7 10l5 5 5-5"></path><path d="M5 20h14"></path></svg>';
 
-      document.addEventListener("play", function (event) {
-        if (!event.target || event.target.tagName !== "AUDIO") return;
-        players.forEach(function (audio) {
-          if (audio !== event.target) audio.pause();
-        });
-      }, true);
+      var players = [];
+      var pickTitle = null;
+      var pickLabel = null;
 
-      function selectedPreference() {
-        var picked = document.querySelector("input[name=preference]:checked");
-        return picked ? picked.value : "尚未選擇";
+      function fmt(s) {
+        if (!isFinite(s) || s < 0) s = 0;
+        var m = Math.floor(s / 60);
+        var r = Math.floor(s % 60);
+        return m + ":" + (r < 10 ? "0" : "") + r;
+      }
+      function el(tag, cls, text) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text != null) e.textContent = text;
+        return e;
       }
 
-      function renderPreference() {
-        var value = selectedPreference();
-        preferenceText.value = value === "尚未選擇"
-          ? "AI 純音樂試聽偏好：尚未選擇"
-          : "AI 純音樂試聽偏好：" + value + "\n請不要自動更改現有影片或音樂預設。";
-      }
+      function buildRow(t, isAB) {
+        var label = isAB ? t.num : t.num + " " + t.name;
+        var row = el("div", "row");
+        row.setAttribute("role", "listitem");
 
-      document.getElementById("preference-choices").addEventListener("change", renderPreference);
-      document.getElementById("copy-preference").addEventListener("click", function () {
-        var text = preferenceText.value;
-        var button = document.getElementById("copy-preference");
-        var done = function () {
-          var original = button.textContent;
-          button.textContent = "已複製";
-          window.setTimeout(function () { button.textContent = original; }, 900);
-        };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(done, function () {
-            preferenceText.focus();
-            preferenceText.select();
-          });
-        } else {
-          preferenceText.focus();
-          preferenceText.select();
+        var btn = el("button", "play");
+        btn.type = "button";
+        btn.setAttribute("aria-pressed", "false");
+        btn.setAttribute("aria-label", "播放 " + label);
+        btn.innerHTML = SVG_PLAY;
+
+        var main = el("div", "main");
+        var title = el("div", "title");
+        title.appendChild(el("span", "num", t.num));
+        title.appendChild(el("span", "name", t.name));
+        main.appendChild(title);
+        if (t.desc) main.appendChild(el("span", "desc", t.desc));
+
+        var prog = el("div", "prog");
+        var cur = el("span", "time", "0:00");
+        var range = el("input", "seek");
+        range.type = "range";
+        range.min = "0";
+        range.max = String(t.dur);
+        range.step = "0.1";
+        range.value = "0";
+        range.setAttribute("aria-label", "播放位置 " + label);
+        range.setAttribute("aria-valuetext", "0:00 / " + fmt(t.dur));
+        var total = el("span", "time end", fmt(t.dur));
+        prog.appendChild(cur);
+        prog.appendChild(range);
+        prog.appendChild(total);
+        main.appendChild(prog);
+        main.appendChild(el("span", "err", "無法播放"));
+        row.appendChild(btn);
+        row.appendChild(main);
+
+        var tags = el("div", "tags");
+        if (!isAB) tags.appendChild(el("span", null, t.bpm + " BPM"));
+        if (!isAB) tags.appendChild(el("span", null, t.drum));
+        tags.appendChild(el("span", null, t.dur.toFixed(1) + " 秒"));
+        row.appendChild(tags);
+
+        var pick = null;
+        if (!isAB) {
+          pick = el("button", "pick", "揀這首");
+          pick.type = "button";
+          pick.setAttribute("aria-pressed", "false");
+          pick.setAttribute("aria-label", "揀 " + label);
+          row.appendChild(pick);
         }
+
+        var dl = el("a", "dl");
+        dl.href = "audio/" + t.file + ".mp3";
+        dl.setAttribute("download", t.file + ".mp3");
+        dl.setAttribute("aria-label", "下載 " + label);
+        dl.innerHTML = SVG_DL;
+        row.appendChild(dl);
+
+        var audio = document.createElement("audio");
+        audio.preload = "none";
+        audio.src = "audio/" + t.file + ".mp3";
+        row.appendChild(audio);
+
+        var p = { t: t, label: label, row: row, btn: btn, audio: audio, range: range, cur: cur, total: total, pick: pick, seeking: false };
+        players.push(p);
+
+        function setState(playing) {
+          btn.setAttribute("aria-pressed", playing ? "true" : "false");
+          btn.setAttribute("aria-label", (playing ? "暫停 " : "播放 ") + label);
+        }
+        function sync() {
+          var d = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : t.dur;
+          range.max = String(d);
+          if (!p.seeking) range.value = String(audio.currentTime);
+          cur.textContent = fmt(audio.currentTime);
+          total.textContent = fmt(d);
+          range.setAttribute("aria-valuetext", fmt(audio.currentTime) + " / " + fmt(d));
+        }
+        function fail() {
+          row.classList.add("failed");
+          row.classList.remove("active");
+          setState(false);
+          btn.disabled = true;
+        }
+
+        btn.addEventListener("click", function () {
+          if (audio.paused) {
+            players.forEach(function (o) { if (o !== p && !o.audio.paused) o.audio.pause(); });
+            var r = audio.play();
+            if (r && r.catch) r.catch(function (e) { if (!e || e.name !== "AbortError") fail(); });
+          } else {
+            audio.pause();
+          }
+        });
+        audio.addEventListener("play", function () {
+          players.forEach(function (o) { if (o !== p && !o.audio.paused) o.audio.pause(); });
+          row.classList.add("active", "started");
+          setState(true);
+        });
+        audio.addEventListener("pause", function () { setState(false); if (!audio.ended) row.classList.remove("active"); });
+        audio.addEventListener("ended", function () {
+          setState(false);
+          audio.currentTime = 0;
+          row.classList.remove("active", "started");
+          sync();
+        });
+        audio.addEventListener("timeupdate", sync);
+        audio.addEventListener("loadedmetadata", sync);
+        audio.addEventListener("error", fail);
+        range.addEventListener("pointerdown", function () { p.seeking = true; });
+        range.addEventListener("pointerup", function () { p.seeking = false; });
+        range.addEventListener("input", function () {
+          var v = parseFloat(range.value);
+          if (isFinite(v)) {
+            try { audio.currentTime = v; } catch (e) {}
+            cur.textContent = fmt(v);
+            range.setAttribute("aria-valuetext", fmt(v) + " / " + total.textContent);
+          }
+        });
+        range.addEventListener("change", function () { p.seeking = false; });
+        return p;
+      }
+
+      var aiList = document.getElementById("ai-list");
+      TRACKS.forEach(function (t) {
+        var p = buildRow(t, false);
+        aiList.appendChild(p.row);
+        p.pick.addEventListener("click", function () {
+          choose(p.label, p);
+        });
+      });
+      var abList = document.getElementById("ab-list");
+      AB.forEach(function (t) { abList.appendChild(buildRow(t, true).row); });
+
+      /* 偏好 */
+      var pickHeading = document.getElementById("pick-h");
+      var copyBtn = document.getElementById("copy-btn");
+      var fallback = document.getElementById("fallback");
+      var fallbackText = document.getElementById("fallback-text");
+      var current = "";
+
+      function render() {
+        pickHeading.textContent = current ? "已揀：" + current : "尚未選擇";
+        copyBtn.disabled = !current;
+        fallback.classList.remove("show");
+      }
+      function choose(text, trackPlayer) {
+        current = text;
+        players.forEach(function (o) {
+          if (o.pick) o.pick.setAttribute("aria-pressed", o === trackPlayer ? "true" : "false");
+        });
+        Array.prototype.forEach.call(document.querySelectorAll("input[name=ab]"), function (r) { r.checked = false; });
+        render();
+      }
+      Array.prototype.forEach.call(document.querySelectorAll("input[name=ab]"), function (r) {
+        r.addEventListener("change", function () {
+          if (!r.checked) return;
+          current = "AI 對照：" + r.value;
+          players.forEach(function (o) { if (o.pick) o.pick.setAttribute("aria-pressed", "false"); });
+          render();
+        });
+      });
+
+      copyBtn.addEventListener("click", function () {
+        if (!current) return;
+        var text = "AI 純音樂試聽偏好：" + current + "\n請不要自動更改現有影片或音樂預設。";
+        function showFallback() {
+          fallbackText.value = text;
+          fallback.classList.add("show");
+          fallbackText.focus();
+          fallbackText.select();
+        }
+        function done() {
+          var o = copyBtn.textContent;
+          copyBtn.textContent = "已複製";
+          window.setTimeout(function () { copyBtn.textContent = o; }, 1200);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, showFallback);
+        } else {
+          showFallback();
+        }
+      });
+
+      /* 篩選 */
+      var filterButtons = Array.prototype.slice.call(document.querySelectorAll(".filters button"));
+      var secAi = document.getElementById("sec-ai");
+      var secAb = document.getElementById("sec-ab");
+      filterButtons.forEach(function (b) {
+        b.addEventListener("click", function () {
+          var f = b.getAttribute("data-filter");
+          filterButtons.forEach(function (o) { o.setAttribute("aria-pressed", o === b ? "true" : "false"); });
+          secAi.hidden = f === "ab";
+          secAb.hidden = f === "ai";
+        });
       });
     }());
   </script>
