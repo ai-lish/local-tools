@@ -105,7 +105,7 @@
 
     <section class="notice" aria-label="AI 生成說明">
       <p><strong>以下全部由 AI 模型 MiniMax-Music3 生成，不是人手編曲。</strong>模型在本機電腦離線運行，沒有使用雲端服務、參考音樂或歌詞。</p>
-      <p>每首都要求 30 秒，但模型會自行提早收尾，所以長度不一；標籤顯示實際長度。音量約 −23 LUFS，只供試聽，用於影片前仍要按需要再混音。</p>
+      <p>每首都要求 30 秒，模型有時會提早收尾，標籤顯示實際長度；在 30 秒截止的曲目加了 1.5 秒淡出。音量約 −23 LUFS，只供試聽，用於影片前仍要按需要再混音。</p>
     </section>
 
     <nav class="filters" aria-label="分類">
@@ -165,13 +165,13 @@
   <script>
     (function () {
       var TRACKS = [
-        { num: "AI01", name: "稀疏柔和鋼琴", file: "ai01_sparse_piano", bpm: 72, drum: "鼓：無", dur: 30.0, desc: "鋼琴獨奏，右手旋律清楚，左手輕和弦。" },
-        { num: "AI02", name: "暖電鋼琴", file: "ai02_warm_epiano", bpm: 80, drum: "鼓：有，輕", dur: 26.6, desc: "Rhodes 電鋼琴主奏旋律，輕貝斯及刷鼓律動。" },
-        { num: "AI03", name: "尼龍木結他", file: "ai03_nylon_guitar", bpm: 84, drum: "鼓：無", dur: 28.4, desc: "尼龍弦指彈主旋律，配分解和弦伴奏。" },
-        { num: "AI04", name: "氛圍 pad", file: "ai04_ambient_pad", bpm: 70, drum: "鼓：無", dur: 30.0, desc: "暖色合成器 pad，上面有緩慢的鐘聲旋律，開揚。" },
-        { num: "AI05", name: "輕電子節拍", file: "ai05_light_electronic", bpm: 96, drum: "鼓：有，輕", dur: 22.9, desc: "合成器主旋律，配電鋼琴和弦及輕 kick、rim、hat。" },
-        { num: "AI06", name: "柔和顫音琴", file: "ai06_soft_mallet", bpm: 88, drum: "鼓：無", dur: 12.7, desc: "顫音琴及馬林巴奏出明快旋律，底下有柔和弦樂。" },
-        { num: "AI07", name: "明亮開場", file: "ai07_bright_intro", bpm: 108, drum: "鼓：沙槌", dur: 20.5, desc: "鋼琴主旋律配馬林巴、撥弦及沙槌，明亮輕快，以解決和弦收尾。" }
+        { num: "AI01", name: "稀疏柔和鋼琴", file: "ai01_sparse_piano", bpm: 72, drum: "鼓：無", dur: 30.0, desc: "鋼琴獨奏，中高音區旋律清楚，左手輕和弦。" },
+        { num: "AI02", name: "暖電鋼琴", file: "ai02_warm_epiano", bpm: 80, drum: "鼓：有，輕", dur: 25.7, desc: "電鋼琴主奏抒情旋律，輕 kick、邊擊及 hi-hat 律動。" },
+        { num: "AI03", name: "尼龍木結他", file: "ai03_nylon_guitar", bpm: 84, drum: "鼓：無", dur: 30.0, desc: "尼龍弦古典結他，高音弦主旋律配指彈伴奏。" },
+        { num: "AI04", name: "氛圍 pad", file: "ai04_ambient_pad", bpm: 70, drum: "鼓：無", dur: 29.2, desc: "柔和 pad 墊底，上面有緩慢、易記的鐘聲旋律。" },
+        { num: "AI05", name: "輕電子節拍", file: "ai05_light_electronic", bpm: 96, drum: "鼓：有，輕", dur: 30.0, desc: "合成器主旋律，配輕 kick、rim 及 hi-hat。" },
+        { num: "AI06", name: "柔和顫音琴", file: "ai06_soft_mallet", bpm: 88, drum: "鼓：無", dur: 30.0, desc: "軟槌顫音琴奏旋律，馬林巴八分音符伴奏。" },
+        { num: "AI07", name: "明亮開場", file: "ai07_bright_intro", bpm: 108, drum: "鼓：沙槌及拍手", dur: 30.0, desc: "明亮鋼琴主旋律，配沙槌及輕拍手，輕快易記。" }
       ];
       var AB = [
         { num: "A", name: "4-bit 語言模型", file: "ai_cmp_4bit", dur: 10 },
