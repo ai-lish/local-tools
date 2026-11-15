@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="逐款試聽六款數學影片背景音樂，可切換純音樂或配旁白；另附 MiniMax-Music3 AI 生成試驗版本。">
-  <title>背景音樂試聽｜Local Tools</title>
+  <meta name="description" content="試聽由 MiniMax-Music3 在本機生成的純音樂，逐首播放或下載。">
+  <title>AI 純音樂試聽｜Local Tools</title>
   <style>
     :root { color-scheme: light; --ink:#162537; --muted:#68798a; --navy:#102a43; --blue:#2367a8; --gold:#d99b22; --gold-soft:#fff7df; --green:#2b7a65; --green-soft:#eaf6f1; --line:#dce5eb; --canvas:#f4f7f9; --surface:#fff; --shadow:0 16px 42px rgba(16,42,67,.08); }
     * { box-sizing: border-box; }
@@ -65,120 +65,11 @@
       <a class="brand" href="../../index.html"><span class="brand-mark">LT</span><span><small>LOCAL TOOLS</small><strong>返回工具入口</strong></span></a>
       <span class="privacy">只在瀏覽器播放</span>
     </header>
-    <h1>背景音樂試聽</h1>
-    <p class="intro">六款原創編曲，每款 30 秒。可以先聽比較合集，再逐款切換純音樂或配旁白。頁面下方另有 AI 生成的試驗版本。頁面沒有自動播放，一次只播一首。</p>
-    <section class="notice" aria-label="音量與使用範圍">
-      <p><strong>純音樂的音量只供聽音色，不可直接套入影片。</strong>純音樂約 −23.3 LUFS。配旁白時，旁白約 −18.3 LUFS；有聲區的旁白與音樂相差 23.50 dB。選定之後，仍要按那條影片的旁白再混，目標大約低 22–25 dB。</p>
-      <p>這頁不會改任何現有影片，也不會把任何一款設成音樂預設。請自己播放比較。</p>
-    </section>
-
-    <section class="panel" aria-labelledby="comparison-title">
-      <div class="panel-head">
-        <div>
-          <p class="kicker">比較合集</p>
-          <h2 id="comparison-title">00 至 06，同一旁白</h2>
-        </div>
-        <span class="tag">3:34.500</span>
-      </div>
-      <p>順序是無音樂，然後 01 至 06。每段 30 秒，中間 0.75 秒靜音，沒有口述標籤。合集使用配旁白版本。</p>
-      <audio id="comparison" controls preload="none" src="audio/comparison_00_to_06.mp3"></audio>
-      <div class="seek">
-        <button type="button" data-seek="0">00 無音樂 · 0:00.000</button>
-        <button type="button" data-seek="30.75">01 鋼琴 · 0:30.750</button>
-        <button type="button" data-seek="61.5">02 電鋼琴 · 1:01.500</button>
-        <button type="button" data-seek="92.25">03 木結他 · 1:32.250</button>
-        <button type="button" data-seek="123">04 氛圍 pad · 2:03.000</button>
-        <button type="button" data-seek="153.75">05 輕電子 · 2:33.750</button>
-        <button type="button" data-seek="184.5">06 顫音琴 · 3:04.500</button>
-      </div>
-      <div class="downloads"><a download="comparison_00_to_06.mp3" href="audio/comparison_00_to_06.mp3">下載比較合集</a></div>
-    </section>
-
-    <div class="original-set">
-    <div class="mode">
-      <div class="mode-row">
-        <div>
-          <p class="kicker">六款切換</p>
-          <h2>純音樂或配旁白</h2>
-        </div>
-        <div class="seek" role="group" aria-label="播放版本">
-          <button type="button" id="mode-voice" aria-pressed="true">配旁白</button>
-          <button type="button" id="mode-solo" aria-pressed="false">純音樂</button>
-        </div>
-      </div>
-      <p id="mode-note">現在顯示配旁白。00 永遠是無音樂旁白，不受這個切換影響。切換時會停止正在播放的聲音。</p>
-    </div>
-
-    <section class="track track-baseline" aria-labelledby="baseline-title">
-      <div class="track-head">
-        <div>
-          <p class="num">00</p>
-          <h3 id="baseline-title">無音樂旁白基準</h3>
-        </div>
-        <span class="tag">30 秒</span>
-      </div>
-      <p>同一段粵語乾聲，沒有背景音樂。六款配旁白都使用這段聲音和同一個音量。</p>
-      <ul class="facts"><li>鼓：無</li><li>旁白約 −18.3 LUFS</li><li>合集 0:00.000</li></ul>
-      <audio controls preload="none" src="audio/00_dry_baseline.mp3"></audio>
-      <div class="downloads"><a download="00_dry_baseline.mp3" href="audio/00_dry_baseline.mp3">下載旁白基準</a></div>
-    </section>
-
-    <div class="grid">
-      <article class="track" data-solo="audio/01_sparse_piano_solo.mp3" data-voice="audio/01_sparse_piano_with_voice.mp3">
-        <div class="track-head"><div><p class="num">01</p><h3>稀疏柔和鋼琴</h3></div><span class="tag">30 秒</span></div>
-        <p>極簡柔和鋼琴：稀疏低音與和聲。</p>
-        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>合集 0:30.750</li></ul>
-        <audio controls preload="none" src="audio/01_sparse_piano_with_voice.mp3"></audio>
-        <div class="downloads"><a download="01_sparse_piano_solo.mp3" href="audio/01_sparse_piano_solo.mp3">下載純音樂</a><a download="01_sparse_piano_with_voice.mp3" href="audio/01_sparse_piano_with_voice.mp3">下載配旁白</a></div>
-      </article>
-      <article class="track" data-solo="audio/02_warm_epiano_solo.mp3" data-voice="audio/02_warm_epiano_with_voice.mp3">
-        <div class="track-head"><div><p class="num">02</p><h3>暖電鋼琴</h3></div><span class="tag">30 秒</span></div>
-        <p>較長和弦，帶輕補拍。</p>
-        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>合集 1:01.500</li></ul>
-        <audio controls preload="none" src="audio/02_warm_epiano_with_voice.mp3"></audio>
-        <div class="downloads"><a download="02_warm_epiano_solo.mp3" href="audio/02_warm_epiano_solo.mp3">下載純音樂</a><a download="02_warm_epiano_with_voice.mp3" href="audio/02_warm_epiano_with_voice.mp3">下載配旁白</a></div>
-      </article>
-      <article class="track" data-solo="audio/03_nylon_guitar_solo.mp3" data-voice="audio/03_nylon_guitar_with_voice.mp3">
-        <div class="track-head"><div><p class="num">03</p><h3>尼龍木結他</h3></div><span class="tag">30 秒</span></div>
-        <p>木結他輕撥弦：尼龍弦分解和弦。</p>
-        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>合集 1:32.250</li></ul>
-        <audio controls preload="none" src="audio/03_nylon_guitar_with_voice.mp3"></audio>
-        <div class="downloads"><a download="03_nylon_guitar_solo.mp3" href="audio/03_nylon_guitar_solo.mp3">下載純音樂</a><a download="03_nylon_guitar_with_voice.mp3" href="audio/03_nylon_guitar_with_voice.mp3">下載配旁白</a></div>
-      </article>
-      <article class="track" data-solo="audio/04_ambient_pad_solo.mp3" data-voice="audio/04_ambient_pad_with_voice.mp3">
-        <div class="track-head"><div><p class="num">04</p><h3>氛圍 pad</h3></div><span class="tag">30 秒</span></div>
-        <p>暖色氛圍 pad，沒有鼓，也沒有主旋律。</p>
-        <ul class="facts"><li>72 BPM 和聲格</li><li>鼓：無</li><li>合集 2:03.000</li></ul>
-        <audio controls preload="none" src="audio/04_ambient_pad_with_voice.mp3"></audio>
-        <div class="downloads"><a download="04_ambient_pad_solo.mp3" href="audio/04_ambient_pad_solo.mp3">下載純音樂</a><a download="04_ambient_pad_with_voice.mp3" href="audio/04_ambient_pad_with_voice.mp3">下載配旁白</a></div>
-      </article>
-      <article class="track" data-solo="audio/05_light_electronic_solo.mp3" data-voice="audio/05_light_electronic_with_voice.mp3">
-        <div class="track-head"><div><p class="num">05</p><h3>輕電子節拍</h3></div><span class="tag tag-drum">有鼓</span></div>
-        <p>低密度節奏加上電鋼琴。鼓只有輕 kick、rim 及 hat。</p>
-        <ul class="facts"><li>80 BPM</li><li>鼓：有，輕</li><li>合集 2:33.750</li></ul>
-        <audio controls preload="none" src="audio/05_light_electronic_with_voice.mp3"></audio>
-        <div class="downloads"><a download="05_light_electronic_solo.mp3" href="audio/05_light_electronic_solo.mp3">下載純音樂</a><a download="05_light_electronic_with_voice.mp3" href="audio/05_light_electronic_with_voice.mp3">下載配旁白</a></div>
-      </article>
-      <article class="track" data-solo="audio/06_soft_mallet_solo.mp3" data-voice="audio/06_soft_mallet_with_voice.mp3">
-        <div class="track-head"><div><p class="num">06</p><h3>柔和顫音琴</h3></div><span class="tag">30 秒</span></div>
-        <p>低中音域顫音琴，不是尖銳鐘琴。</p>
-        <ul class="facts"><li>72 BPM</li><li>鼓：無</li><li>合集 3:04.500</li></ul>
-        <audio controls preload="none" src="audio/06_soft_mallet_with_voice.mp3"></audio>
-        <div class="downloads"><a download="06_soft_mallet_solo.mp3" href="audio/06_soft_mallet_solo.mp3">下載純音樂</a><a download="06_soft_mallet_with_voice.mp3" href="audio/06_soft_mallet_with_voice.mp3">下載配旁白</a></div>
-      </article>
-    </div>
-    </div>
-
-    <section class="panel panel-ai" aria-labelledby="ai-title">
-      <div class="panel-head">
-        <div>
-          <p class="kicker">試驗 · 機器生成</p>
-          <h2 id="ai-title">MiniMax-Music3 AI 生成版本</h2>
-        </div>
-        <span class="tag tag-ai">AI 生成</span>
-      </div>
-      <p><strong>以下全部由 AI 模型 MiniMax-Music3 生成，不是人手編曲。</strong>模型在本機電腦離線運行，沒有使用雲端服務、參考音樂或歌詞。這些是有主旋律、可以單獨聆聽的完整純音樂，不是墊在旁白底下的背景聲；樂器風格大致對應上面六款，但旋律與編曲由模型產生，與上面的原創編曲無關。</p>
-      <p>每段都要求 30 秒，但模型會自行提早收尾，所以長度不一；標籤顯示實際長度。全部只有純音樂，音量約 −23 LUFS，與上面純音樂相若。</p>
+    <h1>AI 純音樂試聽</h1>
+    <p class="intro">七首由 AI 生成、有主旋律的純音樂，可以逐首播放或下載。頁面沒有自動播放，一次只播一首。</p>
+    <section class="notice" aria-label="AI 生成說明">
+      <p><strong>以下全部由 AI 模型 MiniMax-Music3 生成，不是人手編曲。</strong>模型在本機電腦離線運行，沒有使用雲端服務、參考音樂或歌詞。</p>
+      <p>每首都要求 30 秒，但模型會自行提早收尾，所以長度不一；標籤顯示實際長度。音量約 −23 LUFS，只供試聽，用於影片前仍要按需要再混音。</p>
     </section>
 
     <div class="grid">
@@ -244,18 +135,12 @@
     </section>
 
     <section class="preference" aria-labelledby="preference-title">
-      <h2 id="preference-title">記下想先試的一款</h2>
+      <h2 id="preference-title">記下想先試的一首</h2>
       <p class="fine">選擇只留在這個頁面，重新整理後會清空。複製文字要由你自己貼上；頁面不會自動送出，也不會更改任何影片或音樂預設。</p>
       <fieldset>
         <legend>偏好</legend>
         <div class="choice" id="preference-choices">
           <label><input type="radio" name="preference" value="尚未選擇" checked> 尚未選擇</label>
-          <label><input type="radio" name="preference" value="01 稀疏柔和鋼琴"> 01 稀疏柔和鋼琴</label>
-          <label><input type="radio" name="preference" value="02 暖電鋼琴"> 02 暖電鋼琴</label>
-          <label><input type="radio" name="preference" value="03 尼龍木結他"> 03 尼龍木結他</label>
-          <label><input type="radio" name="preference" value="04 氛圍 pad"> 04 氛圍 pad</label>
-          <label><input type="radio" name="preference" value="05 輕電子節拍"> 05 輕電子節拍</label>
-          <label><input type="radio" name="preference" value="06 柔和顫音琴"> 06 柔和顫音琴</label>
           <label><input type="radio" name="preference" value="AI01 稀疏柔和鋼琴（AI 生成）"> AI01 稀疏柔和鋼琴（AI）</label>
           <label><input type="radio" name="preference" value="AI02 暖電鋼琴（AI 生成）"> AI02 暖電鋼琴（AI）</label>
           <label><input type="radio" name="preference" value="AI03 尼龍木結他（AI 生成）"> AI03 尼龍木結他（AI）</label>
@@ -268,85 +153,26 @@
           <label><input type="radio" name="preference" value="AI 對照：聽不出分別"> AI 對照：聽不出分別</label>
         </div>
       </fieldset>
-      <textarea id="preference-text" readonly>背景音樂試聽偏好：尚未選擇</textarea>
+      <textarea id="preference-text" readonly>AI 純音樂試聽偏好：尚未選擇</textarea>
       <div class="downloads"><button type="button" class="copy" id="copy-preference">複製偏好文字</button></div>
     </section>
 
     <footer>
-      <p>六款是 2026-11-08 譜寫的原創編曲。音色來自 FluidR3 GM（Frank Wen，MIT），離線渲染使用 TinySoundFont（Bernhard Schelling，MIT）。旁白是既有數學影片乾聲，沒有新配音。</p>
-      <p>AI01–AI07 及對照 A／B 由 MiniMax-Music3 模型於 2026-11-13 及 2026-11-15 在本機生成，屬機器生成內容；模型授權見 MiniMax-Music3 Community License。</p>
-      <p><a href="licenses/FluidR3-COPYING.txt">FluidR3 授權</a> · <a href="licenses/TinySoundFont-LICENSE.txt">TinySoundFont 授權</a> · <a href="licenses/MiniMax-Music3-LICENSE.txt">MiniMax-Music3 授權</a> · <a href="licenses/SOURCES.txt">來源說明</a> · <a href="licenses/ASSET_SHA256.txt">MP3 SHA-256</a></p>
+      <p>全部由 MiniMax-Music3 模型於 2026-11-13 及 2026-11-15 在本機生成，屬機器生成內容；模型授權見 MiniMax-Music3 Community License。</p>
+      <p><a href="licenses/MiniMax-Music3-LICENSE.txt">MiniMax-Music3 授權</a> · <a href="licenses/SOURCES.txt">來源說明</a> · <a href="licenses/ASSET_SHA256.txt">MP3 SHA-256</a></p>
     </footer>
   </div>
   <script>
     (function () {
       var players = Array.prototype.slice.call(document.querySelectorAll("audio"));
-      var tracks = Array.prototype.slice.call(document.querySelectorAll(".track[data-solo]"));
-      var comparison = document.getElementById("comparison");
-      var voiceButton = document.getElementById("mode-voice");
-      var soloButton = document.getElementById("mode-solo");
-      var modeNote = document.getElementById("mode-note");
       var preferenceText = document.getElementById("preference-text");
-      var pendingSeek = null;
-
-      function pauseOthers(current) {
-        players.forEach(function (audio) {
-          if (audio !== current) audio.pause();
-        });
-      }
-
-      function placeSeek() {
-        if (!pendingSeek) return;
-        var seconds = pendingSeek;
-        if (!comparison.seekable || !comparison.seekable.length) return;
-        var end = comparison.seekable.end(comparison.seekable.length - 1);
-        if (seconds > end + 0.2) return;
-        if (Math.abs(comparison.currentTime - seconds) > 0.35) comparison.currentTime = seconds;
-      }
-
-      comparison.addEventListener("loadedmetadata", placeSeek);
-      comparison.addEventListener("progress", placeSeek);
-      comparison.addEventListener("canplay", placeSeek);
-      comparison.addEventListener("playing", placeSeek);
 
       document.addEventListener("play", function (event) {
         if (!event.target || event.target.tagName !== "AUDIO") return;
-        if (event.target !== comparison) pendingSeek = null;
-        pauseOthers(event.target);
+        players.forEach(function (audio) {
+          if (audio !== event.target) audio.pause();
+        });
       }, true);
-
-      function setMode(mode) {
-        var solo = mode === "solo";
-        pendingSeek = null;
-        pauseOthers(null);
-        tracks.forEach(function (track) {
-          var audio = track.querySelector("audio");
-          var next = solo ? track.getAttribute("data-solo") : track.getAttribute("data-voice");
-          if (audio.getAttribute("src") !== next) {
-            audio.pause();
-            audio.setAttribute("src", next);
-            audio.load();
-          }
-        });
-        voiceButton.setAttribute("aria-pressed", String(!solo));
-        soloButton.setAttribute("aria-pressed", String(solo));
-        modeNote.textContent = solo
-          ? "現在顯示純音樂。這個音量只供聽音色，不可直接套入影片。00 仍然是無音樂旁白。"
-          : "現在顯示配旁白。00 永遠是無音樂旁白，不受這個切換影響。切換時會停止正在播放的聲音。";
-      }
-
-      voiceButton.addEventListener("click", function () { setMode("voice"); });
-      soloButton.addEventListener("click", function () { setMode("solo"); });
-
-      document.querySelectorAll("[data-seek]").forEach(function (button) {
-        button.addEventListener("click", function () {
-          pendingSeek = Number(button.getAttribute("data-seek"));
-          pauseOthers(comparison);
-          placeSeek();
-          var pending = comparison.play();
-          if (pending && typeof pending.then === "function") pending.then(placeSeek, function () {});
-        });
-      });
 
       function selectedPreference() {
         var picked = document.querySelector("input[name=preference]:checked");
@@ -356,8 +182,8 @@
       function renderPreference() {
         var value = selectedPreference();
         preferenceText.value = value === "尚未選擇"
-          ? "背景音樂試聽偏好：尚未選擇"
-          : "背景音樂試聽偏好：" + value + "\n我想先試這一款的純音樂和配旁白。請不要自動更改現有影片或音樂預設。";
+          ? "AI 純音樂試聽偏好：尚未選擇"
+          : "AI 純音樂試聽偏好：" + value + "\n請不要自動更改現有影片或音樂預設。";
       }
 
       document.getElementById("preference-choices").addEventListener("change", renderPreference);
