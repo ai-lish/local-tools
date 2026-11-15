@@ -16,7 +16,7 @@
 
 ## AI 生成試驗版本
 
-頁面下方另有 9 個由 MiniMax-Music3 模型在本機離線生成的純音樂 MP3：`ai01`–`ai07` 及壓縮方式對照 `ai_cmp_4bit`／`ai_cmp_allgpu`。頁面清楚標明屬機器生成，以符合該模型 Acceptable Use Policy 第 11 條的公開披露要求。每段要求 30 秒，但模型會提早收尾，實際長度 11.1–30.0 秒，對照組各 10 秒；音量約 −23 LUFS。提示語、seed 及生成紀錄只留在本機，不入 repo。模型授權全文見 [`licenses/MiniMax-Music3-LICENSE.txt`](licenses/MiniMax-Music3-LICENSE.txt)。
+頁面下方另有 9 個由 MiniMax-Music3 模型在本機離線生成的純音樂 MP3；`ai01`–`ai07` 是有主旋律、可單獨聆聽的完整樂曲，不是旁白背景聲：`ai01`–`ai07` 及壓縮方式對照 `ai_cmp_4bit`／`ai_cmp_allgpu`。頁面清楚標明屬機器生成，以符合該模型 Acceptable Use Policy 第 11 條的公開披露要求。每段要求 30 秒，但模型會提早收尾，實際長度 12.7–30.0 秒，對照組各 10 秒；音量約 −23 LUFS。提示語、seed 及生成紀錄只留在本機，不入 repo。模型授權全文見 [`licenses/MiniMax-Music3-LICENSE.txt`](licenses/MiniMax-Music3-LICENSE.txt)。
 
 授權：
 
