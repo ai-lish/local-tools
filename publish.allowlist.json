@@ -31,6 +31,18 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/conduct-grade-average/index.html",
+      "destination": "tools/conduct-grade-average/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/conduct-grade-average/README.md",
+      "destination": "tools/conduct-grade-average/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/pdf-splitter/index.html",
       "destination": "tools/pdf-splitter/index.html",
       "publicMode": "offline-single-file",
@@ -1469,14 +1481,15 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.13.2",
+      "version": "2026.11.16.4",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
         "tools/photo-merge/index.html",
         "tools/pdf-marking/index.html",
         "tools/pdf-splitter/index.html",
-        "tools/hkdse-question-split/index.html"
+        "tools/hkdse-question-split/index.html",
+        "tools/conduct-grade-average/index.html"
       ],
       "files": [
         "tools/image-upscaler/index.html",
@@ -1501,7 +1514,8 @@
         "tools/pdf-splitter/index.html",
         "tools/_vendor/jszip-3.10.1/jszip.min.js",
         "tools/_vendor/jszip-3.10.1/LICENSE.markdown",
-        "tools/hkdse-question-split/index.html"
+        "tools/hkdse-question-split/index.html",
+        "tools/conduct-grade-average/index.html"
       ],
       "transforms": {
         "injectOfflineHead": true
@@ -2097,6 +2111,28 @@
         "pdfjs-dist",
         "jszip"
       ]
+    },
+    {
+      "id": "conduct-grade-average",
+      "title": "R-ASR024 操行等級計算器",
+      "version": "2026.11.16.4",
+      "entry": "tools/conduct-grade-average/index.html",
+      "entries": [
+        "tools/conduct-grade-average/index.html"
+      ],
+      "files": [
+        "tools/conduct-grade-average/index.html"
+      ],
+      "transforms": {
+        "injectOfflineHead": true
+      },
+      "allowedTextUrls": [
+        {
+          "value": "https://ai-lish.github.io/local-tools/downloads/index.html#",
+          "kind": "hyperlink"
+        }
+      ],
+      "libraries": []
     }
   ]
 }

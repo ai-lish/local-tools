@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>R-ASR024 操行等級計算器｜Local Tools</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#18334b;background:#f2f6f8;font-synthesis:none;text-rendering:optimizeLegibility}
+    *{box-sizing:border-box}body{margin:0;line-height:1.55}.shell{max-width:1180px;margin:0 auto;padding:24px 18px 48px}
+    .topline{color:#496477;font-size:.82rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.hero{padding:24px 0 18px}h1{font-size:clamp(1.7rem,4vw,2.5rem);line-height:1.18;margin:.35rem 0 .65rem}.lead{max-width:760px;color:#435c6d;margin:0}
+    .privacy{margin-top:16px;background:#e8f4ee;border:1px solid #b9d9c7;border-radius:12px;padding:12px 15px;color:#204f38;font-weight:650}
+    .stack{display:grid;gap:16px}.stack>*{min-width:0}.card{background:white;border:1px solid #d8e2e8;border-radius:16px;padding:18px;box-shadow:0 5px 18px #18334b0b}.card h2{font-size:1.13rem;margin:0 0 10px}.section-copy{margin:0 0 12px;color:#5b7180;font-size:.93rem}
+    label{display:block;font-weight:650;margin:0 0 5px}input,select,textarea,button{font:inherit}input,select,textarea{color:#18334b;background:white;border:1px solid #aebfca;border-radius:8px;padding:8px 10px;min-width:0}textarea{width:100%;min-height:170px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92rem;line-height:1.45}
+    input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{outline:3px solid #79b8e4;outline-offset:2px}.row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.field{display:grid;gap:4px}.field small{color:#5b7180}.mode-control{max-width:310px}.mapping-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px}.mapping-grid label{font-size:.89rem}.mapping-grid select{width:100%}
+    .class-list{display:grid;gap:8px}.class-row{display:grid;grid-template-columns:minmax(100px,1fr) minmax(90px,150px) auto;gap:8px;align-items:center}.class-row input{width:100%}.class-actions{display:flex;gap:5px}.class-actions button{padding:6px 9px}
+    button,.button{border:0;border-radius:9px;padding:9px 13px;background:#12648a;color:#fff;font-weight:700;cursor:pointer}.button.secondary,button.secondary{background:#eaf1f5;color:#24485e;border:1px solid #c8d7df}.button.danger,button.danger{background:#a43c3c}.button.small{padding:6px 9px;font-size:.87rem}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+    .status{min-height:1.5em;margin:8px 0 0;color:#32576e}.status.error{color:#a12525;font-weight:700}.status.good{color:#176642;font-weight:700}.warning{background:#fff5df;border:1px solid #e4c67d;color:#614900;border-radius:10px;padding:10px 12px;margin:10px 0}.note{color:#5b7180;font-size:.9rem}
+    #preview{border-top:1px solid #d8e2e8;margin-top:16px;padding-top:14px}#preview h3{font-size:1rem;margin:14px 0 6px}.preview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}.preview-item{border:1px solid #dce6eb;border-radius:9px;padding:9px}.preview-item strong{display:block}.problem-list{margin:4px 0;padding-left:22px;max-height:220px;overflow:auto}.problem-list li{padding:2px 0}
+    .tabs{display:flex;gap:7px;flex-wrap:wrap;margin:6px 0 12px}.tab{background:#edf2f5;color:#29485a;border:1px solid #cad7df}.tab[aria-pressed="true"]{background:#155f83;color:white;border-color:#155f83}.table-wrap{overflow:auto;border:1px solid #d8e2e8;border-radius:10px}table{border-collapse:collapse;width:100%;min-width:920px;font-size:.9rem}th,td{text-align:left;padding:8px;border-bottom:1px solid #e1e8ec;vertical-align:top}th{background:#f3f7f9;position:sticky;top:0;z-index:1}td input{width:100%;min-width:70px;padding:6px 7px}.result-cell{font-weight:750;color:#155f83}.invalid-cell{color:#9a3434}.empty-state{padding:20px;text-align:center;color:#5b7180}
+    .formula{background:#f5f8fa;border-left:4px solid #4b8cac;padding:10px 13px;border-radius:4px;margin:10px 0 0}.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.toolbar .spacer{flex:1}.footer-note{font-size:.82rem;color:#627786;text-align:center;margin-top:20px}
+    @media(max-width:600px){.shell{padding:15px 12px 32px}.card{padding:14px}.class-row{grid-template-columns:minmax(90px,1fr) minmax(74px,105px) auto}.class-actions{gap:3px}.class-actions button{padding:6px}.actions button,.actions .button{flex:1 1 140px}.hero{padding-top:18px}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="topline">CloudSAMS・本機處理</div>
+      <h1>R-ASR024 操行等級計算器</h1>
+      <p class="lead">按四科操行等級計算平均結果，整理班別及班號，方便核對後貼回 Excel。貼上前請先設定欄位與各班人數。</p>
+      <div class="privacy">檔案及貼上的資料只在本機處理，不會上載或發出網絡請求。</div>
+    </header>
+
+    <div class="stack">
+      <section class="card" aria-labelledby="columns-title">
+        <h2 id="columns-title">1. 欄位設定</h2>
+        <p class="section-copy">預設欄序為原操行、班主任、中文、英文、數學。首列如沒有任何有效等級，會視作表頭並略過。匯入後如要轉換欄數，請先匯出或清空現有列。</p>
+        <div class="field mode-control"><label for="columnMode">貼上格式</label><select id="columnMode"><option value="5">5 欄（含原操行）</option><option value="4">4 欄（只有四科）</option></select></div>
+        <div id="columnMappings" class="mapping-grid"></div>
+      </section>
+
+      <section class="card" aria-labelledby="classes-title">
+        <h2 id="classes-title">2. 班別及學生人數</h2>
+        <p class="section-copy">列會按班別清單次序及人數分配；人數只用作預覽及分班，不會自動刪除或補造資料。</p>
+        <div id="classList" class="class-list"></div>
+        <div class="actions"><button id="addClass" class="secondary" type="button">新增班別</button></div>
+      </section>
+
+      <section class="card" aria-labelledby="import-title">
+        <h2 id="import-title">3. 貼上及預覽</h2>
+        <p class="section-copy">只以 Tab 分欄；沒有 Tab 時才以逗號分欄。中間空列會保留，只有結尾全空列會移除。</p>
+        <label for="pasteInput">從 Excel 複製並貼上</label>
+        <textarea id="pasteInput" spellcheck="false" aria-describedby="pasteHint"></textarea>
+        <div id="pasteHint" class="note">五欄格式例：原操行　班主任　中文　英文　數學（每列一名學生；請按上方欄位設定調整）</div>
+        <div class="actions"><button id="previewImport" type="button">預覽匯入</button><button id="cancelPreview" class="secondary" type="button" hidden>返回修改</button></div>
+        <div id="importStatus" class="status" role="status" aria-live="polite"></div>
+        <div id="preview" hidden>
+          <h3>匯入預覽</h3><div id="previewSummary"></div>
+          <h3>各班首尾列樣本</h3><div id="classSamples" class="preview-grid"></div>
+          <h3>問題列</h3><ul id="problemRows" class="problem-list"></ul>
+          <div class="actions"><button id="applyImport" type="button">確認並套用</button></div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="records-title">
+        <h2 id="records-title">4. 核對及輸出</h2>
+        <div class="toolbar"><div id="rowSummary" class="note">目前沒有資料列。</div><span class="spacer"></span><button id="addRow" class="secondary" type="button">新增一列</button></div>
+        <div id="classTabs" class="tabs" role="tablist" aria-label="按班別篩選"></div>
+        <div id="recordsTable" class="table-wrap"></div>
+        <div class="actions">
+          <button id="copyResults" type="button">複製結果（貼回 Excel）</button>
+          <button id="downloadCsv" class="secondary" type="button">匯出 CSV</button>
+          <button id="downloadBlank" class="secondary" type="button">下載空白工具 HTML</button>
+          <button id="resetSample" class="secondary" type="button">重設預設資料（虛構示範）</button>
+          <button id="clearRows" class="danger" type="button">清空資料列</button>
+        </div>
+        <div id="outputStatus" class="status" role="status" aria-live="polite"></div>
+      </section>
+
+      <section class="card" aria-labelledby="formula-title">
+        <h2 id="formula-title">計算法</h2>
+        <p>先找出四科最低等級，再計算四科相對於最低等級的平均級距，按所選取整方式調整，最後加回最低等級；結果最高為甲級。</p>
+        <div class="formula">等級：丁 = 0，丙− = 1，丙 = 2，丙+ = 3，乙− = 4，乙 = 5，乙+ = 6，甲− = 7，甲 = 8。<br>此法結果與「四科直接平均後按同一規則取整」相同；分值設定只影響顯示。</div>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label for="stepMode">每級分值</label><select id="stepMode"><option value="1">1 分</option><option value="12.5">12.5 分</option><option value="custom">自訂</option></select></div>
+          <div class="field"><label for="customStep">自訂分值</label><input id="customStep" type="number" min="0.0001" step="any" value="10"></div>
+          <div class="field"><label for="roundingMode">取整方式</label><select id="roundingMode"><option value="round">四捨五入</option><option value="halfDown">半數向下</option><option value="floor">向下取整</option><option value="ceil">向上取整</option></select></div>
+          <div id="roundSummary" class="note">無須取整</div>
+        </div>
+      </section>
+    </div>
+    <footer class="footer-note">本機工具・請在貼回正式紀錄前核對原始資料及結果。</footer>
+  </main>
+
+  <script>
+  (() => {
+    'use strict';
+    const cleanBlankHtml = '<!doctype html>\n' + document.documentElement.outerHTML + '\n';
+    const FIELDS = [
+      { id: 'orig', label: '原操行' },
+      { id: 'teacher', label: '班主任' },
+      { id: 'chinese', label: '中文' },
+      { id: 'english', label: '英文' },
+      { id: 'math', label: '數學' }
+    ];
+    const SUBJECTS = ['teacher', 'chinese', 'english', 'math'];
+    const GRADE_LEVELS = [
+      { level: 0, zh: '丁', en: 'D', group: 'D', desc: '待改進' },
+      { level: 1, zh: '丙-', en: 'C-', group: 'C', desc: '尚可偏弱' },
+      { level: 2, zh: '丙', en: 'C', group: 'C', desc: '尚可' },
+      { level: 3, zh: '丙+', en: 'C+', group: 'C', desc: '尚可偏佳' },
+      { level: 4, zh: '乙-', en: 'B-', group: 'B', desc: '良好偏弱' },
+      { level: 5, zh: '乙', en: 'B', group: 'B', desc: '良好' },
+      { level: 6, zh: '乙+', en: 'B+', group: 'B', desc: '良好偏優' },
+      { level: 7, zh: '甲-', en: 'A-', group: 'A', desc: '優異' },
+      { level: 8, zh: '甲', en: 'A', group: 'A', desc: '極優異（滿分）' }
+    ];
+    const GRADE_LOOKUP = Object.create(null);
+    for (const grade of GRADE_LEVELS) {
+      GRADE_LOOKUP[grade.zh] = grade;
+      GRADE_LOOKUP[grade.en] = grade;
+    }
+    GRADE_LOOKUP['丙−'] = GRADE_LOOKUP['丙-'];
+    GRADE_LOOKUP['丙＋'] = GRADE_LOOKUP['丙+'];
+    GRADE_LOOKUP['乙−'] = GRADE_LOOKUP['乙-'];
+    GRADE_LOOKUP['乙＋'] = GRADE_LOOKUP['乙+'];
+    GRADE_LOOKUP['甲−'] = GRADE_LOOKUP['甲-'];
+    const state = {
+      mode: '5',
+      mapping: ['orig', 'teacher', 'chinese', 'english', 'math'],
+      classes: [
+        { id: 'class-1', name: '1A', size: 0 },
+        { id: 'class-2', name: '1B', size: 0 },
+        { id: 'class-3', name: '1C', size: 0 },
+        { id: 'class-4', name: '1D', size: 0 }
+      ],
+      rows: [],
+      activeClassId: 'all',
+      nextRowId: 1,
+      nextClassId: 1,
+      pendingImport: null,
+      fictional: false
+    };
+    const byId = (id) => document.getElementById(id);
+    function uniqueClassId() {
+      let candidate;
+      do { candidate = `custom-class-${state.nextClassId++}`; }
+      while (state.classes.some((item) => item.id === candidate));
+      return candidate;
+    }
+    function invalidatePendingImport() {
+      if (!state.pendingImport) return;
+      state.pendingImport = null;
+      byId('preview').hidden = true;
+      byId('cancelPreview').hidden = true;
+      setStatus('貼上內容、班別或計算設定已改動，請重新預覽後再套用。', 'error');
+    }
+    function importStateSignature() {
+      return JSON.stringify({
+        text: byId('pasteInput').value,
+        mode: state.mode,
+        mapping: activeFields(),
+        classes: state.classes.map(({ id, name, size }) => ({ id, name, size })),
+        rows: state.rows.map(({ id, classId, classNo, rawCells, mapping, values }) => ({ id, classId, classNo, rawCells, mapping, values })),
+        stepMode: byId('stepMode').value,
+        customStep: byId('customStep').value,
+        roundingMode: byId('roundingMode').value
+      });
+    }
+
+    function parseGradeToken(rawToken) {
+      if (rawToken == null) return null;
+      const cleaned = String(rawToken).trim()
+        .replace(/＋/g, '+').replace(/[－—–]/g, '-').replace(/\s+/g, '').toUpperCase();
+      return Object.prototype.hasOwnProperty.call(GRADE_LOOKUP, cleaned) ? GRADE_LOOKUP[cleaned] : null;
+    }
+    function getStepValue() {
+      const mode = byId('stepMode').value;
+      if (mode === '1') return 1;
+      if (mode === '12.5') return 12.5;
+      const custom = Number.parseFloat(byId('customStep').value);
+      return Number.isFinite(custom) && custom > 0 ? custom : 1;
+    }
+    function round4(num) { return Math.round((num + Number.EPSILON) * 10000) / 10000; }
+    function formatNumberClean(num) {
+      const rounded = Math.round(num * 100) / 100;
+      return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/\.?0+$/, '');
+    }
+    function applyRounding(avgStep) {
+      const cleanAvg = round4(avgStep);
+      const mode = byId('roundingMode').value;
+      if (mode === 'round') return Math.floor(cleanAvg + 0.5 + 1e-9);
+      if (mode === 'halfDown') return Math.ceil(cleanAvg - 0.5 - 1e-9);
+      if (mode === 'floor') return Math.floor(cleanAvg + 1e-9);
+      if (mode === 'ceil') return Math.ceil(cleanAvg - 1e-9);
+      return Math.floor(cleanAvg + 0.5 + 1e-9);
+    }
+    function calculateRow(row) {
+      const subs = SUBJECTS.map((field) => row.levels[field]);
+      const minLevel = Math.min(subs[0], subs[1], subs[2], subs[3]);
+      const stepVal = getStepValue();
+      const relSteps = subs.map((lvl) => lvl - minLevel);
+      const relScores = relSteps.map((step) => round4(step * stepVal));
+      const avgRelStep = round4((relSteps[0] + relSteps[1] + relSteps[2] + relSteps[3]) / 4);
+      const avgRelScore = round4(avgRelStep * stepVal);
+      const roundedStep = applyRounding(avgRelStep);
+      const finalLevel = Math.min(8, Math.max(0, minLevel + roundedStep));
+      const isExact = Math.abs(avgRelStep - Math.round(avgRelStep)) < 1e-9;
+      let roundDirection = 'exact';
+      if (!isExact) roundDirection = roundedStep > avgRelStep ? 'up' : 'down';
+      const origGrade = row.values.orig ? parseGradeToken(row.values.orig) : null;
+      const compareStatus = origGrade ? (origGrade.level === finalLevel ? 'match' : 'diff') : 'noOrig';
+      return {
+        row, minLevel, minGrade: GRADE_LEVELS[minLevel], relSteps, relScores,
+        avgRelStep, avgRelScore, roundedStep, finalLevel, finalGrade: GRADE_LEVELS[finalLevel],
+        roundDirection, compareStatus
+      };
+    }
+    function fieldCount() { return Number(state.mode); }
+    function activeFields() { return state.mapping.slice(0, fieldCount()); }
+    function renumberClassNos() {
+      const nextNumber = new Map(state.classes.map((item) => [item.id, 0]));
+      for (const row of state.rows) {
+        if (!nextNumber.has(row.classId)) continue;
+        nextNumber.set(row.classId, nextNumber.get(row.classId) + 1);
+        row.classNo = nextNumber.get(row.classId);
+      }
+    }
+    function mappingError() {
+      const mapped = activeFields();
+      const missing = SUBJECTS.filter((field) => mapped.filter((candidate) => candidate === field).length !== 1);
+      if (missing.length) return `欄位設定須各有一欄：${missing.map((field) => FIELDS.find((item) => item.id === field).label).join('、')}`;
+      if (state.mode === '5' && mapped.filter((field) => field === 'orig').length > 1) return '原操行只能指定一欄。';
+      return '';
+    }
+    function sourceLines(text) {
+      const lines = String(text).replace(/\r/g, '').split('\n').map((line, index) => ({
+        lineNo: index + 1,
+        cells: line.includes('\t') ? line.split('\t') : line.split(/[,，]/)
+      }));
+      while (lines.length && lines[lines.length - 1].cells.every((cell) => cell.trim() === '')) lines.pop();
+      return lines;
+    }
+    function anyValidGrade(cells) { return cells.some((cell) => parseGradeToken(cell) !== null); }
+    function makeRow(cells, lineNo, mapping = activeFields()) {
+      const values = { orig: '', teacher: '', chinese: '', english: '', math: '' };
+      for (let index = 0; index < mapping.length; index += 1) {
+        const field = mapping[index];
+        if (field) values[field] = cells[index] ?? '';
+      }
+      const row = {
+        id: `row-${state.nextRowId++}`,
+        sourceLineNo: lineNo,
+        rawCells: [...cells],
+        mapping: [...mapping],
+        values,
+        classId: null,
+        classNo: null,
+        calculated: false,
+        reason: '',
+        result: null
+      };
+      evaluateRow(row, cells.length === fieldCount());
+      return row;
+    }
+    function evaluateRow(row, columnCountOk = true) {
+      row.calculated = false;
+      row.reason = '';
+      row.result = null;
+      if (!columnCountOk) { row.reason = `欄數不符（應有 ${fieldCount()} 欄）`; return row; }
+      const reasons = [];
+      const missing = SUBJECTS.filter((field) => !String(row.values[field] ?? '').trim());
+      if (missing.length) reasons.push(`缺科：${missing.map((field) => FIELDS.find((item) => item.id === field).label).join('、')}`);
+      const invalidSubjects = SUBJECTS.filter((field) => String(row.values[field] ?? '').trim() && !parseGradeToken(row.values[field]));
+      if (invalidSubjects.length) reasons.push(`無效等級：${invalidSubjects.map((field) => FIELDS.find((item) => item.id === field).label).join('、')}`);
+      if (row.values.orig && !parseGradeToken(row.values.orig)) reasons.push('無效等級：原操行');
+      if (reasons.length) { row.reason = reasons.join('；'); return row; }
+      row.levels = Object.fromEntries(SUBJECTS.map((field) => [field, parseGradeToken(row.values[field]).level]));
+      row.result = calculateRow(row);
+      row.calculated = true;
+      return row;
+    }
+    function currentCounts() {
+      const result = new Map(state.classes.map((item) => [item.id, 0]));
+      for (const row of state.rows) if (result.has(row.classId)) result.set(row.classId, result.get(row.classId) + 1);
+      return result;
+    }
+    function makeImportPlan(text) {
+      const error = mappingError();
+      if (error) throw new Error(error);
+      const lines = sourceLines(text);
+      if (!lines.length) throw new Error('請先貼上資料。');
+      const headerSkipped = !anyValidGrade(lines[0].cells);
+      const dataLines = headerSkipped ? lines.slice(1) : lines;
+      const existingCounts = currentCounts();
+      const planRows = dataLines.map((line) => makeRow(line.cells, line.lineNo));
+      const counts = new Map(existingCounts);
+      for (const row of planRows) {
+        let target = state.classes.find((item) => (counts.get(item.id) || 0) < Math.max(0, item.size));
+        if (!target) target = state.classes[state.classes.length - 1];
+        if (!target) throw new Error('請先設定至少一個班別。');
+        row.classId = target.id;
+        row.classNo = (counts.get(target.id) || 0) + 1;
+        counts.set(target.id, row.classNo);
+      }
+      const available = state.classes.reduce((sum, item) => sum + Math.max(0, item.size - (existingCounts.get(item.id) || 0)), 0);
+      return { rows: planRows, headerSkipped, sourceLineCount: lines.length, available, append: state.rows.length > 0 };
+    }
+    function previewText(row) {
+      const grades = SUBJECTS.map((field) => row.values[field] || '（空白）').join('／');
+      return `原貼上第 ${row.sourceLineNo} 列：${grades}${row.calculated ? ` → ${GRADE_LEVELS[row.result.finalLevel].zh}` : `（${row.reason}）`}`;
+    }
+    function renderPreview(plan) {
+      const target = byId('preview');
+      target.hidden = false;
+      const summary = byId('previewSummary');
+      summary.replaceChildren();
+      const sum = state.classes.reduce((total, item) => total + Math.max(0, item.size), 0);
+      const paragraph = document.createElement('p');
+      paragraph.textContent = `${plan.headerSkipped ? '已略過首列表頭。' : '沒有略過表頭。'} 本次資料列 ${plan.rows.length} 列；目前班別設定合計 ${sum} 人。`;
+      summary.append(paragraph);
+      const difference = plan.rows.length - plan.available;
+      if (difference !== 0) {
+        const warning = document.createElement('div');
+        warning.className = 'warning';
+        warning.textContent = difference > 0
+          ? `明確警告：本次列數比可用班額多 ${difference} 列；仍可套用，超出部分會續編在最後一班。`
+          : `明確警告：本次列數比可用班額少 ${Math.abs(difference)} 列；仍可套用。`;
+        summary.append(warning);
+      } else {
+        const note = document.createElement('p');
+        note.className = 'status good';
+        note.textContent = '本次列數與可用班額相同。';
+        summary.append(note);
+      }
+      const samples = byId('classSamples');
+      samples.replaceChildren();
+      for (const classItem of state.classes) {
+        const rows = plan.rows.filter((row) => row.classId === classItem.id);
+        const card = document.createElement('div');
+        card.className = 'preview-item';
+        const title = document.createElement('strong');
+        title.textContent = `${classItem.name}（${rows.length} 列）`;
+        card.append(title);
+        const body = document.createElement('span');
+        body.textContent = rows.length ? `首：${previewText(rows[0])}；尾：${previewText(rows[rows.length - 1])}` : '沒有分配到資料列。';
+        card.append(body);
+        samples.append(card);
+      }
+      const problemList = byId('problemRows');
+      problemList.replaceChildren();
+      const problems = plan.rows.filter((row) => !row.calculated);
+      if (!problems.length) {
+        const item = document.createElement('li');
+        item.textContent = '沒有問題列。';
+        problemList.append(item);
+      } else {
+        for (const row of problems) {
+          const item = document.createElement('li');
+          item.textContent = `原貼上第 ${row.sourceLineNo} 列：${row.reason}`;
+          problemList.append(item);
+        }
+      }
+    }
+    function renderMappings() {
+      const container = byId('columnMappings');
+      container.replaceChildren();
+      byId('columnMode').disabled = state.rows.length > 0;
+      byId('pasteHint').textContent = state.mode === '5'
+        ? '五欄格式：原操行、班主任、中文、英文、數學；可按上方設定更改欄位。'
+        : '四欄格式：班主任、中文、英文、數學；可按上方設定更改欄位。';
+      const fieldOptions = state.mode === '5' ? FIELDS : FIELDS.filter((item) => item.id !== 'orig');
+      for (let index = 0; index < fieldCount(); index += 1) {
+        const wrap = document.createElement('div');
+        const label = document.createElement('label');
+        label.textContent = `第 ${index + 1} 欄對應`;
+        label.htmlFor = `mapping-${index}`;
+        const select = document.createElement('select');
+        select.id = `mapping-${index}`;
+        select.dataset.mappingIndex = String(index);
+        select.disabled = state.rows.length > 0;
+        for (const field of fieldOptions) {
+          const option = document.createElement('option');
+          option.value = field.id;
+          option.textContent = field.label;
+          select.append(option);
+        }
+        select.value = state.mapping[index] || fieldOptions[index % fieldOptions.length].id;
+        select.addEventListener('change', () => {
+          invalidatePendingImport();
+          state.mapping[index] = select.value;
+          byId('importStatus').textContent = mappingError();
+        });
+        wrap.append(label, select);
+        container.append(wrap);
+      }
+    }
+    function renderClasses() {
+      const list = byId('classList');
+      list.replaceChildren();
+      state.classes.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = 'class-row';
+        const name = document.createElement('input');
+        name.type = 'text'; name.maxLength = 40; name.value = item.name;
+        name.setAttribute('aria-label', `第 ${index + 1} 班名稱`);
+        name.id = `class-name-${index}`;
+        name.addEventListener('change', () => { invalidatePendingImport(); item.name = name.value.trim() || `班別${index + 1}`; renderAll(); });
+        const size = document.createElement('input');
+        size.type = 'number'; size.min = '0'; size.step = '1'; size.value = String(Math.max(0, item.size));
+        size.setAttribute('aria-label', `${item.name}學生人數`);
+        size.id = `class-count-${index}`;
+        size.addEventListener('change', () => { invalidatePendingImport(); item.size = Math.max(0, Math.floor(Number(size.value) || 0)); renderAll(); });
+        const actions = document.createElement('div'); actions.className = 'class-actions';
+        const up = document.createElement('button'); up.type = 'button'; up.className = 'secondary small'; up.textContent = '↑'; up.setAttribute('aria-label', `將${item.name}上移`); up.disabled = index === 0;
+        up.addEventListener('click', () => { invalidatePendingImport(); [state.classes[index - 1], state.classes[index]] = [state.classes[index], state.classes[index - 1]]; renderAll(); });
+        const down = document.createElement('button'); down.type = 'button'; down.className = 'secondary small'; down.textContent = '↓'; down.setAttribute('aria-label', `將${item.name}下移`); down.disabled = index === state.classes.length - 1;
+        down.addEventListener('click', () => { invalidatePendingImport(); [state.classes[index + 1], state.classes[index]] = [state.classes[index], state.classes[index + 1]]; renderAll(); });
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'danger small'; remove.textContent = '刪除'; remove.setAttribute('aria-label', `刪除${item.name}`);
+        remove.addEventListener('click', () => {
+          if (!window.confirm(`確認刪除班別「${item.name}」？該班現有列會保留並轉到第一班。`)) return;
+          invalidatePendingImport();
+          state.classes.splice(index, 1);
+          if (!state.classes.length) state.classes.push({ id: uniqueClassId(), name: '1A', size: 0 });
+          const fallback = state.classes[0].id;
+          const moved = state.rows.filter((dataRow) => dataRow.classId === item.id);
+          moved.forEach((dataRow) => { dataRow.classId = fallback; });
+          renumberClassNos();
+          state.activeClassId = 'all'; renderAll();
+        });
+        actions.append(up, down, remove);
+        row.append(name, size, actions);
+        list.append(row);
+      });
+    }
+    function displayValue(row, field) { return row.values[field] ?? ''; }
+    function updateRowFromEditor(row, tr) {
+      invalidatePendingImport();
+      for (const input of tr.querySelectorAll('[data-edit-field]')) row.values[input.dataset.editField] = input.value;
+      row.rawCells = row.mapping.map((field) => row.values[field] ?? '');
+      evaluateRow(row, true);
+      renderAll();
+      byId('outputStatus').textContent = '已更新該列。';
+      byId('outputStatus').className = 'status good';
+    }
+    function renderTabs() {
+      const tabs = byId('classTabs');
+      tabs.replaceChildren();
+      const counts = currentCounts();
+      const choices = [{ id: 'all', name: '全部' }, ...state.classes];
+      for (const item of choices) {
+        const button = document.createElement('button');
+        button.type = 'button'; button.className = 'tab';
+        button.setAttribute('aria-pressed', String(state.activeClassId === item.id));
+        const count = item.id === 'all' ? state.rows.length : counts.get(item.id) || 0;
+        button.textContent = `${item.name}（${count}）`;
+        button.addEventListener('click', () => { state.activeClassId = item.id; renderTable(); renderTabs(); });
+        tabs.append(button);
+      }
+    }
+    function renderTable() {
+      const container = byId('recordsTable');
+      container.replaceChildren();
+      const visibleRows = state.activeClassId === 'all' ? state.rows : state.rows.filter((row) => row.classId === state.activeClassId);
+      if (!visibleRows.length) {
+        const empty = document.createElement('div'); empty.className = 'empty-state'; empty.textContent = '此頁籤目前沒有資料列。'; container.append(empty); return;
+      }
+      const table = document.createElement('table');
+      const head = document.createElement('thead'); const headerRow = document.createElement('tr');
+      for (const title of ['班別', '班號', ...FIELDS.filter((field) => state.mode === '5' || field.id !== 'orig').map((field) => field.label), '自身最低等級', '相對平均分', '捨入方向', '最終操行', '比對狀態', '資料狀態', '操作']) {
+        const th = document.createElement('th'); th.textContent = title; headerRow.append(th);
+      }
+      head.append(headerRow); table.append(head);
+      const body = document.createElement('tbody');
+      for (const row of visibleRows) {
+        const tr = document.createElement('tr'); tr.dataset.rowId = row.id;
+        const className = state.classes.find((item) => item.id === row.classId)?.name || '未分班';
+        const classCell = document.createElement('td'); classCell.textContent = className; tr.append(classCell);
+        const noCell = document.createElement('td'); noCell.textContent = row.classNo == null ? '' : String(row.classNo); noCell.dataset.classNo = String(row.classNo ?? ''); tr.append(noCell);
+        const visibleFields = FIELDS.filter((field) => state.mode === '5' || field.id !== 'orig');
+        for (const field of visibleFields) {
+          const cell = document.createElement('td');
+          const input = document.createElement('input'); input.type = 'text'; input.value = displayValue(row, field.id); input.dataset.editField = field.id;
+          input.setAttribute('aria-label', `${className}第${row.classNo}號${field.label}`); cell.append(input); tr.append(cell);
+        }
+        const lowestCell = document.createElement('td');
+        lowestCell.textContent = row.calculated ? `${row.result.minGrade.zh}（${row.result.minGrade.en}）` : '';
+        tr.append(lowestCell);
+        const averageCell = document.createElement('td');
+        averageCell.textContent = row.calculated ? formatNumberClean(row.result.avgRelScore) : '';
+        if (row.calculated) averageCell.dataset.avgScore = formatNumberClean(row.result.avgRelScore);
+        tr.append(averageCell);
+        const directionCell = document.createElement('td');
+        directionCell.textContent = row.calculated ? (row.result.roundDirection === 'up' ? '上捨' : row.result.roundDirection === 'down' ? '下捨' : '無須取整') : '';
+        tr.append(directionCell);
+        const resultCell = document.createElement('td'); resultCell.className = row.calculated ? 'result-cell' : 'invalid-cell';
+        resultCell.textContent = row.calculated ? `${row.result.finalGrade.zh}（${row.result.finalGrade.en}）` : '';
+        if (row.calculated) resultCell.dataset.finalLevel = String(row.result.finalLevel);
+        tr.append(resultCell);
+        const compareCell = document.createElement('td');
+        compareCell.textContent = row.calculated ? (row.result.compareStatus === 'match' ? '一致' : row.result.compareStatus === 'diff' ? '差異' : '無原操行') : '';
+        if (row.calculated) compareCell.dataset.compareStatus = row.result.compareStatus;
+        tr.append(compareCell);
+        const statusCell = document.createElement('td'); statusCell.textContent = row.calculated ? '已計算' : `未能計算：${row.reason}`; tr.append(statusCell);
+        const actionCell = document.createElement('td');
+        const save = document.createElement('button'); save.type = 'button'; save.className = 'secondary small'; save.textContent = '儲存修改'; save.addEventListener('click', () => updateRowFromEditor(row, tr));
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'danger small'; remove.textContent = '刪除'; remove.addEventListener('click', () => {
+          if (!window.confirm(`確認刪除${className}第 ${row.classNo} 號？`)) return;
+          invalidatePendingImport();
+          state.rows = state.rows.filter((item) => item.id !== row.id); renumberClassNos(); renderAll();
+        });
+        actionCell.append(save, document.createTextNode(' '), remove); tr.append(actionCell); body.append(tr);
+      }
+      table.append(body); container.append(table);
+    }
+    function renderSummary() {
+      const counts = currentCounts();
+      const invalid = state.rows.filter((row) => !row.calculated).length;
+      const classSummary = state.classes.map((item) => `${item.name} ${counts.get(item.id) || 0}/${item.size}`).join('、');
+      byId('rowSummary').textContent = state.rows.length
+        ? `共 ${state.rows.length} 列；未能計算 ${invalid} 列。班別列數：${classSummary}${state.fictional ? '（虛構示範）' : ''}`
+        : '目前沒有資料列。';
+      byId('roundSummary').textContent = '無須取整';
+    }
+    function renderAll() { renderMappings(); renderClasses(); renderTabs(); renderTable(); renderSummary(); }
+    function setStatus(message, kind = '') {
+      const element = byId('importStatus'); element.textContent = message; element.className = `status${kind ? ` ${kind}` : ''}`;
+    }
+    function showOutputStatus(message, kind = '') {
+      const element = byId('outputStatus'); element.textContent = message; element.className = `status${kind ? ` ${kind}` : ''}`;
+    }
+    function applyPendingImport() {
+      if (!state.pendingImport) return;
+      if (state.pendingImport.signature !== importStateSignature()) {
+        invalidatePendingImport();
+        return;
+      }
+      state.rows.push(...state.pendingImport.rows);
+      renumberClassNos();
+      state.fictional = false;
+      state.pendingImport = null;
+      byId('preview').hidden = true;
+      byId('cancelPreview').hidden = true;
+      state.activeClassId = 'all';
+      setStatus('已套用匯入列；問題列仍保留，可修改後再計算。', 'good');
+      renderAll();
+    }
+    function safeOutput(value) {
+      const cleaned = String(value ?? '').replace(/[\t\r\n]/g, '');
+      return /^[=+\-@]/.test(cleaned) ? `'${cleaned}` : cleaned;
+    }
+    function outputRows() {
+      const fields = activeFields();
+      const header = ['班別', '班號', ...fields.map((field) => FIELDS.find((item) => item.id === field)?.label || ''), '自身最低等級', '相對平均分', '捨入方向', '最終操行（中文）', '最終操行（英文）', '比對狀態', '資料狀態'];
+      const rows = state.rows.map((row) => {
+        const className = state.classes.find((item) => item.id === row.classId)?.name || '';
+        const values = row.rawCells.length === row.mapping.length
+          ? [...row.rawCells]
+          : fields.map((field) => row.values[field] ?? '');
+        const direction = row.calculated ? (row.result.roundDirection === 'up' ? '上捨' : row.result.roundDirection === 'down' ? '下捨' : '無須取整') : '';
+        const compare = row.calculated ? (row.result.compareStatus === 'match' ? '一致' : row.result.compareStatus === 'diff' ? '差異' : '無原操行') : '';
+        const calculatedFields = row.calculated
+          ? [row.result.minGrade.zh, formatNumberClean(row.result.avgRelScore), direction, row.result.finalGrade.zh, row.result.finalGrade.en, compare, '已計算']
+          : ['', '', '', '', '', '', `未能計算：${row.reason}`];
+        return [className, row.classNo ?? '', ...values, ...calculatedFields].map(safeOutput);
+      });
+      return [header.map(safeOutput), ...rows];
+    }
+    function makeTsv() { return outputRows().map((row) => row.join('\t')).join('\r\n'); }
+    function makeCsv() { return outputRows().map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\r\n'); }
+    async function copyResults() {
+      const value = makeTsv();
+      try {
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') throw new Error('clipboard API unavailable');
+        await navigator.clipboard.writeText(value);
+        showOutputStatus('已複製結果，可貼回 Excel。', 'good');
+      } catch {
+        showOutputStatus('複製失敗：瀏覽器未能存取剪貼簿。請改用「匯出 CSV」。', 'error');
+      }
+    }
+    function saveBlob(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename;
+      document.body.append(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
+    }
+    function dateStamp() {
+      const date = new Date();
+      const pad = (number) => String(number).padStart(2, '0');
+      return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}`;
+    }
+    function resetSample() {
+      if (!window.confirm('確認載入虛構示範資料？目前資料列會被取代。')) return;
+      invalidatePendingImport();
+      state.mode = '5'; state.mapping = ['orig', 'teacher', 'chinese', 'english', 'math'];
+      state.classes = [
+        { id: 'demo-a', name: '2A', size: 5 },
+        { id: 'demo-b', name: '2B', size: 5 },
+        { id: 'demo-c', name: '2C', size: 6 }
+      ];
+      const sample = [
+        ['甲', '乙', '乙-', '乙', '乙+'], ['乙', '乙', '乙', '丙+', '乙'], ['丙+', '丙', '乙-', '丙+', '丙'], ['甲-', '乙+', '甲-', '乙', '乙+'], ['乙-', '丙+', '乙-', '乙', '丙+'],
+        ['乙', '乙-', '乙', '乙+', '乙'], ['丙', '丙+', '丙', '乙-', '丙+'], ['甲', '甲-', '乙+', '甲-', '乙+'], ['乙+', '乙', '乙+', '乙', '丙+'], ['丙+', '乙-', '丙+', '丙', '丙+'],
+        ['乙-', '丙+', '乙', '乙-', '丙+'], ['甲-', '乙+', '甲-', '乙+', '甲-'], ['丙', '丙', '丙+', '丙-', '丙'], ['乙', '乙', '乙-', '乙', '乙+'], ['丙+', '丙', '乙-', '丙+', '乙-'], ['甲', '甲-', '甲-', '乙+', '甲-']
+      ];
+      state.rows = sample.map((cells, index) => {
+        const row = makeRow(cells, index + 1, ['orig', 'teacher', 'chinese', 'english', 'math']);
+        const classIndex = index < 5 ? 0 : index < 10 ? 1 : 2;
+        row.classId = state.classes[classIndex].id;
+        row.classNo = index - (classIndex === 0 ? 0 : classIndex === 1 ? 5 : 10) + 1;
+        return row;
+      });
+      state.fictional = true; state.activeClassId = 'all';
+      byId('pasteInput').value = '';
+      byId('columnMode').value = '5';
+      setStatus('已載入虛構示範資料，沒有使用真實學生資料。', 'good');
+      renderAll();
+    }
+    function clearRows() {
+      if (!window.confirm('確認清空所有資料列？班別及欄位設定會保留。')) return;
+      invalidatePendingImport();
+      state.rows = []; state.fictional = false; state.pendingImport = null;
+      byId('pasteInput').value = ''; byId('preview').hidden = true; byId('cancelPreview').hidden = true;
+      setStatus('資料列已清空。', 'good'); renderAll();
+    }
+    function addEmptyRow() {
+      invalidatePendingImport();
+      const mapping = activeFields();
+      const values = { orig: '', teacher: '', chinese: '', english: '', math: '' };
+      const row = makeRow(mapping.map((field) => values[field] || ''), 0, mapping);
+      row.classId = state.activeClassId !== 'all' ? state.activeClassId : state.classes[0].id;
+      const counts = currentCounts(); row.classNo = (counts.get(row.classId) || 0) + 1;
+      state.rows.push(row); renumberClassNos(); state.fictional = false; state.activeClassId = 'all'; renderAll();
+      const editor = document.querySelector(`[data-row-id="${row.id}"] input`); if (editor) editor.focus();
+    }
+
+    byId('columnMode').addEventListener('change', () => {
+      invalidatePendingImport();
+      state.mode = byId('columnMode').value;
+      state.mapping = state.mode === '5' ? ['orig', 'teacher', 'chinese', 'english', 'math'] : ['teacher', 'chinese', 'english', 'math'];
+      state.pendingImport = null; byId('preview').hidden = true; byId('cancelPreview').hidden = true; renderAll();
+    });
+    byId('previewImport').addEventListener('click', () => {
+      try {
+        state.pendingImport = makeImportPlan(byId('pasteInput').value);
+        state.pendingImport.signature = importStateSignature();
+        renderPreview(state.pendingImport); byId('cancelPreview').hidden = false;
+        setStatus('請檢查列數、分班及問題列；確認後才會套用。');
+      } catch (error) { state.pendingImport = null; byId('preview').hidden = true; setStatus(error.message, 'error'); }
+    });
+    byId('applyImport').addEventListener('click', applyPendingImport);
+    byId('cancelPreview').addEventListener('click', () => { state.pendingImport = null; byId('preview').hidden = true; byId('cancelPreview').hidden = true; setStatus('已返回修改貼上內容。'); });
+    byId('pasteInput').addEventListener('input', invalidatePendingImport);
+    byId('addClass').addEventListener('click', () => { invalidatePendingImport(); state.classes.push({ id: uniqueClassId(), name: `${state.classes.length + 1}A`, size: 0 }); renderAll(); });
+    byId('addRow').addEventListener('click', addEmptyRow);
+    byId('copyResults').addEventListener('click', copyResults);
+    byId('downloadCsv').addEventListener('click', () => saveBlob(`conduct-grade-results-${dateStamp()}.csv`, '\ufeff' + makeCsv(), 'text/csv;charset=utf-8'));
+    byId('downloadBlank').addEventListener('click', () => saveBlob('conduct-grade-average-blank.html', cleanBlankHtml, 'text/html;charset=utf-8'));
+    byId('resetSample').addEventListener('click', resetSample);
+    byId('clearRows').addEventListener('click', clearRows);
+    function recalculateExistingRows() {
+      for (const row of state.rows) evaluateRow(row, row.rawCells.length === row.mapping.length);
+      renderTable(); renderSummary();
+    }
+    byId('stepMode').addEventListener('change', () => { invalidatePendingImport(); recalculateExistingRows(); });
+    byId('customStep').addEventListener('change', () => { invalidatePendingImport(); recalculateExistingRows(); });
+    byId('roundingMode').addEventListener('change', () => { invalidatePendingImport(); recalculateExistingRows(); });
+    renderAll();
+  })();
+  </script>
+</body>
+</html>

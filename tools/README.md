@@ -17,6 +17,7 @@ CloudSAMS server；有外部 API 的工具只會在使用者明確啟動後傳�
 - `thank-teacher-cards`：`beta`，瀏覽器內整理班別名單、OCR 文章、老師修訂稿、收稿張數和感恩卡；支援本機 JSON／CSV 匯入匯出及 Word 預覽／匯出。MiniMax OCR 只在使用者按下按鈕時直接傳送所選影像。
 - `fx-50fh-ii`：`beta`，非官方、多檔案瀏覽器計算機模擬器；只載入本機資源，重要結果應以真機核對。
 - `bgm-auditions`：瀏覽器內試聽七首 MiniMax-Music3 AI 生成的純音樂，可逐首播放及下載；不會上載，也不會更改現有影片。
+- `conduct-grade-average`：離線整理 R-ASR024 操行等級，按設定班別及人數分配班號；貼上的資料只在本機瀏覽器處理。請先閱讀 `conduct-grade-average/README.md`。
 
 使用者需要自行安裝 Python 及各工具的 `requirements.txt` 依賴。input、output、
 mapping、學生資料及相片不得提交到 Git 或公開服務。使用外部 OCR／LLM 功能前，請閱讀工具內的資料傳送說明並遵守校方規定。
