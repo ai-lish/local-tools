@@ -167,14 +167,6 @@
               <label class="field" id="dictation-first-row-field"><span>舊模式後備每行格數</span><input id="dictation-first-row" type="number" min="1" max="80" value="20"></label>
             </div>
             <p class="rotation-note">答案會移除空白及換行；標點自動識別，不計字。新模式按答案句批改；舊版格位模式保留原有格線及校準。</p>
-            <div class="toolbar-row" id="sentence-mark-toolbar">
-              <div class="mark-modes" role="group" aria-label="默書卷面標記模式">
-                <button class="button mode-mark active" data-mark="wrongCircle" type="button" aria-pressed="true">錯字圈</button>
-                <button class="button mode-mark" data-mark="extraCircle" type="button" aria-pressed="false">多字圈</button>
-                <button class="button mode-mark" data-mark="arrow" type="button" aria-pressed="false">上箭嘴</button>
-              </div>
-              <button class="button" id="undo-dictation" type="button" disabled>撤銷上一步</button>
-            </div>
             <p class="muted" id="dictation-note">在頁面任何位置點擊放置標記；再次點擊同一標記可移除。</p>
             <div class="toolbar-row" id="grid-mark-toolbar" hidden>
               <div class="mark-modes" role="group" aria-label="舊版默書格位標記模式">
@@ -222,10 +214,26 @@
               <button class="button" id="restore-dictation-auto" type="button">還原自動計算</button>
             </div>
           </section>
-          <section id="dictation-answer-review-wrap" class="answer-review-wrap">
-            <h3>答案句（逐字標示）</h3>
-            <p class="muted small">按非標點字循環：正常 → 錯字 → 漏字 → 正常；錯字及漏字均標紅。</p>
-            <div id="dictation-answer-review" class="dictation-answer-review" role="group" aria-label="答案句逐字批改"></div>
+          <section id="dictation-sentence-sticky" class="dictation-sentence-sticky" hidden aria-label="答案句及卷面標記工具列">
+            <div class="dictation-sentence-toolbar-row">
+              <div id="sentence-mark-toolbar" class="toolbar-row">
+                <div class="mark-modes" role="group" aria-label="默書卷面標記模式">
+                  <button class="button mode-mark active" data-mark="wrongCircle" type="button" aria-pressed="true">錯字圈</button>
+                  <button class="button mode-mark" data-mark="extraCircle" type="button" aria-pressed="false">多字圈</button>
+                  <button class="button mode-mark" data-mark="arrow" type="button" aria-pressed="false">上箭嘴</button>
+                </div>
+                <button class="button" id="undo-dictation" type="button" disabled>撤銷上一步</button>
+              </div>
+              <div class="dictation-sticky-score" role="group" aria-label="本頁最終分數及扣字數">
+                <div><span>最終分</span><strong id="dictation-sticky-score">—</strong></div>
+                <div><span>N</span><strong id="dictation-sticky-deduction">—</strong></div>
+              </div>
+            </div>
+            <section id="dictation-answer-review-wrap" class="answer-review-wrap">
+              <h3>答案句（逐字標示）</h3>
+              <p class="muted small">按非標點字循環：正常 → 錯字 → 漏字 → 正常；錯字及漏字均標紅。</p>
+              <div id="dictation-answer-review" class="dictation-answer-review" role="group" aria-label="答案句逐字批改"></div>
+            </section>
           </section>
           <div id="dictation-stage" class="pdf-stage"><p class="empty-state">載入 PDF 後，掃描頁會顯示在這裏。</p></div>
           <div class="dictation-grid-wrap"><h3>本頁格位</h3><div id="dictation-grid" class="dictation-grid"></div></div>

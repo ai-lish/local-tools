@@ -50,6 +50,8 @@
     dictationAnswer: byId("dictation-answer"), firstRow: byId("dictation-first-row"),
     dictationBaseEnabled: byId("dictation-base-enabled"), dictationCalibration: byId("dictation-calibration"),
     firstRowField: byId("dictation-first-row-field"), sentenceToolbar: byId("sentence-mark-toolbar"),
+    sentenceStickyToolbar: byId("dictation-sentence-sticky"), dictationStickyScore: byId("dictation-sticky-score"),
+    dictationStickyDeduction: byId("dictation-sticky-deduction"),
     gridToolbar: byId("grid-mark-toolbar"), dictationGridWrap: document.querySelector(".dictation-grid-wrap"),
     answerReviewWrap: byId("dictation-answer-review-wrap"), answerReview: byId("dictation-answer-review"),
     undoDictation: byId("undo-dictation"), markDictationPerfect: byId("mark-dictation-perfect"),
@@ -595,6 +597,7 @@
   function syncDictationStyleControls() {
     state.dictationStyle = els.dictationStyle.value === "grid" ? "grid" : "sentence";
     var sentence = state.dictationStyle === "sentence";
+    els.sentenceStickyToolbar.hidden = !sentence;
     els.sentenceToolbar.hidden = !sentence;
     els.gridToolbar.hidden = sentence;
     els.answerReviewWrap.hidden = !sentence;
@@ -692,6 +695,8 @@
     els.dictationScore.textContent = result.reviewed ? result.finalScore.toFixed(1) : "—";
     els.dictationAutoScore.textContent = result.reviewed ? result.autoFinalScore.toFixed(1) : "—";
     els.dictationDeduction.textContent = result.reviewed ? String(result.N) : "—";
+    els.dictationStickyScore.textContent = els.dictationScore.textContent;
+    els.dictationStickyDeduction.textContent = els.dictationDeduction.textContent;
     els.dictationPageStatus.textContent = result.reviewed ? "已批改" : "未批改";
     els.dictationPageStatus.dataset.manual = result.manualAdjusted ? "true" : "false";
     els.dictationStudentId.value = result.studentId || "";

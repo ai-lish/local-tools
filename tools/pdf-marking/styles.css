@@ -100,6 +100,18 @@ h3 { font-size: 14px; }
 .rotation-note { margin-top: 8px; color: var(--muted); font-size: 11px; }
 .mark-modes { display: flex; flex-wrap: wrap; gap: 6px; }
 .mode-mark.active { color: #fff; border-color: var(--navy); background: var(--navy); }
+.button.mode-mark.active, .button.mode-mark.active:hover:not(:disabled) { color: #fff; border-color: var(--navy); background: var(--navy); }
+.button.mode-mark.active:focus-visible { outline: 3px solid #6aa6d4; outline-offset: 2px; }
+.dictation-sentence-sticky { position: sticky; top: 8px; z-index: 20; width: 100%; max-width: 100%; max-height: 35vh; margin: 4px 0 12px; padding: 10px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid #c8d5df; border-radius: 11px; background: #fff; box-shadow: 0 5px 16px rgba(16, 42, 67, .16); }
+.dictation-sentence-toolbar-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.dictation-sentence-sticky #sentence-mark-toolbar { flex: 1 1 400px; align-items: center; gap: 6px; min-width: 0; margin-top: 0; }
+.dictation-sentence-sticky #sentence-mark-toolbar .mark-modes { flex: 0 1 auto; }
+.dictation-sticky-score { display: flex; flex: 0 0 auto; gap: 6px; }
+.dictation-sticky-score > div { min-width: 48px; padding: 3px 8px; border: 1px solid #d4e2ec; border-radius: 8px; background: var(--blue-soft); }
+.dictation-sticky-score span, .dictation-sticky-score strong { display: block; }
+.dictation-sticky-score span { color: var(--muted); font-size: 10px; line-height: 1.3; }
+.dictation-sticky-score strong { color: var(--navy); font-size: 15px; line-height: 1.3; }
+.dictation-sentence-sticky .answer-review-wrap { margin: 8px 0 0; padding: 8px; }
 .dictation-stage { margin-top: 4px; border: 1px solid var(--line); border-radius: 10px; background: #eef2f5; }
 .dictation-hit { position: absolute; z-index: 2; padding: 0; transform: translate(-50%, -50%); border: 1px dashed rgba(35, 103, 168, .13); border-radius: 4px; color: transparent; background: rgba(255,255,255,0); }
 .dictation-hit:hover { border-color: rgba(35, 103, 168, .8); background: rgba(35, 103, 168, .08); }
@@ -241,4 +253,13 @@ footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: cent
   .identity-grid { flex-direction: column; }
   .review-items { grid-template-columns: 1fr; }
   .file-status { flex-wrap: wrap; }
+}
+@media (max-width: 480px) {
+  .dictation-sentence-sticky { top: 5px; padding: 7px; border-radius: 9px; }
+  .dictation-sentence-sticky .toolbar-row { gap: 5px; }
+  .dictation-sentence-sticky #sentence-mark-toolbar { flex-basis: 100%; }
+  .dictation-sentence-sticky #sentence-mark-toolbar .button { min-height: 34px; padding: 6px 8px; font-size: 12px; }
+  .dictation-sentence-sticky .mark-modes { gap: 4px; }
+  .dictation-sentence-sticky .answer-review-wrap { padding: 7px; }
+  .dictation-sentence-sticky .dictation-answer-char { min-width: 26px; min-height: 32px; padding: 2px 4px; font-size: 18px; }
 }
