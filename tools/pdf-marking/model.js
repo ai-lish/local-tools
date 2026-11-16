@@ -1,7 +1,7 @@
 (function (root) {
   "use strict";
 
-  var PUNCTUATION = "，、。";
+  var PUNCTUATION = "，、。？！；：「」『』（）《》〈〉…—·,.?!;:'\"()";
 
   function dictationSegmentAnswer(segment, segmentNumber, firstAnswer) {
     if (segment && segment.answer != null) return String(segment.answer);
@@ -74,16 +74,361 @@
   }
 
   function autoPunctuation(answer) {
-    var text = String(answer || "");
+    var text = Array.from(String(answer || ""));
     var indexes = [];
     for (var i = 0; i < text.length; i += 1) {
-      if (PUNCTUATION.indexOf(text.charAt(i)) !== -1) indexes.push(i);
+      if (PUNCTUATION.indexOf(text[i]) !== -1) indexes.push(i);
     }
     return indexes;
   }
 
+  function normalizeDictationAnswer(answer) {
+    return Array.from(String(answer == null ? "" : answer).trim().replace(/\s/g, "")).join("");
+  }
+
+  function dictationCharacters(answer) {
+    return Array.from(normalizeDictationAnswer(answer));
+  }
+
+  function dictationWordCount(answer) {
+    return dictationCharacters(answer).filter(function (character) {
+      return PUNCTUATION.indexOf(character) < 0;
+    }).length;
+  }
+
+  function blankDictationV4Page(answer) {
+    return {
+      studentId: "", reviewStatus: "pending", surfaceMarks: [],
+      answerStates: dictationCharacters(answer).map(function () { return "normal"; }),
+      baseOverride: null,
+      overrides: { wrong: null, extra: null, miss: null, finalScore: null }
+    };
+  }
+
+  function toggleAnswerState(page, index, answer) {
+    var next = cloneDictationV4Page(page, answer);
+    var characters = dictationCharacters(answer);
+    if (!Number.isInteger(index) || index < 0 || index >= characters.length || PUNCTUATION.indexOf(characters[index]) >= 0) {
+      return { page: next, changed: false };
+    }
+    var cycle = ["normal", "wrong", "miss"];
+    var current = cycle.indexOf(next.answerStates[index]);
+    next.answerStates[index] = cycle[(current + 1) % cycle.length];
+    next.reviewStatus = "reviewed";
+    return { page: next, changed: true };
+  }
+
+  function cloneDictationV4Page(page, answer) {
+    var blank = blankDictationV4Page(answer);
+    if (!page || typeof page !== "object") return blank;
+    var characters = dictationCharacters(answer);
+    var states = Array.isArray(page.answerStates) ? page.answerStates : [];
+    blank.studentId = String(page.studentId == null ? "" : page.studentId).slice(0, 24);
+    blank.reviewStatus = page.reviewStatus === "reviewed" ? "reviewed" : "pending";
+    blank.surfaceMarks = Array.isArray(page.surfaceMarks) ? page.surfaceMarks.map(function (mark) {
+      return { type: mark && mark.type, x: mark && mark.x, y: mark && mark.y };
+    }) : [];
+    blank.answerStates = characters.map(function (_, index) {
+      return ["normal", "wrong", "miss"].indexOf(states[index]) >= 0 ? states[index] : "normal";
+    });
+    blank.baseOverride = typeof page.baseOverride === "boolean" ? page.baseOverride : null;
+    var overrides = page.overrides || {};
+    ["wrong", "extra", "miss", "finalScore"].forEach(function (key) {
+      blank.overrides[key] = overrides[key] == null ? null : overrides[key];
+    });
+    return blank;
+  }
+
+  function toggleSurfaceMark(page, type, x, y, answer) {
+    var next = cloneDictationV4Page(page, answer);
+    var allowed = ["wrongCircle", "extraCircle", "arrow"];
+    var px = Number(x); var py = Number(y);
+    if (allowed.indexOf(type) < 0 || !Number.isFinite(px) || !Number.isFinite(py) || px < 0 || px > 1 || py < 0 || py > 1) {
+      return { page: next, changed: false };
+    }
+    var at = next.surfaceMarks.findIndex(function (mark) {
+      return mark.type === type && Math.hypot(mark.x - px, mark.y - py) <= 0.025;
+    });
+    if (at >= 0) next.surfaceMarks.splice(at, 1);
+    else next.surfaceMarks.push({ type: type, x: px, y: py });
+    next.reviewStatus = "reviewed";
+    return { page: next, changed: true };
+  }
+
+  function scoreDictationCounts(counts, answerCount, baseEnabled) {
+    var wrong = Math.max(0, Number(counts && counts.wrong) || 0);
+    var extra = Math.max(0, Number(counts && counts.extra) || 0);
+    var miss = Math.max(0, Number(counts && counts.miss) || 0);
+    var N = wrong + Math.max(extra, miss);
+    var rawScore = roundToHalf(Math.max(0, 10 - 0.5 * N));
+    var correctWords = Number(answerCount) - wrong - miss;
+    var baseScore = correctWords >= 10 ? 3 : correctWords >= 5 ? 2 : 0;
+    return { wrong: wrong, extra: extra, miss: miss, N: N, correctWords: correctWords,
+      baseScore: baseScore, rawScore: rawScore,
+      finalScore: baseEnabled ? Math.max(baseScore, rawScore) : rawScore };
+  }
+
+  function dictationV4Record(page, answer, defaultBaseEnabled, legacyStats) {
+    var characters = dictationCharacters(answer);
+    var wordCount = characters.filter(function (character) { return PUNCTUATION.indexOf(character) < 0; }).length;
+    var source = cloneDictationV4Page(page, answer);
+    var autoCounts = legacyStats ? {
+      wrong: legacyStats.wrong || 0, extra: legacyStats.extra || 0,
+      miss: legacyStats.miss || 0
+    } : {
+      wrong: source.answerStates.filter(function (status) { return status === "wrong"; }).length,
+      extra: source.surfaceMarks.filter(function (mark) { return mark.type === "extraCircle"; }).length,
+      miss: source.answerStates.filter(function (status) { return status === "miss"; }).length
+    };
+    var baseEnabled = source.baseOverride == null ? Boolean(defaultBaseEnabled) : source.baseOverride;
+    var automatic = scoreDictationCounts(autoCounts, wordCount, baseEnabled);
+    if (legacyStats && Number.isFinite(legacyStats.legacyN)) {
+      automatic.N = legacyStats.legacyN;
+      automatic.rawScore = roundToHalf(Math.max(0, 10 - 0.5 * legacyStats.legacyN));
+      automatic.finalScore = baseEnabled ? Math.max(automatic.baseScore, automatic.rawScore) : automatic.rawScore;
+    }
+    var overrides = source.overrides;
+    var counts = {
+      wrong: overrides.wrong == null ? autoCounts.wrong : overrides.wrong,
+      extra: overrides.extra == null ? autoCounts.extra : overrides.extra,
+      miss: overrides.miss == null ? autoCounts.miss : overrides.miss
+    };
+    var countAdjusted = overrides.wrong != null || overrides.extra != null || overrides.miss != null;
+    var effective = scoreDictationCounts(counts, wordCount, baseEnabled);
+    if (legacyStats && !countAdjusted && Number.isFinite(legacyStats.legacyN)) {
+      effective.N = legacyStats.legacyN;
+      effective.rawScore = automatic.rawScore;
+      effective.finalScore = automatic.finalScore;
+    }
+    var finalScore = overrides.finalScore == null ? effective.finalScore : overrides.finalScore;
+    var manualAdjusted = overrides.wrong != null || overrides.extra != null || overrides.miss != null ||
+      overrides.finalScore != null || source.baseOverride != null;
+    return {
+      page: source, reviewed: source.reviewStatus === "reviewed", baseEnabled: baseEnabled,
+      studentId: source.studentId,
+      autoCounts: autoCounts, counts: counts, N: effective.N, correctWords: effective.correctWords,
+      baseScore: effective.baseScore, rawScore: effective.rawScore,
+      autoFinalScore: automatic.finalScore, finalScore: finalScore,
+      manualAdjusted: manualAdjusted
+    };
+  }
+
+  function sanitizeDictationV4Pages(pages, pageCount, answer) {
+    var clean = {};
+    var dropped = 0;
+    var maximumPages = Math.max(0, Math.floor(Number(pageCount) || 0));
+    Object.keys(pages || {}).forEach(function (key) {
+      var pageNumber = Number(key);
+      if (!/^\d+$/.test(key) || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > maximumPages) {
+        dropped += 1; return;
+      }
+      var source = pages[key] || {};
+      Object.keys(source).forEach(function (name) {
+        if (["studentId", "reviewStatus", "surfaceMarks", "answerStates", "baseOverride", "overrides"].indexOf(name) < 0) dropped += 1;
+      });
+      var target = blankDictationV4Page(answer);
+      target.studentId = String(source.studentId == null ? "" : source.studentId).slice(0, 24);
+      if (source.reviewStatus === "reviewed" || source.reviewStatus === "pending") target.reviewStatus = source.reviewStatus;
+      else if (source.reviewStatus != null) dropped += 1;
+      if (source.baseOverride == null || typeof source.baseOverride === "boolean") target.baseOverride = source.baseOverride;
+      else dropped += 1;
+      var chars = dictationCharacters(answer);
+      if (Array.isArray(source.answerStates)) {
+        if (source.answerStates.length > chars.length) {
+          dropped += source.answerStates.slice(chars.length).filter(function (status) {
+            return status != null && status !== "normal";
+          }).length;
+        }
+        chars.forEach(function (character, index) {
+          var status = source.answerStates[index];
+          if (PUNCTUATION.indexOf(character) >= 0) {
+            if (status != null && status !== "normal") dropped += 1;
+            target.answerStates[index] = "normal";
+          } else if (status == null || status === "normal" || status === "wrong" || status === "miss") {
+            target.answerStates[index] = status || "normal";
+          } else dropped += 1;
+        });
+      } else if (source.answerStates != null) dropped += 1;
+      if (Array.isArray(source.surfaceMarks)) {
+        var seen = new Set();
+        source.surfaceMarks.forEach(function (mark) {
+          var type = mark && mark.type; var x = Number(mark && mark.x); var y = Number(mark && mark.y);
+          var keySignature = type + ":" + x.toFixed(5) + ":" + y.toFixed(5);
+          if (["wrongCircle", "extraCircle", "arrow"].indexOf(type) < 0 || !Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x > 1 || y < 0 || y > 1 || seen.has(keySignature)) {
+            dropped += 1; return;
+          }
+          seen.add(keySignature); target.surfaceMarks.push({ type: type, x: x, y: y });
+        });
+      } else if (source.surfaceMarks != null) dropped += 1;
+      var overrides = source.overrides;
+      if (overrides && typeof overrides === "object" && !Array.isArray(overrides)) {
+        ["wrong", "extra", "miss"].forEach(function (name) {
+          var value = overrides[name];
+          var maximum = name === "extra" ? 1000 : dictationWordCount(answer);
+          if (value == null) target.overrides[name] = null;
+          else if (Number.isInteger(value) && value >= 0 && value <= maximum) target.overrides[name] = value;
+          else dropped += 1;
+        });
+        var finalScore = overrides.finalScore;
+        if (finalScore == null) target.overrides.finalScore = null;
+        else if (Number.isFinite(finalScore) && finalScore >= 0 && finalScore <= 10 && Number.isInteger(finalScore * 2)) {
+          target.overrides.finalScore = finalScore;
+        } else dropped += 1;
+        Object.keys(overrides).forEach(function (name) {
+          if (["wrong", "extra", "miss", "finalScore"].indexOf(name) < 0) dropped += 1;
+        });
+      } else if (overrides != null) dropped += 1;
+      clean[pageNumber] = target;
+    });
+    return { pages: clean, dropped: dropped };
+  }
+
+  function legacyIndexMap(answer) {
+    var source = String(answer == null ? "" : answer);
+    var byCodeUnit = Array(source.length).fill(-1);
+    var normalized = [];
+    var outputIndex = 0;
+    for (var offset = 0; offset < source.length;) {
+      var codePoint = source.codePointAt(offset);
+      var character = String.fromCodePoint(codePoint);
+      var units = codePoint > 0xffff ? 2 : 1;
+      if (!/\s/.test(character)) {
+        byCodeUnit[offset] = outputIndex;
+        normalized.push(character);
+        outputIndex += 1;
+      }
+      offset += units;
+    }
+    return { answer: normalized.join(""), byCodeUnit: byCodeUnit };
+  }
+
+  function migrateLegacyDictationProgress(progress, arrowPositionsBySegment) {
+    var pageCount = Math.max(0, Math.floor(Number(progress && progress.pageCount) || 0));
+    var sourceSegments = {};
+    if (progress.version === 1) {
+      sourceSegments["1"] = { settings: progress.settings || {}, pages: progress.pages || {} };
+      sourceSegments["2"] = { settings: { answer: "", firstRow: 20 }, pages: {} };
+    } else {
+      [1, 2].forEach(function (segmentNumber) {
+        sourceSegments[String(segmentNumber)] = progress.segments && progress.segments[String(segmentNumber)] ||
+          { settings: { answer: "", firstRow: 20 }, pages: {} };
+      });
+    }
+    var segments = {};
+    var dropped = 0;
+    [1, 2].forEach(function (segmentNumber) {
+      var key = String(segmentNumber);
+      var sourceSegment = sourceSegments[key] || {};
+      var settings = sourceSegment.settings || {};
+      var rawAnswer = String(settings.answer == null ? "" : settings.answer);
+      var mappedAnswer = legacyIndexMap(rawAnswer);
+      var answer = mappedAnswer.answer;
+      var punctuation = autoPunctuation(answer);
+      var v4Pages = {};
+      var legacyPages = {};
+      var rawPages = sourceSegment.pages && typeof sourceSegment.pages === "object" ? sourceSegment.pages : {};
+      Object.keys(rawPages).forEach(function (pageKey) {
+        var pageNumber = Number(pageKey);
+        if (!/^\d+$/.test(pageKey) || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > pageCount) dropped += 1;
+      });
+      for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+        var sourcePage = rawPages[String(pageNumber)] || rawPages[pageNumber] || {};
+        var next = blankDictationV4Page(answer);
+        next.studentId = String(sourcePage.studentId == null ? "" : sourcePage.studentId).slice(0, 24);
+        var converted = { circles: [], miss: [], arrows: [], arrowSourceIndexes: {} };
+        var seen = { circles: new Set(), miss: new Set(), arrows: new Set() };
+        ["circles", "miss", "arrows"].forEach(function (name) {
+          var values = sourcePage[name];
+          if (values == null) return;
+          if (!Array.isArray(values)) { dropped += 1; return; }
+          values.forEach(function (oldIndex) {
+            if (!Number.isInteger(oldIndex) || oldIndex < 0 || oldIndex >= rawAnswer.length) { dropped += 1; return; }
+            var newIndex = mappedAnswer.byCodeUnit[oldIndex];
+            if (newIndex == null || newIndex < 0 || name !== "arrows" && PUNCTUATION.indexOf(Array.from(answer)[newIndex]) >= 0) {
+              dropped += 1; return;
+            }
+            if (seen[name].has(newIndex)) { dropped += 1; return; }
+            seen[name].add(newIndex); converted[name].push(newIndex);
+            if (name === "arrows") converted.arrowSourceIndexes[newIndex] = oldIndex;
+          });
+        });
+        converted.circles.forEach(function (index) { next.answerStates[index] = "wrong"; });
+        converted.miss.forEach(function (index) {
+          if (next.answerStates[index] === "wrong") dropped += 1;
+          next.answerStates[index] = "miss";
+        });
+        var positionMap = arrowPositionsBySegment && arrowPositionsBySegment[key] && arrowPositionsBySegment[key][pageNumber] || {};
+        converted.arrows.forEach(function (index) {
+          var point = positionMap[converted.arrowSourceIndexes[index]];
+          if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y) || point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1) {
+            dropped += 1; return;
+          }
+          next.surfaceMarks.push({ type: "arrow", x: point.x, y: point.y });
+        });
+        next.reviewStatus = converted.circles.length || converted.miss.length || next.surfaceMarks.length ? "reviewed" : "pending";
+        v4Pages[pageNumber] = next;
+        legacyPages[pageNumber] = {
+          studentId: next.studentId, circles: converted.circles,
+          arrows: converted.arrows, miss: converted.miss,
+          reviewStatus: next.reviewStatus,
+          baseOverride: null, overrides: { wrong: null, extra: null, miss: null, finalScore: null }
+        };
+      }
+      var calibration = settings.calibration || {};
+      segments[key] = {
+        settings: {
+          answer: answer,
+          firstRow: Math.max(1, Math.min(80, Number(settings.firstRow) || 20)),
+          calibration: { dx: Number(calibration.dx) || 0, dy: Number(calibration.dy) || 0,
+            scale: Math.max(0.7, Math.min(1.4, Number(calibration.scale) || 1)) }
+        },
+        pages: v4Pages, legacyPages: legacyPages
+      };
+    });
+    var selected = Number(progress.selectedSegment || progress["段落"] || 1) === 2 ? 2 : 1;
+    return {
+      value: {
+        version: 4, mode: "dictation", templateId: progress.templateId || "builtin:dictation-2seg",
+        pdfFingerprint: progress.pdfFingerprint, pageCount: pageCount,
+        dictationMode: "sentence", baseEnabled: false, selectedSegment: selected,
+        segments: segments, settings: segments[String(selected)].settings,
+        pages: segments[String(selected)].pages
+      },
+      dropped: dropped,
+      migrated: true
+    };
+  }
+
+  function safeCsvValue(value) {
+    var text = String(value == null ? "" : value).replace(/[\t\r\n]/g, " ");
+    return /^[=+\-@]/.test(text) ? "'" + text : text;
+  }
+
+  function buildDictationCsv(records, pageCount, segmentNumber) {
+    var rows = [["頁碼", "段落", "學號", "狀態", "錯字", "多字", "漏字", "N", "正確字數", "底分開關", "底分", "原始分", "自動最終分", "最終分", "人手調整"]];
+    for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      var record = records[pageNumber] || records[String(pageNumber)];
+      if (!record) {
+        rows.push([pageNumber, segmentNumber, "", "未批改", 0, 0, 0, 0, "", "否", "", "", "", "", "否"]);
+        continue;
+      }
+      var isReviewed = Boolean(record.reviewed);
+      rows.push([
+        pageNumber, segmentNumber, safeCsvValue(record.studentId), isReviewed ? "已批改" : "未批改",
+        record.counts.wrong, record.counts.extra, record.counts.miss, record.N,
+        record.correctWords, record.baseEnabled ? "是" : "否", isReviewed ? (record.baseEnabled ? record.baseScore : 0) : "",
+        isReviewed ? record.rawScore.toFixed(1) : "", isReviewed ? record.autoFinalScore.toFixed(1) : "",
+        isReviewed ? record.finalScore.toFixed(1) : "", record.manualAdjusted ? "是" : "否"
+      ]);
+    }
+    return "\ufeff" + rows.map(function (row) {
+      return row.map(function (value) { return csvQuote(safeCsvValue(value)); }).join(",");
+    }).join("\r\n");
+  }
+
   function blankDictationPage() {
-    return { studentId: "", circles: [], arrows: [], miss: [] };
+    return { studentId: "", circles: [], arrows: [], miss: [], reviewStatus: "pending",
+      baseOverride: null, overrides: { wrong: null, extra: null, miss: null, finalScore: null } };
   }
 
   function cloneDictationPage(page) {
@@ -91,7 +436,10 @@
       studentId: page && page.studentId ? String(page.studentId) : "",
       circles: (page && page.circles ? page.circles : []).slice(),
       arrows: (page && page.arrows ? page.arrows : []).slice(),
-      miss: (page && page.miss ? page.miss : []).slice()
+      miss: (page && page.miss ? page.miss : []).slice(),
+      reviewStatus: page && page.reviewStatus === "reviewed" ? "reviewed" : "pending",
+      baseOverride: page && typeof page.baseOverride === "boolean" ? page.baseOverride : null,
+      overrides: Object.assign({ wrong: null, extra: null, miss: null, finalScore: null }, page && page.overrides || {})
     };
   }
 
@@ -143,6 +491,52 @@
       }
     });
     return { pages: clean, droppedIndexes: droppedIndexes };
+  }
+
+  function sanitizeLegacyDictationPages(pages, pageCount, answerLength, punctuation) {
+    var clean = {};
+    var dropped = 0;
+    Object.keys(pages || {}).forEach(function (key) {
+      var pageNumber = Number(key);
+      if (!/^\d+$/.test(key) || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > pageCount) {
+        dropped += 1; return;
+      }
+      var source = pages[key] && typeof pages[key] === "object" ? pages[key] : {};
+      Object.keys(source).forEach(function (name) {
+        if (["studentId", "circles", "arrows", "miss", "reviewStatus", "baseOverride", "overrides"].indexOf(name) < 0) dropped += 1;
+      });
+      var normalized = dictationRecord(source, answerLength, punctuation);
+      if (!normalized) { dropped += 1; clean[pageNumber] = blankDictationPage(); return; }
+      dropped += normalized.droppedIndexes;
+      var target = blankDictationPage();
+      target.studentId = normalized.studentId;
+      target.circles = normalized.circles; target.arrows = normalized.arrows; target.miss = normalized.miss;
+      if (source.reviewStatus == null || source.reviewStatus === "pending" || source.reviewStatus === "reviewed") {
+        target.reviewStatus = source.reviewStatus || "pending";
+      } else dropped += 1;
+      if (source.baseOverride == null || typeof source.baseOverride === "boolean") target.baseOverride = source.baseOverride;
+      else dropped += 1;
+      var overrides = source.overrides;
+      if (overrides && typeof overrides === "object" && !Array.isArray(overrides)) {
+        ["wrong", "extra", "miss"].forEach(function (name) {
+          var value = overrides[name];
+          var maximum = name === "extra" ? 1000 : Math.max(0, answerLength - new Set(punctuation || []).size);
+          if (value == null) target.overrides[name] = null;
+          else if (Number.isInteger(value) && value >= 0 && value <= maximum) target.overrides[name] = value;
+          else dropped += 1;
+        });
+        var finalScore = overrides.finalScore;
+        if (finalScore == null) target.overrides.finalScore = null;
+        else if (Number.isFinite(finalScore) && finalScore >= 0 && finalScore <= 10 && Number.isInteger(finalScore * 2)) {
+          target.overrides.finalScore = finalScore;
+        } else dropped += 1;
+        Object.keys(overrides).forEach(function (name) {
+          if (["wrong", "extra", "miss", "finalScore"].indexOf(name) < 0) dropped += 1;
+        });
+      } else if (overrides != null) dropped += 1;
+      clean[pageNumber] = target;
+    });
+    return { pages: clean, dropped: dropped };
   }
 
   function choiceAnswersForSettings(page, type, count) {
@@ -319,6 +713,7 @@
     if (at >= 0) list.splice(at, 1);
     else list.push(index);
     next[key] = list.sort(function (a, b) { return a - b; });
+    next.reviewStatus = "reviewed";
     return { page: next, blocked: false };
   }
 
@@ -326,19 +721,23 @@
     if (!progress || typeof progress !== "object" || Array.isArray(progress)) {
       return { ok: false, message: "進度檔格式不正確。" };
     }
-    if (![1, 2, 3].includes(progress.version) || (progress.mode !== "choice" && progress.mode !== "dictation") ||
+    if (![1, 2, 3, 4].includes(progress.version) || (progress.mode !== "choice" && progress.mode !== "dictation") ||
+        (progress.version === 4 && progress.mode !== "dictation") ||
         (progress.version === 2 && progress.mode !== "dictation")) {
       return { ok: false, message: "進度檔版本或批改模式不支援。" };
     }
-    if (progress.version === 3 && (typeof progress.templateId !== "string" || !/^(builtin|custom):[a-z0-9][a-z0-9._-]{0,60}$/i.test(progress.templateId))) {
+    if ((progress.version === 3 || progress.version === 4) && (typeof progress.templateId !== "string" || !/^(builtin|custom):[a-z0-9][a-z0-9._-]{0,60}$/i.test(progress.templateId))) {
       return { ok: false, message: "進度檔缺少有效的範本 ID。" };
     }
     if (!progress.pages || typeof progress.pages !== "object" || Array.isArray(progress.pages)) {
       return { ok: false, message: "進度檔缺少頁面資料。" };
     }
-    if ((progress.version === 2 || progress.version === 3 && progress.mode === "dictation") && (!progress.segments || typeof progress.segments !== "object" ||
+    if ((progress.version === 2 || progress.version === 3 && progress.mode === "dictation" || progress.version === 4 && progress.mode === "dictation") && (!progress.segments || typeof progress.segments !== "object" ||
         (Number(progress.selectedSegment || progress["段落"]) !== 1 && Number(progress.selectedSegment || progress["段落"]) !== 2))) {
       return { ok: false, message: "進度檔缺少默書段落資料。" };
+    }
+    if (progress.version === 4 && progress.mode === "dictation" && ["sentence", "grid"].indexOf(progress.dictationMode) < 0) {
+      return { ok: false, message: "進度檔的默書模式不正確。" };
     }
     return { ok: true, value: progress };
   }
@@ -354,10 +753,23 @@
     dictationScoreFromCount: dictationScoreFromCount,
     deductionCount: deductionCount,
     autoPunctuation: autoPunctuation,
+    normalizeDictationAnswer: normalizeDictationAnswer,
+    dictationCharacters: dictationCharacters,
+    dictationWordCount: dictationWordCount,
     blankDictationPage: blankDictationPage,
     cloneDictationPage: cloneDictationPage,
     dictationRecord: dictationRecord,
     sanitizeDictationPages: sanitizeDictationPages,
+    sanitizeLegacyDictationPages: sanitizeLegacyDictationPages,
+    blankDictationV4Page: blankDictationV4Page,
+    cloneDictationV4Page: cloneDictationV4Page,
+    toggleAnswerState: toggleAnswerState,
+    toggleSurfaceMark: toggleSurfaceMark,
+    scoreDictationCounts: scoreDictationCounts,
+    dictationV4Record: dictationV4Record,
+    sanitizeDictationV4Pages: sanitizeDictationV4Pages,
+    migrateLegacyDictationProgress: migrateLegacyDictationProgress,
+    buildDictationCsv: buildDictationCsv,
     toggleDictationMark: toggleDictationMark,
     choiceAnswersForSettings: choiceAnswersForSettings,
     choiceIdentityConfirmed: choiceIdentityConfirmed,

@@ -186,12 +186,26 @@
     ctx.restore();
   }
 
-  function drawDictationAnnotations(canvas, layout, page, answer, sourceData) {
+  function drawDictationAnnotations(canvas, layout, page, answer, sourceData, scoreValue) {
     var ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (page.reviewStatus !== "reviewed") return;
     var ratioX = canvas.width / layout.pageWidth;
     var ratioY = canvas.height / layout.pageHeight;
     ctx.save(); ctx.strokeStyle = RED; ctx.lineWidth = Math.max(2, ratioX * 1.4);
+    (page.surfaceMarks || []).forEach(function (mark) {
+      var x = mark.x * canvas.width; var y = mark.y * canvas.height;
+      var radius = Math.max(12, Math.min(canvas.width, canvas.height) * 0.018);
+      ctx.beginPath();
+      if (mark.type === "arrow") {
+        ctx.moveTo(x, y); ctx.lineTo(x, y + radius * 0.9);
+        ctx.moveTo(x, y); ctx.lineTo(x - radius * 0.35, y + radius * 0.4);
+        ctx.moveTo(x, y); ctx.lineTo(x + radius * 0.35, y + radius * 0.4);
+      } else {
+        ctx.ellipse(x, y, radius, radius, 0, 0, Math.PI * 2);
+      }
+      ctx.stroke();
+    });
     (page.circles || []).forEach(function (index) {
       var box = layout.cells[index];
       if (!box) return;
@@ -213,36 +227,47 @@
     });
     ctx.restore();
 
-    var score = model.dictationScoreFromCount(model.deductionCount(page.circles, page.miss)).toFixed(1);
-    ctx.fillStyle = RED;
-    var scoreFont = Math.max(14, Math.min(layout.score.h * ratioY * 0.46,
-      layout.score.w * ratioX / Math.max(3, score.length + 0.5)));
-    ctx.font = "700 " + scoreFont + "px sans-serif";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
     var integral = inkIntegral(sourceData);
-    var scoreRect = findLeastInkRect(integral, {
-      x: layout.score.x * ratioX, y: layout.score.y * ratioY,
-      w: layout.score.w * ratioX, h: layout.score.h * ratioY
-    }, ctx.measureText(score).width + 2, scoreFont * 1.18, true);
-    ctx.fillText(score, scoreRect.x + scoreRect.w / 2, scoreRect.y + scoreRect.h / 2);
+    if (page.reviewStatus === "reviewed" && Number.isFinite(scoreValue) && layout.score) {
+      var score = scoreValue.toFixed(1);
+      ctx.fillStyle = RED;
+      var scoreFont = Math.max(14, Math.min(layout.score.h * ratioY * 0.46,
+        layout.score.w * ratioX / Math.max(3, score.length + 0.5)));
+      ctx.font = "700 " + scoreFont + "px sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      var scoreRect = findLeastInkRect(integral, {
+        x: layout.score.x * ratioX, y: layout.score.y * ratioY,
+        w: layout.score.w * ratioX, h: layout.score.h * ratioY
+      }, ctx.measureText(score).width + 2, scoreFont * 1.18, true);
+      ctx.fillText(score, scoreRect.x + scoreRect.w / 2, scoreRect.y + scoreRect.h / 2);
+    }
     var box = layout.correction;
     if (!box || !answer) return;
+    var characters = Array.from(answer);
     var size = Math.max(12, Math.min(box.h * ratioY * 0.62,
-      box.w * ratioX / Math.max(1, answer.length) * 0.92));
+      box.w * ratioX / Math.max(1, characters.length) * 0.92));
     ctx.textAlign = "left"; ctx.textBaseline = "middle";
-    var missed = new Set(page.miss || []);
+    var states = Array.isArray(page.answerStates) ? page.answerStates.slice() : Array(characters.length).fill("normal");
+    (page.circles || []).forEach(function (index) { states[index] = "wrong"; });
+    (page.miss || []).forEach(function (index) { states[index] = "miss"; });
     var baseline = box.baseline ? box.baseline * ratioY : (box.y + box.h * 0.88) * ratioY;
     var correctionRect = findLeastInkRect(integral, {
       x: box.x * ratioX, y: Math.max(box.y * ratioY, baseline - size * 0.82),
       w: box.w * ratioX, h: Math.min(box.h * ratioY, size * 1.1)
-    }, Math.min(box.w * ratioX, size * answer.length), size * 1.05, false);
+    }, Math.min(box.w * ratioX, size * characters.length), size * 1.05, false);
     var cursor = correctionRect.x;
-    for (var i = 0; i < answer.length; i += 1) {
-      var glyph = answer.charAt(i);
-      ctx.fillStyle = missed.has(i) ? "#c40000" : "#161616";
-      ctx.font = (missed.has(i) ? "800 " : "600 ") + size + "px sans-serif";
+    for (var i = 0; i < characters.length; i += 1) {
+      var glyph = characters[i];
+      var marked = states[i] === "wrong" || states[i] === "miss";
+      ctx.fillStyle = marked ? "#c40000" : "#161616";
+      ctx.font = (marked ? "800 " : "600 ") + size + "px sans-serif";
       ctx.fillText(glyph, cursor, baseline);
-      cursor += ctx.measureText(glyph).width;
+      var glyphWidth = ctx.measureText(glyph).width;
+      if (states[i] === "miss") {
+        ctx.beginPath(); ctx.strokeStyle = "#c40000"; ctx.lineWidth = Math.max(1.5, size * 0.045);
+        ctx.moveTo(cursor, baseline + size * 0.45); ctx.lineTo(cursor + glyphWidth, baseline + size * 0.45); ctx.stroke();
+      }
+      cursor += glyphWidth;
     }
   }
 
@@ -296,7 +321,8 @@
     var count = Math.min(pdfjs.numPages, pdfLib.getPageCount());
     for (var index = 0; index < count; index += 1) {
       var pageNumber = index + 1;
-      var record = model.dictationRecord(state.pages[pageNumber], state.answer.length, state.punctuation) || model.blankDictationPage();
+      var record = state.pages[pageNumber] || (state.style === "sentence"
+        ? model.blankDictationV4Page(state.answer) : model.blankDictationPage());
       var jsPage = await pdfjs.getPage(pageNumber);
       var baseViewport = jsPage.getViewport({ scale: 1 });
       var viewport = jsPage.getViewport({ scale: 2 });
@@ -306,24 +332,21 @@
       await jsPage.render({ canvasContext: sourceContext, viewport: viewport }).promise;
       var sourceData = sourceContext.getImageData(0, 0, source.width, source.height);
       var fittedGrid = geometry.fitDictationGrid(sourceData, baseViewport.width, baseViewport.height, state.segment, state.templateParams);
-      var layout = geometry.dictationLayout(baseViewport.width, baseViewport.height, state.answer.length,
+      var layout = geometry.dictationLayout(baseViewport.width, baseViewport.height, model.dictationCharacters(state.answer).length,
         state.firstRow, state.calibration || { dx: 0, dy: 0, scale: 1 }, fittedGrid, state.templateParams, state.segment);
       var annotation = root.document.createElement("canvas");
       annotation.width = Math.ceil(viewport.width); annotation.height = Math.ceil(viewport.height);
-      drawDictationAnnotations(annotation, layout, record, state.answer, sourceData);
+      var scoreRecord = state.scoreRecords && state.scoreRecords[pageNumber];
+      var annotationPage = Object.assign({}, record);
+      if (state.style === "grid") {
+        annotationPage.answerStates = Array(model.dictationCharacters(state.answer).length).fill("normal");
+        (record.circles || []).forEach(function (characterIndex) { annotationPage.answerStates[characterIndex] = "wrong"; });
+        (record.miss || []).forEach(function (characterIndex) { annotationPage.answerStates[characterIndex] = "miss"; });
+      }
+      drawDictationAnnotations(annotation, layout, annotationPage, state.answer, sourceData,
+        scoreRecord && scoreRecord.reviewed ? scoreRecord.finalScore : null);
       var libPage = pdfLib.getPage(index);
       var rotation = ((libPage.getRotation().angle % 360) + 360) % 360;
-      layout.cells.forEach(function (cell, cellIndex) {
-        if (record.circles.indexOf(cellIndex) < 0 && record.arrows.indexOf(cellIndex) < 0) return;
-        if (record.circles.indexOf(cellIndex) >= 0) {
-          drawRedCircle(libPage, baseViewport, {
-            x: cell.x + cell.w / 2, y: cell.y + cell.h / 2
-          }, Math.min(cell.w, cell.h) * 0.42, root.PDFLib);
-        }
-        if (record.arrows.indexOf(cellIndex) >= 0) {
-          drawArrow(libPage, baseViewport, cell, root.PDFLib);
-        }
-      });
       await embedAnnotation(annotation, pdfLib, libPage, rotation, root.PDFLib);
     }
     return pdfLib.save();

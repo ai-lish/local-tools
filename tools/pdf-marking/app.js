@@ -19,18 +19,19 @@
   var state = {
     mode: initialTemplate.kind, step: 1, templateId: initialTemplate.id, template: initialTemplate,
     pdfBytes: null, pdfDoc: null, pdfFingerprint: "", pageCount: 0, currentPage: 1,
-    choicePages: {}, dictationPages: {}, activeMark: "circle", renderToken: 0,
+    choicePages: {}, dictationPages: {}, legacyDictationPages: {}, activeMark: "wrongCircle", renderToken: 0,
     focusKey: "", demo: false,
     dictationSegment: 1, dictationSegments: {},
     dictationAnswer: DEFAULT_DICTATION_ANSWER, firstRow: 20, punctuation: model.autoPunctuation(DEFAULT_DICTATION_ANSWER),
-    dictationCalibration: { dx: 0, dy: 0, scale: 1 }, dictationAnswerEditOriginal: null
+    dictationCalibration: { dx: 0, dy: 0, scale: 1 }, dictationAnswerEditOriginal: null,
+    dictationStyle: "sentence", dictationBaseEnabled: false, dictationUndo: []
   };
   var byId = function (id) { return document.getElementById(id); };
   var els = {
     pdfFile: byId("pdf-file"), clearPdf: byId("clear-pdf"), fileStatus: byId("file-status"),
     fileDot: byId("file-dot"), pageCount: byId("page-count"), choiceMode: byId("choice-mode"),
     dictationMode: byId("dictation-mode"), choiceSettingsPanel: byId("choice-settings"),
-    dictationSettingsPanel: byId("dictation-settings"), startDictation: byId("start-dictation"),
+    dictationSettingsPanel: byId("dictation-settings"), dictationEntry: byId("dictation-entry"), startDictation: byId("start-dictation"),
     step1: byId("step-1"), step2: byId("step-2"), step3: byId("step-3"), step1State: byId("step-1-state"),
     step2State: byId("step-2-state"), step3State: byId("step-3-state"), stepPills: Array.from(document.querySelectorAll(".step-pill")),
     templateList: byId("template-list"), useTemplate: byId("use-template"), demoStart: byId("demo-start"),
@@ -45,15 +46,25 @@
     choicePrev: byId("choice-prev"), choiceNext: byId("choice-next"), choiceScore: byId("choice-score"),
     choiceReviews: byId("choice-reviews"), choiceAlignment: byId("choice-alignment"), choiceClass: byId("choice-class"),
     choiceStudentId: byId("choice-student-id"), choiceStage: byId("choice-stage"), reviewItems: byId("review-items"),
-    pageFlags: byId("page-flags"), dictationSegment: byId("dictation-segment"),
+    pageFlags: byId("page-flags"), dictationSegment: byId("dictation-segment"), dictationStyle: byId("dictation-style"),
     dictationAnswer: byId("dictation-answer"), firstRow: byId("dictation-first-row"),
-    punctuationIndexes: byId("punctuation-indexes"), detectPunctuation: byId("detect-punctuation"),
+    dictationBaseEnabled: byId("dictation-base-enabled"), dictationCalibration: byId("dictation-calibration"),
+    firstRowField: byId("dictation-first-row-field"), sentenceToolbar: byId("sentence-mark-toolbar"),
+    gridToolbar: byId("grid-mark-toolbar"), dictationGridWrap: document.querySelector(".dictation-grid-wrap"),
+    answerReviewWrap: byId("dictation-answer-review-wrap"), answerReview: byId("dictation-answer-review"),
+    undoDictation: byId("undo-dictation"), markDictationPerfect: byId("mark-dictation-perfect"),
+    dictationPageBase: byId("dictation-page-base"), overrideWrong: byId("dictation-override-wrong"),
+    overrideExtra: byId("dictation-override-extra"), overrideMiss: byId("dictation-override-miss"),
+    overrideScore: byId("dictation-override-score"), restoreDictationAuto: byId("restore-dictation-auto"),
+    dictationAutoScore: byId("dictation-auto-score"), dictationPageStatus: byId("dictation-page-status"),
+    dictationManualBadge: byId("dictation-manual-badge"),
     dictationDx: byId("dictation-dx"), dictationDy: byId("dictation-dy"), dictationScale: byId("dictation-scale"),
     resetDictationCalibration: byId("reset-dictation-calibration"),
     dictationPage: byId("dictation-page"), dictationPrev: byId("dictation-prev"), dictationNext: byId("dictation-next"),
     dictationScore: byId("dictation-score"), dictationDeduction: byId("dictation-deduction"),
     dictationStudentId: byId("dictation-student-id"), dictationStage: byId("dictation-stage"),
-    dictationGrid: byId("dictation-grid"), dictationNote: byId("dictation-note"), exportPdf: byId("export-pdf"), exportCsv: byId("export-csv"),
+    dictationGrid: byId("dictation-grid"), dictationNote: byId("dictation-note"),
+    dictationRuleNote: byId("dictation-rule-note"), exportPdf: byId("export-pdf"), exportCsv: byId("export-csv"),
     downloadProgress: byId("download-progress"), progressFile: byId("progress-file"), exportStatus: byId("export-status")
   };
 
@@ -62,7 +73,8 @@
   }
   els.dictationAnswer.value = DEFAULT_DICTATION_ANSWER;
   els.dictationAnswer.placeholder = "請輸入第一段默書句子";
-  els.punctuationIndexes.value = state.punctuation.join(", ");
+  els.dictationStyle.value = state.dictationStyle;
+  els.dictationBaseEnabled.checked = state.dictationBaseEnabled;
 
   function setStatus(message, target) {
     (target || els.exportStatus).textContent = message;
@@ -103,7 +115,7 @@
         var mc = questionBlock("mc", definition); var tf = questionBlock("tf", definition);
         detail.textContent = (mc ? mc.maxCount + " 題 " + mc.options.join("／") : "無選擇題") +
           (tf ? "＋" + tf.maxCount + " 題是非" : "") + " · 班別及學號圈格";
-      } else detail.textContent = "兩段金句 · 印刷格線自動定位 · 每次批改一段";
+      } else detail.textContent = "兩段金句 · 答案句新模式或舊版格位模式 · 每次批改一段";
       card.append(head, detail);
       card.addEventListener("click", function () {
         state.templateId = definition.id;
@@ -120,7 +132,7 @@
   function updateStepper() {
     var selected = templateById(state.templateId);
     els.step1State.textContent = selected.name;
-    els.step2State.textContent = state.pdfDoc ? "已載入 " + state.pageCount + " 頁" : "選擇 PDF 並輸入答案";
+    els.step2State.textContent = state.pdfDoc ? "已載入 " + state.pageCount + " 頁" : "選擇本機 PDF";
     if (selected.kind === "choice") {
       var settings = choiceSettings();
       var summary = model.choiceReviewSummary(state.choicePages, state.pageCount, settings.mcCount, settings.tfCount);
@@ -128,8 +140,8 @@
       els.step3State.textContent = hasReadPages ? choiceReviewStatusText(summary) : "開始讀圈後可覆核及匯出";
       els.reviewStepStatus.textContent = !state.pdfDoc ? "先載入 PDF" : hasReadPages ? choiceReviewStatusText(summary) : "開始讀圈後可覆核及匯出";
     } else {
-      els.step3State.textContent = state.pdfDoc ? "檢查格位並匯出" : "先載入 PDF";
-      els.reviewStepStatus.textContent = state.pdfDoc ? "點擊格位批改所選段落" : "先載入 PDF";
+      els.step3State.textContent = state.pdfDoc ? "默書設定、批改及匯出" : "先載入 PDF";
+      els.reviewStepStatus.textContent = state.pdfDoc ? "按答案句標記；可切換舊版格位模式" : "先載入 PDF";
     }
     els.stepPills.forEach(function (pill) {
       var target = Number(pill.dataset.step);
@@ -159,6 +171,7 @@
     state.mode = state.template.kind;
     var choice = state.mode === "choice";
     els.choiceSettingsPanel.hidden = !choice;
+    els.dictationEntry.hidden = choice;
     els.dictationSettingsPanel.hidden = choice;
     els.choiceMode.hidden = !choice;
     els.dictationMode.hidden = choice;
@@ -249,7 +262,7 @@
     var dictationReady = state.dictationAnswer.length > 0;
     els.clearPdf.disabled = !loaded;
     els.readOmr.disabled = !loaded;
-    els.startDictation.disabled = !loaded || !dictationReady;
+    els.startDictation.disabled = !loaded;
     els.choicePage.disabled = !loaded;
     els.dictationPage.disabled = !loaded;
     els.choicePrev.disabled = !loaded || state.currentPage <= 1;
@@ -469,38 +482,53 @@
     return window.confirm(message + "。仍要匯出嗎？");
   }
 
+  function confirmDictationExport() {
+    var pending = [];
+    for (var pageNumber = 1; pageNumber <= state.pageCount; pageNumber += 1) {
+      if (!dictationScoreRecordForPage(pageNumber).reviewed) pending.push(pageNumber);
+    }
+    if (!pending.length) return true;
+    return window.confirm("以下頁面尚未批改：" + pending.join("、") + "。這些頁面的分數會留空，仍要匯出嗎？");
+  }
+
   function hasDictationMarks(pages) {
     return Object.keys(pages || {}).some(function (pageNumber) {
       var page = pages[pageNumber] || {};
-      return [page.circles, page.arrows, page.miss].some(function (list) { return Array.isArray(list) && list.length > 0; });
+      return [page.circles, page.arrows, page.miss, page.surfaceMarks].some(function (list) {
+        return Array.isArray(list) && list.length > 0;
+      }) || Array.isArray(page.answerStates) && page.answerStates.some(function (status) { return status !== "normal"; });
     });
   }
 
   function finishDictationAnswerEdit() {
     var original = state.dictationAnswerEditOriginal;
     if (!original) return;
-    var nextAnswer = els.dictationAnswer.value;
+    var nextAnswer = model.normalizeDictationAnswer(els.dictationAnswer.value);
     var changed = nextAnswer !== original.answer;
-    if (changed && hasDictationMarks(state.dictationPages) &&
-        !window.confirm("所選段落已有批改標記；更改句子會按新字數保留仍有效的索引。要繼續嗎？")) {
+    if (changed && (hasDictationMarks(state.dictationPages) || hasDictationMarks(state.legacyDictationPages)) &&
+        !window.confirm("所選段落已有批改標記；更改句子會按新字數保留仍有效的標記。要繼續嗎？")) {
       state.dictationAnswer = original.answer;
-      state.punctuation = original.punctuation.slice();
       els.dictationAnswer.value = original.answer;
-      els.punctuationIndexes.value = state.punctuation.join(", ");
+      state.punctuation = model.autoPunctuation(state.dictationAnswer);
       saveActiveDictationSegment();
       state.dictationAnswerEditOriginal = null;
       renderCurrentMode();
       return;
     }
     var config = getDictationConfig();
-    var cleaned = model.sanitizeDictationPages(state.dictationPages, config.answer.length, config.punctuation);
+    els.dictationAnswer.value = config.answer;
+    var cleaned = model.sanitizeDictationV4Pages(state.dictationPages, state.pageCount, config.answer);
     state.dictationPages = cleaned.pages;
+    var legacyCleaned = model.sanitizeLegacyDictationPages(state.legacyDictationPages, state.pageCount,
+      model.dictationCharacters(config.answer).length, config.punctuation);
+    state.legacyDictationPages = legacyCleaned.pages;
     saveActiveDictationSegment();
     state.dictationAnswerEditOriginal = null;
-    if (cleaned.droppedIndexes) {
-      setStatus("句子更改後已移除 " + cleaned.droppedIndexes + " 個超出字數或屬於標點的標記索引；其他標記已保留。", els.exportStatus);
+    var dropped = cleaned.dropped + legacyCleaned.dropped;
+    if (dropped) {
+      setStatus("句子更改後已移除 " + dropped + " 個超出字數或屬於標點的標記；其他標記已保留。", els.exportStatus);
+      renderCurrentMode();
     }
-    renderCurrentMode();
   }
 
   function renderChoiceSummary(page) {
@@ -547,25 +575,49 @@
   }
 
   function dictationPageRecord() {
-    if (!state.dictationPages[state.currentPage]) state.dictationPages[state.currentPage] = model.blankDictationPage();
-    return state.dictationPages[state.currentPage];
+    if (!state.dictationPages[state.currentPage]) state.dictationPages[state.currentPage] = model.blankDictationV4Page(state.dictationAnswer);
+    return model.cloneDictationV4Page(state.dictationPages[state.currentPage], state.dictationAnswer);
+  }
+
+  function legacyDictationPageRecord() {
+    if (!state.legacyDictationPages[state.currentPage]) state.legacyDictationPages[state.currentPage] = model.blankDictationPage();
+    return model.cloneDictationPage(state.legacyDictationPages[state.currentPage]);
   }
 
   function saveActiveDictationSegment() {
     state.dictationSegments[String(state.dictationSegment)] = {
-      answer: state.dictationAnswer, firstRow: state.firstRow, punctuation: state.punctuation.slice(),
-      calibration: Object.assign({}, state.dictationCalibration), pages: state.dictationPages
+      answer: state.dictationAnswer, firstRow: state.firstRow,
+      calibration: Object.assign({}, state.dictationCalibration),
+      pages: state.dictationPages, legacyPages: state.legacyDictationPages
     };
+  }
+
+  function syncDictationStyleControls() {
+    state.dictationStyle = els.dictationStyle.value === "grid" ? "grid" : "sentence";
+    var sentence = state.dictationStyle === "sentence";
+    els.sentenceToolbar.hidden = !sentence;
+    els.gridToolbar.hidden = sentence;
+    els.answerReviewWrap.hidden = !sentence;
+    els.dictationGridWrap.hidden = sentence;
+    els.dictationCalibration.hidden = sentence;
+    els.firstRowField.hidden = sentence;
+    els.dictationRuleNote.textContent = sentence
+      ? "N = 錯字 + max(多字, 漏字)。原始分 = max(0, 10 − 0.5 × N)，四捨五入至 0.5；啟用底分時，正確字數 ≥ 5 為 2 分、≥ 10 為 3 分。"
+      : "舊版自動計分以錯字圈與漏字格的不同格數計 N，同一格同時圈及漏只扣一次；人手覆寫數目後按 N = 錯字 + max(多字, 漏字) 重算。底分規則相同。";
+    var toolbar = sentence ? els.sentenceToolbar : els.gridToolbar;
+    toolbar.querySelectorAll(".mode-mark").forEach(function (button) {
+      var active = button.dataset.mark === state.activeMark;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
   }
 
   function restoreDictationSegment(segmentNumber) {
     var segment = state.dictationSegments[String(segmentNumber)] || {};
     state.dictationSegment = segmentNumber;
-    state.dictationAnswer = model.dictationSegmentAnswer(segment, segmentNumber, DEFAULT_DICTATION_ANSWER);
+    state.dictationAnswer = model.normalizeDictationAnswer(model.dictationSegmentAnswer(segment, segmentNumber, DEFAULT_DICTATION_ANSWER));
     state.firstRow = Math.max(1, Math.min(80, Number(segment.firstRow) || 20));
-    state.punctuation = Array.isArray(segment.punctuation) ? segment.punctuation.filter(function (value) {
-      return Number.isInteger(value) && value >= 0 && value < state.dictationAnswer.length;
-    }) : model.autoPunctuation(state.dictationAnswer);
+    state.punctuation = model.autoPunctuation(state.dictationAnswer);
     var calibration = segment.calibration || {};
     state.dictationCalibration = {
       dx: Math.max(-200, Math.min(200, Number(calibration.dx) || 0)),
@@ -573,28 +625,30 @@
       scale: Math.max(0.7, Math.min(1.4, Number(calibration.scale) || 1))
     };
     state.dictationPages = segment.pages || {};
+    state.legacyDictationPages = segment.legacyPages || {};
     if (state.pdfDoc) {
       for (var pageNo = 1; pageNo <= state.pageCount; pageNo += 1) {
-        if (!state.dictationPages[pageNo]) state.dictationPages[pageNo] = model.blankDictationPage();
+        if (!state.dictationPages[pageNo]) state.dictationPages[pageNo] = model.blankDictationV4Page(state.dictationAnswer);
+        if (!state.legacyDictationPages[pageNo]) state.legacyDictationPages[pageNo] = model.blankDictationPage();
       }
     }
     els.dictationSegment.value = String(segmentNumber);
     els.dictationAnswer.value = state.dictationAnswer;
     els.dictationAnswer.placeholder = segmentNumber === 2 ? "請輸入第二段默書句子" : "請輸入第一段默書句子";
     els.firstRow.value = String(state.firstRow);
-    els.punctuationIndexes.value = state.punctuation.join(", ");
     els.dictationDx.value = String(state.dictationCalibration.dx);
     els.dictationDy.value = String(state.dictationCalibration.dy);
     els.dictationScale.value = String(Math.round(state.dictationCalibration.scale * 100));
+    els.dictationStyle.value = state.dictationStyle;
+    els.dictationBaseEnabled.checked = state.dictationBaseEnabled;
+    syncDictationStyleControls();
   }
 
   function getDictationConfig() {
-    state.dictationAnswer = els.dictationAnswer.value;
+    state.dictationAnswer = model.normalizeDictationAnswer(els.dictationAnswer.value);
     state.firstRow = numberInput(els.firstRow, 20, 1, 80);
-    var punctuation = els.punctuationIndexes.value.split(/[，,\s]+/).filter(Boolean).map(Number);
-    state.punctuation = Array.from(new Set(punctuation.filter(function (value) {
-      return Number.isInteger(value) && value >= 0 && value < state.dictationAnswer.length;
-    }))).sort(function (a, b) { return a - b; });
+    state.punctuation = model.autoPunctuation(state.dictationAnswer);
+    syncDictationStyleControls();
     saveActiveDictationSegment();
     return { answer: state.dictationAnswer, firstRow: state.firstRow, punctuation: state.punctuation,
       segment: state.dictationSegment };
@@ -606,70 +660,179 @@
     renderCurrentMode();
   }
 
+  function activeLegacyScoreStats(page) {
+    var record = model.dictationRecord(page, model.dictationCharacters(state.dictationAnswer).length, state.punctuation);
+    return record ? { wrong: record.circles.length, extra: 0, miss: record.miss.length, legacyN: record.N } :
+      { wrong: 0, extra: 0, miss: 0, legacyN: 0 };
+  }
+
+  function dictationScoreRecordForPage(pageNumber) {
+    if (state.dictationStyle === "sentence") {
+      var page = state.dictationPages[pageNumber] || model.blankDictationV4Page(state.dictationAnswer);
+      return model.dictationV4Record(page, state.dictationAnswer, state.dictationBaseEnabled);
+    }
+    var legacy = state.legacyDictationPages[pageNumber] || model.blankDictationPage();
+    var compatible = model.blankDictationV4Page(state.dictationAnswer);
+    compatible.studentId = legacy.studentId;
+    compatible.reviewStatus = legacy.reviewStatus;
+    compatible.baseOverride = legacy.baseOverride;
+    compatible.overrides = legacy.overrides;
+    var score = model.dictationV4Record(compatible, state.dictationAnswer, state.dictationBaseEnabled,
+      activeLegacyScoreStats(legacy));
+    score.page = legacy;
+    return score;
+  }
+
+  function currentDictationScoreRecord() {
+    return dictationScoreRecordForPage(state.currentPage);
+  }
+
   function renderDictationStats() {
-    var record = dictationPageRecord();
-    var valid = model.dictationRecord(record, state.dictationAnswer.length, state.punctuation);
-    els.dictationScore.textContent = valid ? valid.score.toFixed(1) : "10.0";
-    els.dictationDeduction.textContent = valid ? String(valid.N) : "0";
-    els.dictationStudentId.value = record.studentId || "";
+    var result = currentDictationScoreRecord();
+    els.dictationScore.textContent = result.reviewed ? result.finalScore.toFixed(1) : "—";
+    els.dictationAutoScore.textContent = result.reviewed ? result.autoFinalScore.toFixed(1) : "—";
+    els.dictationDeduction.textContent = result.reviewed ? String(result.N) : "—";
+    els.dictationPageStatus.textContent = result.reviewed ? "已批改" : "未批改";
+    els.dictationPageStatus.dataset.manual = result.manualAdjusted ? "true" : "false";
+    els.dictationStudentId.value = result.studentId || "";
+    els.dictationManualBadge.hidden = !result.manualAdjusted;
+    els.dictationPageBase.value = result.page.baseOverride == null ? "inherit" : result.page.baseOverride ? "on" : "off";
+    els.overrideWrong.value = result.page.overrides.wrong == null ? "" : String(result.page.overrides.wrong);
+    els.overrideExtra.value = result.page.overrides.extra == null ? "" : String(result.page.overrides.extra);
+    els.overrideMiss.value = result.page.overrides.miss == null ? "" : String(result.page.overrides.miss);
+    els.overrideScore.value = result.page.overrides.finalScore == null ? "" : String(result.page.overrides.finalScore);
+    els.undoDictation.disabled = state.dictationUndo.length === 0;
+  }
+
+  function renderAnswerReview() {
+    var page = dictationPageRecord();
+    var chars = model.dictationCharacters(state.dictationAnswer);
+    els.answerReview.replaceChildren();
+    chars.forEach(function (character, index) {
+      if (model.PUNCTUATION.indexOf(character) >= 0) {
+        var punctuation = document.createElement("span");
+        punctuation.className = "dictation-answer-punct";
+        punctuation.textContent = character;
+        els.answerReview.appendChild(punctuation);
+        return;
+      }
+      var button = document.createElement("button");
+      var status = page.answerStates[index] || "normal";
+      button.type = "button"; button.className = "dictation-answer-char";
+      button.dataset.index = String(index); button.setAttribute("aria-pressed", status === "normal" ? "false" : "true");
+      button.setAttribute("aria-label", character + (status === "wrong" ? "，錯字" : status === "miss" ? "，漏字" : "，正確"));
+      if (status === "wrong") button.classList.add("is-wrong");
+      if (status === "miss") button.classList.add("is-miss");
+      button.textContent = character;
+      if (status === "miss") {
+        var tag = document.createElement("span"); tag.className = "miss-tag"; tag.textContent = "漏";
+        button.appendChild(tag);
+      }
+      els.answerReview.appendChild(button);
+    });
   }
 
   function renderDictationGrid() {
     var config = getDictationConfig();
-    var record = dictationPageRecord();
+    var record = legacyDictationPageRecord();
+    var chars = model.dictationCharacters(config.answer);
     els.dictationGrid.replaceChildren();
-    for (var index = 0; index < config.answer.length; index += 1) {
+    chars.forEach(function (character, index) {
       var button = document.createElement("button"); button.type = "button";
       button.className = "dictation-cell"; button.dataset.index = String(index);
-      button.textContent = (index + 1) + " · " + config.answer.charAt(index);
+      button.textContent = (index + 1) + " · " + character;
       var punct = config.punctuation.indexOf(index) !== -1;
       if (record.circles.indexOf(index) !== -1) button.classList.add("is-circled");
       if (record.arrows.indexOf(index) !== -1) button.classList.add("is-arrow");
       if (record.miss.indexOf(index) !== -1) button.classList.add("is-miss");
       if (punct && (state.activeMark === "circle" || state.activeMark === "miss")) button.disabled = true;
-      button.setAttribute("aria-label", "第 " + (index + 1) + " 格 " + config.answer.charAt(index) + (punct ? "，標點" : ""));
+      button.setAttribute("aria-label", "第 " + (index + 1) + " 格 " + character + (punct ? "，標點" : ""));
       els.dictationGrid.append(button);
-    }
+    });
   }
 
-  async function renderDictationPage() {
-    var token = ++state.renderToken;
-    renderDictationStats(); renderDictationGrid();
+  function dictationLayoutFor(rendered, page) {
+    var params = templates.dictationParams(state.template);
+    var fitted = geometry.fitDictationGrid(rendered.data, rendered.viewport.width, rendered.viewport.height,
+      state.dictationSegment, params);
+    var layout = geometry.dictationLayout(rendered.viewport.width, rendered.viewport.height,
+      model.dictationCharacters(state.dictationAnswer).length, state.firstRow, state.dictationCalibration,
+      fitted, params, state.dictationSegment);
+    return { fitted: fitted, layout: layout, params: params, page: page };
+  }
+
+  function renderSurfaceMarks(layer, marks) {
+    (marks || []).forEach(function (mark) {
+      var item = document.createElement("span");
+      item.className = "surface-mark" + (mark.type === "arrow" ? " is-arrow" : " is-circle");
+      item.style.left = (mark.x * 100) + "%"; item.style.top = (mark.y * 100) + "%";
+      item.setAttribute("aria-hidden", "true");
+      item.textContent = mark.type === "arrow" ? "↑" : "";
+      if (mark.type !== "arrow") {
+        var tag = document.createElement("span"); tag.className = "surface-mark-tag";
+        tag.textContent = mark.type === "extraCircle" ? "多" : "錯";
+        item.appendChild(tag);
+      }
+      layer.appendChild(item);
+    });
+  }
+
+  async function renderSentenceDictationPage(token) {
+    var record = dictationPageRecord();
+    renderAnswerReview();
     if (!state.pdfDoc) {
-      els.dictationStage.innerHTML = '<p class="empty-state">選擇 PDF 後，掃描頁會顯示在這裏。</p>';
+      els.dictationStage.textContent = "選擇 PDF 後，掃描頁會顯示在這裏。";
       return;
     }
-    var width = Math.max(480, Math.min(1050, els.dictationStage.clientWidth || 900));
     var page = await state.pdfDoc.getPage(state.currentPage);
     var base = page.getViewport({ scale: 1 });
+    var width = Math.max(1, Math.min(1050, els.dictationStage.clientWidth || 900));
     var rendered = await renderPdfToCanvas(state.currentPage, width / base.width);
     if (token !== state.renderToken) return;
-    var record = dictationPageRecord();
-    var dictationTemplateParams = templates.dictationParams(state.template);
-    var fittedGrid = geometry.fitDictationGrid(rendered.data, base.width, base.height, state.dictationSegment, dictationTemplateParams);
-    var layout = geometry.dictationLayout(base.width, base.height,
-      state.dictationAnswer.length, state.firstRow, state.dictationCalibration, fittedGrid, dictationTemplateParams, state.dictationSegment);
-    if (!state.dictationAnswer.length) {
-      els.dictationNote.textContent = (fittedGrid
-        ? "已按印刷方格自動對齊，共偵測 " + layout.availableCellCount + " 格。"
-        : "未能確認印刷方格，使用下方校準滑桿調整格位。") +
-        (state.dictationSegment === 2 ? "請輸入第二段默書句子。" : "請輸入默書句子。");
-    } else if (fittedGrid && state.dictationAnswer.length !== layout.availableCellCount) {
-      var placed = Math.min(state.dictationAnswer.length, layout.availableCellCount);
-      els.dictationNote.textContent = "答案 " + state.dictationAnswer.length + " 字，印刷方格 " +
-        layout.availableCellCount + " 格；只把前 " + placed + " 字放進對應格位。請核對字數；如需微調，可使用下方校準滑桿。";
-    } else {
-      els.dictationNote.textContent = fittedGrid
-        ? "已按印刷方格自動對齊；如需微調，可使用下方校準滑桿。"
-        : "未能確認印刷方格，使用下方校準滑桿調整格位。";
-    }
+    var frame = document.createElement("div"); frame.className = "pdf-page-frame";
+    rendered.canvas.style.width = "100%"; rendered.canvas.style.height = "auto";
     var overlay = document.createElement("div"); overlay.className = "pdf-overlay";
-    layout.cells.forEach(function (box, index) {
+    var hit = document.createElement("button"); hit.type = "button";
+    hit.className = "surface-hit-area"; hit.setAttribute("aria-label", "在頁面目前位置放置默書標記");
+    var layer = document.createElement("div"); layer.className = "surface-marks";
+    renderSurfaceMarks(layer, record.surfaceMarks);
+    overlay.append(hit, layer); frame.append(rendered.canvas, overlay);
+    els.dictationNote.textContent = "新模式不需格位校準；在卷面任何位置點擊放置所選標記，再點同一標記可移除。";
+    els.dictationStage.replaceChildren(frame);
+  }
+
+  async function renderLegacyDictationPage(token) {
+    renderDictationGrid();
+    if (!state.pdfDoc) {
+      els.dictationStage.textContent = "選擇 PDF 後，掃描頁會顯示在這裏。";
+      return;
+    }
+    var page = await state.pdfDoc.getPage(state.currentPage);
+    var base = page.getViewport({ scale: 1 });
+    var width = Math.max(1, Math.min(1050, els.dictationStage.clientWidth || 900));
+    var rendered = await renderPdfToCanvas(state.currentPage, width / base.width);
+    if (token !== state.renderToken) return;
+    var record = legacyDictationPageRecord();
+    var info = dictationLayoutFor(rendered, page);
+    if (!state.dictationAnswer.length) {
+      els.dictationNote.textContent = "請輸入答案句；舊版格位模式會按印刷格線定位，可用滑桿微調。";
+    } else if (info.fitted && model.dictationCharacters(state.dictationAnswer).length !== info.layout.availableCellCount) {
+      els.dictationNote.textContent = "答案 " + model.dictationCharacters(state.dictationAnswer).length + " 字，印刷方格 " +
+        info.layout.availableCellCount + " 格；只把前 " + Math.min(model.dictationCharacters(state.dictationAnswer).length,
+          info.layout.availableCellCount) + " 字放進格位。請核對字數。";
+    } else {
+      els.dictationNote.textContent = info.fitted ? "已按印刷格線定位；如需微調，可使用校準滑桿。" :
+        "未能確認印刷格線，使用後備格數及校準滑桿。";
+    }
+    var frame = document.createElement("div"); frame.className = "pdf-page-frame";
+    rendered.canvas.style.width = "100%"; rendered.canvas.style.height = "auto";
+    var overlay = document.createElement("div"); overlay.className = "pdf-overlay";
+    info.layout.cells.forEach(function (box, index) {
       var hit = document.createElement("button"); hit.type = "button"; hit.className = "dictation-hit";
-      hit.style.left = ((box.x + box.w / 2) / layout.pageWidth * 100) + "%";
-      hit.style.top = ((box.y + box.h / 2) / layout.pageHeight * 100) + "%";
-      hit.style.width = (box.w / layout.pageWidth * 100) + "%";
-      hit.style.height = (box.h / layout.pageHeight * 100) + "%";
+      hit.style.left = ((box.x + box.w / 2) / info.layout.pageWidth * 100) + "%";
+      hit.style.top = ((box.y + box.h / 2) / info.layout.pageHeight * 100) + "%";
+      hit.style.width = (box.w / info.layout.pageWidth * 100) + "%";
+      hit.style.height = (box.h / info.layout.pageHeight * 100) + "%";
       hit.dataset.index = String(index);
       var punct = state.punctuation.indexOf(index) !== -1;
       if (record.circles.indexOf(index) !== -1) hit.classList.add("is-circled");
@@ -679,8 +842,17 @@
       hit.setAttribute("aria-label", "默書第 " + (index + 1) + " 格" + (punct ? "，標點" : ""));
       overlay.append(hit);
     });
-    rendered.canvas.style.width = "100%"; rendered.canvas.style.height = "auto";
-    els.dictationStage.replaceChildren(rendered.canvas, overlay);
+    frame.append(rendered.canvas, overlay);
+    els.dictationStage.replaceChildren(frame);
+  }
+
+  async function renderDictationPage() {
+    var token = ++state.renderToken;
+    getDictationConfig();
+    syncDictationStyleControls();
+    renderDictationStats();
+    if (state.dictationStyle === "sentence") await renderSentenceDictationPage(token);
+    else await renderLegacyDictationPage(token);
   }
 
   function renderCurrentMode() {
@@ -718,14 +890,18 @@
       state.demo = Boolean(file.isDemo);
       els.demoBanner.hidden = !state.demo;
       state.choicePages = {};
-      var blankPages = {};
-      for (var i = 1; i <= state.pageCount; i += 1) blankPages[i] = model.blankDictationPage();
+      var blankPages = {}; var blankLegacyPages = {};
+      for (var i = 1; i <= state.pageCount; i += 1) {
+        blankPages[i] = model.blankDictationV4Page(DEFAULT_DICTATION_ANSWER);
+        blankLegacyPages[i] = model.blankDictationPage();
+      }
       state.dictationSegments = {
-        "1": { answer: DEFAULT_DICTATION_ANSWER, firstRow: 20, punctuation: model.autoPunctuation(DEFAULT_DICTATION_ANSWER),
-          calibration: { dx: 0, dy: 0, scale: 1 }, pages: blankPages },
-        "2": { answer: "", firstRow: 20, punctuation: [], calibration: { dx: 0, dy: 0, scale: 1 },
-          pages: JSON.parse(JSON.stringify(blankPages)) }
+        "1": { answer: DEFAULT_DICTATION_ANSWER, firstRow: 20,
+          calibration: { dx: 0, dy: 0, scale: 1 }, pages: blankPages, legacyPages: blankLegacyPages },
+        "2": { answer: "", firstRow: 20, calibration: { dx: 0, dy: 0, scale: 1 },
+          pages: {}, legacyPages: {} }
       };
+      state.dictationStyle = "sentence"; state.activeMark = "wrongCircle"; state.dictationBaseEnabled = false; state.dictationUndo = [];
       restoreDictationSegment(1);
       els.fileStatus.textContent = "PDF 已在本機開啟";
       els.pageCount.textContent = "共 " + state.pageCount + " 頁";
@@ -826,11 +1002,6 @@
     renderCurrentMode();
   }
 
-  function csvQuote(value) {
-    var text = String(value == null ? "" : value);
-    return '"' + text.replace(/"/g, '""') + '"';
-  }
-
   function buildChoiceCsv() {
     var settings = choiceSettings();
     if (!settings.valid) throw new Error(settings.message || "請先輸入完整答案。");
@@ -839,13 +1010,11 @@
 
   function buildDictationCsv() {
     var config = getDictationConfig();
-    var rows = [["頁碼", "班別", "學號", "分數", "段落"]];
+    var records = {};
     for (var pageNo = 1; pageNo <= state.pageCount; pageNo += 1) {
-      var record = model.dictationRecord(state.dictationPages[pageNo], config.answer.length, config.punctuation) || model.blankDictationPage();
-      var result = model.dictationRecord(record, config.answer.length, config.punctuation);
-      rows.push([pageNo, "", record.studentId || "", result ? result.score.toFixed(1) : "10.0", config.segment]);
+      records[pageNo] = dictationScoreRecordForPage(pageNo);
     }
-    return "\ufeff" + rows.map(function (row) { return row.map(csvQuote).join(","); }).join("\r\n");
+    return model.buildDictationCsv(records, state.pageCount, config.segment);
   }
 
   function currentProgress() {
@@ -869,16 +1038,16 @@
     [1, 2].forEach(function (segmentNumber) {
       var segment = state.dictationSegments[String(segmentNumber)] || {};
       segments[String(segmentNumber)] = {
-        settings: { answer: String(segment.answer || ""), firstRow: segment.firstRow || 20,
-          punctuation: Array.isArray(segment.punctuation) ? segment.punctuation.slice() : [],
+        settings: { answer: model.normalizeDictationAnswer(String(segment.answer || "")), firstRow: segment.firstRow || 20,
           calibration: Object.assign({ dx: 0, dy: 0, scale: 1 }, segment.calibration || {}) },
-        pages: segment.pages || {}
+        pages: segment.pages || {}, legacyPages: segment.legacyPages || {}
       };
     });
     return {
-      version: 3, mode: "dictation", templateId: state.template.id, pdfFingerprint: state.pdfFingerprint, pageCount: state.pageCount,
+      version: 4, mode: "dictation", templateId: state.template.id, pdfFingerprint: state.pdfFingerprint, pageCount: state.pageCount,
+      dictationMode: state.dictationStyle, baseEnabled: state.dictationBaseEnabled,
       selectedSegment: config.segment, "段落": config.segment, segments: segments,
-      settings: { answer: config.answer, firstRow: config.firstRow, punctuation: config.punctuation,
+      settings: { answer: config.answer, firstRow: config.firstRow,
         calibration: state.dictationCalibration },
       pages: state.dictationPages
     };
@@ -963,77 +1132,121 @@
     };
   }
 
-  function applyProgress(data) {
+  async function legacyArrowPositions(progress) {
+    var sources = {};
+    if (progress.version === 1) {
+      sources["1"] = { settings: progress.settings || {}, pages: progress.pages || {} };
+      sources["2"] = { settings: { answer: "", firstRow: 20 }, pages: {} };
+    } else {
+      [1, 2].forEach(function (segmentNumber) {
+        sources[String(segmentNumber)] = progress.segments && progress.segments[String(segmentNumber)] ||
+          { settings: { answer: "", firstRow: 20 }, pages: {} };
+      });
+    }
+    var positions = {};
+    for (var segmentNumber = 1; segmentNumber <= 2; segmentNumber += 1) {
+      var key = String(segmentNumber); var segment = sources[key] || {}; var settings = segment.settings || {};
+      var rawPages = segment.pages || {}; var pagesWithArrows = Object.keys(rawPages).filter(function (pageNo) {
+        return rawPages[pageNo] && Array.isArray(rawPages[pageNo].arrows) && rawPages[pageNo].arrows.length;
+      });
+      if (!pagesWithArrows.length) { positions[key] = {}; continue; }
+      var answer = String(settings.answer || "");
+      var firstRow = Math.max(1, Math.min(80, Number(settings.firstRow) || 20));
+      var calibration = settings.calibration || { dx: 0, dy: 0, scale: 1 };
+      positions[key] = {};
+      for (var arrowPageIndex = 0; arrowPageIndex < pagesWithArrows.length; arrowPageIndex += 1) {
+        var pageNumber = Number(pagesWithArrows[arrowPageIndex]);
+        if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > state.pageCount) continue;
+        var pdfPage = await state.pdfDoc.getPage(pageNumber);
+        var base = pdfPage.getViewport({ scale: 1 });
+        var rendered = await renderPdfToCanvas(pageNumber, 1);
+        var params = templates.dictationParams(state.template);
+        var fitted = geometry.fitDictationGrid(rendered.data, base.width, base.height, segmentNumber, params);
+        var layout = geometry.dictationLayout(base.width, base.height, answer.length,
+          firstRow, calibration, fitted, params, segmentNumber);
+        positions[key][pageNumber] = {};
+        rawPages[pageNumber].arrows.forEach(function (oldIndex) {
+          var cell = Number.isInteger(oldIndex) && layout.cells[oldIndex];
+          if (!cell) return;
+          positions[key][pageNumber][oldIndex] = {
+            x: (cell.x + cell.w / 2) / layout.pageWidth,
+            y: (cell.y + cell.h / 2) / layout.pageHeight
+          };
+        });
+      }
+    }
+    return positions;
+  }
+
+  async function applyProgress(data) {
     var checked = model.sanitizeProgress(data);
     if (!checked.ok) throw new Error(checked.message);
-    if (checked.value.pdfFingerprint !== state.pdfFingerprint || checked.value.pageCount !== state.pageCount) {
+    var original = checked.value;
+    if (original.pdfFingerprint !== state.pdfFingerprint || original.pageCount !== state.pageCount) {
       throw new Error("進度 JSON 與目前 PDF 不相符；請先選回建立進度時使用的 PDF。");
     }
-    var targetTemplate = checked.value.version === 3 ? findTemplateById(checked.value.templateId) :
-      templates.BUILTIN_TEMPLATES.find(function (definition) { return definition.kind === checked.value.mode; });
+    var targetTemplate = original.version >= 3 ? findTemplateById(original.templateId) :
+      templates.BUILTIN_TEMPLATES.find(function (definition) { return definition.kind === original.mode; });
     if (!targetTemplate) throw new Error("進度檔使用的自訂範本未在本機找到；請先匯入該範本 JSON。");
-    if (targetTemplate.kind !== checked.value.mode) throw new Error("進度檔的範本類型與批改模式不相符。");
+    if (targetTemplate.kind !== original.mode) throw new Error("進度檔的範本類型與批改模式不相符。");
     state.templateId = targetTemplate.id; state.template = targetTemplate; state.mode = targetTemplate.kind;
     configureTemplateMode();
-    if (checked.value.mode === "choice") {
-      var settings = checked.value.settings || {};
+    if (original.mode === "choice") {
+      var settings = original.settings || {};
       els.mcCount.value = String(settings.mcCount == null ? 60 : settings.mcCount); els.tfCount.value = String(settings.tfCount == null ? 10 : settings.tfCount);
       els.mcKey.value = String(settings.mcAnswer || ""); els.tfKey.value = String(settings.tfAnswer || "");
       els.mcPoints.value = String(settings.mcPoints || "1"); els.tfPoints.value = String(settings.tfPoints || "1");
       state.choicePages = {};
-      Object.keys(checked.value.pages).forEach(function (key) {
-        if (/^\d+$/.test(key) && Number(key) <= state.pageCount) state.choicePages[Number(key)] = cleanChoicePage(checked.value.pages[key]);
+      Object.keys(original.pages).forEach(function (key) {
+        if (/^\d+$/.test(key) && Number(key) <= state.pageCount) state.choicePages[Number(key)] = cleanChoicePage(original.pages[key]);
       });
       refreshChoiceIdentityWarnings();
-    } else {
-      var config = checked.value.settings || {};
-      state.dictationSegments = {};
-      if ((checked.value.version === 2 || checked.value.version === 3) && checked.value.segments) {
-        [1, 2].forEach(function (segmentNumber) {
-          var sourceSegment = checked.value.segments[String(segmentNumber)] || {};
-          var segmentSettings = sourceSegment.settings || {};
-          var answer = String(segmentSettings.answer || "");
-          var punctuation = Array.isArray(segmentSettings.punctuation) ? segmentSettings.punctuation.filter(function (value) {
-            return Number.isInteger(value) && value >= 0 && value < answer.length;
-          }) : model.autoPunctuation(answer);
-          var calibration = segmentSettings.calibration || {};
-          var pages = {};
-          for (var segmentPage = 1; segmentPage <= state.pageCount; segmentPage += 1) {
-            var sourcePage = sourceSegment.pages && (sourceSegment.pages[String(segmentPage)] || sourceSegment.pages[segmentPage]) || {};
-            var normalizedPage = model.dictationRecord(sourcePage, answer.length, punctuation);
-            pages[segmentPage] = normalizedPage || model.blankDictationPage();
-          }
-          state.dictationSegments[String(segmentNumber)] = {
-            answer: answer, firstRow: Math.max(1, Math.min(80, Number(segmentSettings.firstRow) || 20)),
-            punctuation: punctuation,
-            calibration: { dx: Math.max(-200, Math.min(200, Number(calibration.dx) || 0)),
-              dy: Math.max(-200, Math.min(200, Number(calibration.dy) || 0)),
-              scale: Math.max(0.7, Math.min(1.4, Number(calibration.scale) || 1)) },
-            pages: pages
-          };
-        });
-        restoreDictationSegment(Number(checked.value.selectedSegment || checked.value["段落"]) === 2 ? 2 : 1);
-      } else {
-        var answer = String(config.answer || DEFAULT_DICTATION_ANSWER);
-        var punctuation = Array.isArray(config.punctuation) ? config.punctuation.filter(function (value) {
-          return Number.isInteger(value) && value >= 0 && value < answer.length;
-        }) : model.autoPunctuation(answer);
-        var oldPages = {};
-        for (var oldPageNo = 1; oldPageNo <= state.pageCount; oldPageNo += 1) {
-          var oldSource = checked.value.pages[String(oldPageNo)] || checked.value.pages[oldPageNo] || {};
-          var oldNormalized = model.dictationRecord(oldSource, answer.length, punctuation);
-          oldPages[oldPageNo] = oldNormalized || model.blankDictationPage();
-        }
-        state.dictationSegments["1"] = { answer: answer,
-          firstRow: Math.max(1, Math.min(80, Number(config.firstRow) || 20)), punctuation: punctuation,
-          calibration: config.calibration || { dx: 0, dy: 0, scale: 1 }, pages: oldPages };
-        state.dictationSegments["2"] = { answer: "", firstRow: 20, punctuation: [],
-          calibration: { dx: 0, dy: 0, scale: 1 }, pages: {} };
-        restoreDictationSegment(1);
-      }
+      state.mode = "choice";
+      setStatus("已載入進度 JSON（不包含 PDF）。", els.exportStatus);
+      renderCurrentMode(); updateControls();
+      return;
     }
-    state.mode = checked.value.mode;
-    setStatus("已載入進度 JSON（不包含 PDF）。", els.exportStatus);
+
+    var value = original;
+    var dropped = 0; var migrated = false;
+    if (original.version < 4) {
+      var positions = await legacyArrowPositions(original);
+      var conversion = model.migrateLegacyDictationProgress(original, positions);
+      value = conversion.value; dropped += conversion.dropped; migrated = true;
+    }
+    state.dictationStyle = value.dictationMode === "grid" ? "grid" : "sentence";
+    state.activeMark = state.dictationStyle === "grid" ? "circle" : "wrongCircle";
+    state.dictationBaseEnabled = Boolean(value.baseEnabled);
+    els.dictationBaseEnabled.checked = state.dictationBaseEnabled;
+    state.dictationUndo = [];
+    state.dictationSegments = {};
+    [1, 2].forEach(function (segmentNumber) {
+      var key = String(segmentNumber); var sourceSegment = value.segments && value.segments[key] || {};
+      var settings = sourceSegment.settings || {};
+      var answer = model.normalizeDictationAnswer(settings.answer || "");
+      var cleanPages = model.sanitizeDictationV4Pages(sourceSegment.pages || {}, state.pageCount, answer);
+      var cleanLegacy = model.sanitizeLegacyDictationPages(sourceSegment.legacyPages || {}, state.pageCount,
+        model.dictationCharacters(answer).length, model.autoPunctuation(answer));
+      dropped += cleanPages.dropped + cleanLegacy.dropped;
+      for (var pageNo = 1; pageNo <= state.pageCount; pageNo += 1) {
+        if (!cleanPages.pages[pageNo]) cleanPages.pages[pageNo] = model.blankDictationV4Page(answer);
+        if (!cleanLegacy.pages[pageNo]) cleanLegacy.pages[pageNo] = model.blankDictationPage();
+      }
+      var calibration = settings.calibration || {};
+      state.dictationSegments[key] = {
+        answer: answer, firstRow: Math.max(1, Math.min(80, Number(settings.firstRow) || 20)),
+        calibration: { dx: Math.max(-200, Math.min(200, Number(calibration.dx) || 0)),
+          dy: Math.max(-200, Math.min(200, Number(calibration.dy) || 0)),
+          scale: Math.max(0.7, Math.min(1.4, Number(calibration.scale) || 1)) },
+        pages: cleanPages.pages, legacyPages: cleanLegacy.pages
+      };
+    });
+    var selectedSegment = Number(value.selectedSegment || value["段落"] || 1) === 2 ? 2 : 1;
+    restoreDictationSegment(selectedSegment);
+    state.mode = "dictation";
+    var note = migrated ? "已由舊版進度轉換，請核對。" : "已載入進度 JSON（不包含 PDF）。";
+    if (dropped) note += " 已丟棄 " + dropped + " 項無效或超出範圍的資料。";
+    setStatus(note, els.exportStatus);
     renderCurrentMode(); updateControls();
   }
 
@@ -1043,6 +1256,8 @@
       var choiceSettingsForExport = choiceSettings();
       if (!choiceSettingsForExport.valid) { setStatus(choiceSettingsForExport.message || "請先輸入答案。"); return; }
       if (!confirmChoiceExport(choiceSettingsForExport)) return;
+    } else if (!confirmDictationExport()) {
+      return;
     }
     els.exportPdf.disabled = true; setStatus("正在本機製作已批改 PDF…");
     try {
@@ -1056,9 +1271,16 @@
       } else {
         var config = getDictationConfig();
         if (!config.answer.length) throw new Error("請輸入所選段落的默書句子。");
+        var scoreRecords = {};
+        for (var pageNumber = 1; pageNumber <= state.pageCount; pageNumber += 1) {
+          scoreRecords[pageNumber] = dictationScoreRecordForPage(pageNumber);
+        }
         bytes = await pdfExport.exportDictationPdf(state.pdfBytes, { answer: config.answer, firstRow: config.firstRow,
-          punctuation: config.punctuation, pages: state.dictationPages, calibration: state.dictationCalibration,
-          segment: config.segment, templateParams: templates.dictationParams(state.template) });
+          style: state.dictationStyle, baseEnabled: state.dictationBaseEnabled,
+          pages: state.dictationStyle === "sentence" ? state.dictationPages : state.legacyDictationPages,
+          scoreRecords: scoreRecords,
+          calibration: state.dictationCalibration, segment: config.segment,
+          templateParams: templates.dictationParams(state.template) });
         createDownload(downloadName("pdf-marking-dictation-reviewed.pdf"), new Blob([bytes], { type: "application/pdf" }));
       }
       setStatus("已在本機製作 PDF，下載已開始。");
@@ -1088,7 +1310,7 @@
     if (!file || !state.pdfDoc) { setStatus("請先選擇 PDF，再載入進度 JSON。"); return; }
     try {
       var data = JSON.parse(await file.text());
-      applyProgress(data);
+      await applyProgress(data);
     } catch (error) {
       setStatus(error && error.message ? error.message : "進度 JSON 無法載入。");
     }
@@ -1098,14 +1320,15 @@
     var nextTemplate = templateById(state.templateId);
     if (state.template && state.template.id !== nextTemplate.id) {
       var hasChoiceWork = Object.keys(state.choicePages).length > 0;
-      var hasDictationWork = hasDictationMarks(state.dictationPages) || Object.keys(state.dictationSegments).some(function (key) {
-        return hasDictationMarks(state.dictationSegments[key] && state.dictationSegments[key].pages);
+      var hasDictationWork = hasDictationMarks(state.dictationPages) || hasDictationMarks(state.legacyDictationPages) || Object.keys(state.dictationSegments).some(function (key) {
+        var segment = state.dictationSegments[key] || {};
+        return hasDictationMarks(segment.pages) || hasDictationMarks(segment.legacyPages);
       });
       if (state.pdfDoc && (hasChoiceWork || hasDictationWork) &&
           !window.confirm("更換範本會清除目前 PDF 的批改記錄；PDF 本身仍會保留。要繼續嗎？")) {
         state.templateId = state.template.id; renderTemplateList(); updateStepper(); return;
       }
-      state.choicePages = {}; state.dictationPages = {}; state.dictationSegments = {}; state.focusKey = "";
+      state.choicePages = {}; state.dictationPages = {}; state.legacyDictationPages = {}; state.dictationSegments = {}; state.focusKey = "";
     }
     state.template = nextTemplate; state.mode = nextTemplate.kind;
     templateStore.savePreference(window, nextTemplate.id);
@@ -1213,7 +1436,7 @@
     state.demo = false;
     els.demoBanner.hidden = true;
     state.pdfBytes = null; state.pdfDoc = null; state.pdfFingerprint = ""; state.pageCount = 0; state.currentPage = 1;
-    state.choicePages = {}; state.dictationPages = {}; state.dictationSegments = {}; state.focusKey = "";
+    state.choicePages = {}; state.dictationPages = {}; state.legacyDictationPages = {}; state.dictationSegments = {}; state.dictationUndo = []; state.focusKey = "";
     els.pdfFile.value = ""; els.fileStatus.textContent = "尚未載入 PDF"; els.pageCount.textContent = ""; els.fileDot.classList.remove("ready");
     els.omrStatus.textContent = "示範已結束；可選擇自己的本機 PDF。";
     renderCurrentMode(); setStep(1); updateControls(); updateStepper();
@@ -1223,20 +1446,21 @@
   els.clearPdf.addEventListener("click", function () {
     state.demo = false; els.demoBanner.hidden = true;
     state.pdfBytes = null; state.pdfDoc = null; state.pdfFingerprint = ""; state.pageCount = 0; state.currentPage = 1;
-    state.choicePages = {}; state.dictationPages = {}; state.dictationSegments = {}; state.dictationSegment = 1; state.focusKey = "";
+    state.choicePages = {}; state.dictationPages = {}; state.legacyDictationPages = {}; state.dictationSegments = {}; state.dictationUndo = []; state.dictationSegment = 1; state.focusKey = "";
     state.dictationAnswer = DEFAULT_DICTATION_ANSWER; state.firstRow = 20;
     state.punctuation = model.autoPunctuation(DEFAULT_DICTATION_ANSWER);
     state.dictationCalibration = { dx: 0, dy: 0, scale: 1 };
     els.dictationSegment.value = "1"; els.dictationAnswer.value = DEFAULT_DICTATION_ANSWER;
     els.dictationAnswer.placeholder = "請輸入第一段默書句子";
-    els.firstRow.value = "20"; els.punctuationIndexes.value = state.punctuation.join(", ");
+    els.firstRow.value = "20"; state.dictationStyle = "sentence"; state.activeMark = "wrongCircle"; state.dictationBaseEnabled = false;
+    state.dictationUndo = []; els.dictationStyle.value = "sentence"; els.dictationBaseEnabled.checked = false;
     els.dictationDx.value = "0"; els.dictationDy.value = "0"; els.dictationScale.value = "100"; els.pdfFile.value = "";
     els.fileStatus.textContent = "尚未載入 PDF"; els.pageCount.textContent = ""; els.fileDot.classList.remove("ready");
     els.omrStatus.textContent = "讀圈會比較同題選項深淺，模糊答案及班別／學號會標示覆核。";
     setStep(2); renderCurrentMode(); updateControls(); updateStepper();
   });
   els.readOmr.addEventListener("click", function () { readAllPages(); });
-  els.startDictation.addEventListener("click", function () { if (state.pdfDoc && state.dictationAnswer.length) { setStep(3); renderCurrentMode(); } });
+  els.startDictation.addEventListener("click", function () { if (state.pdfDoc) { setStep(3); renderCurrentMode(); } });
   els.useTemplate.addEventListener("click", useSelectedTemplate);
   els.exportTemplate.addEventListener("click", exportSelectedTemplate);
   els.deleteTemplate.addEventListener("click", deleteSelectedTemplate);
@@ -1279,14 +1503,81 @@
       renderChoiceSummary(page);
     });
   });
+  function pushDictationUndo() {
+    saveActiveDictationSegment();
+    var sentenceMode = state.dictationStyle === "sentence";
+    var page = sentenceMode ? dictationPageRecord() : legacyDictationPageRecord();
+    state.dictationUndo.push({ segment: state.dictationSegment, pageNumber: state.currentPage,
+      style: sentenceMode ? "sentence" : "grid", page: JSON.parse(JSON.stringify(page)) });
+    if (state.dictationUndo.length > 100) state.dictationUndo.shift();
+  }
+
+  function undoDictation() {
+    var snapshot = state.dictationUndo.pop();
+    if (!snapshot) return;
+    var segment = state.dictationSegments[String(snapshot.segment)] || {};
+    var key = snapshot.style === "sentence" ? "pages" : "legacyPages";
+    var pages = segment[key] || {};
+    pages[snapshot.pageNumber] = snapshot.page;
+    segment[key] = pages;
+    state.dictationSegments[String(snapshot.segment)] = segment;
+    if (snapshot.segment === state.dictationSegment) {
+      if (snapshot.style === "sentence") state.dictationPages = pages;
+      else state.legacyDictationPages = pages;
+    }
+    renderCurrentMode();
+  }
+
+  function activeMutableDictationPage() {
+    return state.dictationStyle === "sentence" ? dictationPageRecord() : legacyDictationPageRecord();
+  }
+
+  function saveActiveMutableDictationPage(page) {
+    if (state.dictationStyle === "sentence") state.dictationPages[state.currentPage] = page;
+    else state.legacyDictationPages[state.currentPage] = page;
+    saveActiveDictationSegment();
+  }
+
+  function updateDictationOverride(name, value) {
+    var page = activeMutableDictationPage();
+    var answerLength = model.dictationWordCount(state.dictationAnswer);
+    var maximum = name === "extra" ? 1000 : answerLength;
+    if (value != null) {
+      var valid = name === "finalScore"
+        ? Number.isFinite(value) && value >= 0 && value <= 10 && Number.isInteger(value * 2)
+        : Number.isInteger(value) && value >= 0 && value <= maximum;
+      if (!valid) {
+        setStatus(name === "finalScore" ? "最終分須為 0 至 10，並以 0.5 為步長。" :
+          "人手調整數目須為 0 至 " + maximum + " 的整數。", els.exportStatus); return;
+      }
+    }
+    pushDictationUndo();
+    page.overrides[name] = value;
+    page.reviewStatus = "reviewed";
+    saveActiveMutableDictationPage(page);
+    renderCurrentMode();
+  }
+
+  function handleOverrideInput(name, input) {
+    var text = input.value.trim();
+    if (!text) { updateDictationOverride(name, null); return; }
+    var value = Number(text);
+    if (name === "finalScore") {
+      if (!Number.isFinite(value) || value < 0 || value > 10 || !Number.isInteger(value * 2)) {
+        setStatus("最終分須為 0 至 10，並以 0.5 為步長。", els.exportStatus); return;
+      }
+    } else if (!Number.isInteger(value)) {
+      setStatus("人手調整數目須為整數。", els.exportStatus); return;
+    }
+    updateDictationOverride(name, value);
+  }
+
   els.dictationAnswer.addEventListener("focus", function () {
-    state.dictationAnswerEditOriginal = { answer: state.dictationAnswer, punctuation: state.punctuation.slice() };
+    state.dictationAnswerEditOriginal = { answer: state.dictationAnswer };
   });
   els.dictationAnswer.addEventListener("input", function () { getDictationConfig(); renderCurrentMode(); });
   els.dictationAnswer.addEventListener("change", finishDictationAnswerEdit);
-  [els.firstRow, els.punctuationIndexes].forEach(function (input) {
-    input.addEventListener("input", function () { getDictationConfig(); renderCurrentMode(); });
-  });
+  els.firstRow.addEventListener("input", function () { getDictationConfig(); renderCurrentMode(); });
   els.dictationSegment.addEventListener("change", function () {
     switchDictationSegment(Number(els.dictationSegment.value) === 2 ? 2 : 1);
   });
@@ -1307,35 +1598,108 @@
     saveActiveDictationSegment();
     renderDictationPage();
   });
-  els.detectPunctuation.addEventListener("click", function () {
-    var indexes = model.autoPunctuation(els.dictationAnswer.value);
-    els.punctuationIndexes.value = indexes.join(", "); getDictationConfig(); renderCurrentMode();
+  els.dictationStyle.addEventListener("change", function () {
+    state.dictationStyle = els.dictationStyle.value === "grid" ? "grid" : "sentence";
+    state.activeMark = state.dictationStyle === "sentence" ? "wrongCircle" : "circle";
+    syncDictationStyleControls(); renderCurrentMode();
+  });
+  els.dictationBaseEnabled.addEventListener("change", function () {
+    state.dictationBaseEnabled = Boolean(els.dictationBaseEnabled.checked);
+    saveActiveDictationSegment(); renderDictationStats(); updateStepper();
+  });
+  els.undoDictation.addEventListener("click", undoDictation);
+  els.markDictationPerfect.addEventListener("click", function () {
+    pushDictationUndo();
+    var page = activeMutableDictationPage();
+    if (state.dictationStyle === "sentence") {
+      page.answerStates = page.answerStates.map(function () { return "normal"; });
+      page.surfaceMarks = [];
+    } else {
+      page.circles = []; page.arrows = []; page.miss = [];
+    }
+    page.reviewStatus = "reviewed";
+    page.overrides = { wrong: null, extra: null, miss: null, finalScore: null };
+    saveActiveMutableDictationPage(page); renderCurrentMode();
+  });
+  els.dictationPageBase.addEventListener("change", function () {
+    pushDictationUndo();
+    var page = activeMutableDictationPage();
+    page.baseOverride = els.dictationPageBase.value === "on" ? true : els.dictationPageBase.value === "off" ? false : null;
+    page.reviewStatus = "reviewed";
+    saveActiveMutableDictationPage(page); renderCurrentMode();
+  });
+  [["wrong", els.overrideWrong], ["extra", els.overrideExtra], ["miss", els.overrideMiss], ["finalScore", els.overrideScore]]
+    .forEach(function (entry) { entry[1].addEventListener("change", function () { handleOverrideInput(entry[0], entry[1]); }); });
+  els.manualAdjustGrid = document.querySelector(".manual-adjust-grid");
+  els.manualAdjustGrid.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-count-delta]");
+    if (!button) return;
+    var parts = button.dataset.countDelta.split(":"); var name = parts[0]; var delta = Number(parts[1]);
+    var record = currentDictationScoreRecord();
+    updateDictationOverride(name, Math.max(0, Number(record.counts[name] || 0) + delta));
+  });
+  els.restoreDictationAuto.addEventListener("click", function () {
+    pushDictationUndo();
+    var page = activeMutableDictationPage();
+    page.overrides = { wrong: null, extra: null, miss: null, finalScore: null };
+    page.baseOverride = null;
+    saveActiveMutableDictationPage(page); renderCurrentMode();
   });
   document.querySelectorAll(".mode-mark").forEach(function (button) {
     button.addEventListener("click", function () {
+      var toolbar = state.dictationStyle === "sentence" ? els.sentenceToolbar : els.gridToolbar;
+      if (!toolbar.contains(button)) return;
       state.activeMark = button.dataset.mark;
-      document.querySelectorAll(".mode-mark").forEach(function (entry) {
+      toolbar.querySelectorAll(".mode-mark").forEach(function (entry) {
         var active = entry === button; entry.classList.toggle("active", active); entry.setAttribute("aria-pressed", active ? "true" : "false");
       });
       renderDictationGrid(); renderDictationPage();
     });
   });
   function editDictationCell(index) {
-    var config = getDictationConfig(); var record = dictationPageRecord();
+    var config = getDictationConfig(); var record = legacyDictationPageRecord();
     var changed = model.toggleDictationMark(record, index, state.activeMark, config.punctuation);
     if (changed.blocked) { setStatus("標點不可圈或標成漏字；可使用箭嘴。", els.exportStatus); return; }
-    state.dictationPages[state.currentPage] = model.dictationRecord(changed.page, config.answer.length, config.punctuation);
-    saveActiveDictationSegment();
-    renderDictationStats(); renderDictationGrid(); renderDictationPage();
+    pushDictationUndo();
+    changed.page.reviewStatus = "reviewed";
+    state.legacyDictationPages[state.currentPage] = changed.page;
+    saveActiveDictationSegment(); renderCurrentMode();
+  }
+  function editSurfaceMark(clientX, clientY) {
+    var frame = els.dictationStage.querySelector(".pdf-page-frame");
+    if (!frame) return;
+    var rect = frame.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    var x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    var y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    pushDictationUndo();
+    var changed = model.toggleSurfaceMark(dictationPageRecord(), state.activeMark, x, y, state.dictationAnswer);
+    if (!changed.changed) { state.dictationUndo.pop(); return; }
+    state.dictationPages[state.currentPage] = changed.page;
+    saveActiveDictationSegment(); renderCurrentMode();
   }
   els.dictationStage.addEventListener("click", function (event) {
-    var cell = event.target.closest(".dictation-hit"); if (cell && !cell.disabled) editDictationCell(Number(cell.dataset.index));
+    if (state.dictationStyle === "sentence") {
+      if (event.target.closest(".surface-hit-area")) editSurfaceMark(event.clientX, event.clientY);
+    } else {
+      var cell = event.target.closest(".dictation-hit"); if (cell && !cell.disabled) editDictationCell(Number(cell.dataset.index));
+    }
   });
   els.dictationGrid.addEventListener("click", function (event) {
     var cell = event.target.closest(".dictation-cell"); if (cell && !cell.disabled) editDictationCell(Number(cell.dataset.index));
   });
+  els.answerReview.addEventListener("click", function (event) {
+    var button = event.target.closest(".dictation-answer-char");
+    if (!button) return;
+    pushDictationUndo();
+    var changed = model.toggleAnswerState(dictationPageRecord(), Number(button.dataset.index), state.dictationAnswer);
+    if (!changed.changed) { state.dictationUndo.pop(); return; }
+    state.dictationPages[state.currentPage] = changed.page;
+    saveActiveDictationSegment(); renderCurrentMode();
+  });
   els.dictationStudentId.addEventListener("input", function () {
-    var page = dictationPageRecord(); page.studentId = els.dictationStudentId.value;
+    var page = activeMutableDictationPage(); page.studentId = els.dictationStudentId.value;
+    saveActiveMutableDictationPage(page);
   });
   els.exportPdf.addEventListener("click", exportCurrentPdf);
   els.exportCsv.addEventListener("click", exportCsv);

@@ -60,7 +60,7 @@
           <div><p class="eyebrow">第一步</p><h2 id="step-1-heading">選擇批改範本</h2></div>
           <span class="hint-pill">範本決定批改方式</span>
         </div>
-        <p class="muted">選擇題範本用來讀圈；金句默書範本用來點擊格位。自訂範本只會保存在這部電腦的瀏覽器。</p>
+        <p class="muted">選擇題範本用來讀圈；默書範本可選新式答案句批改或舊版格位批改。自訂範本只會保存在這部電腦的瀏覽器。</p>
         <div id="template-list" class="template-list" role="radiogroup" aria-label="可用範本"></div>
         <div class="template-actions">
           <button class="button primary" id="use-template" type="button">使用此範本</button>
@@ -104,31 +104,10 @@
           <p class="privacy-note">自動結果會列出模糊答案及身份資料供人手確認；不會辨識姓名或上載檔案。</p>
         </section>
 
-        <section id="dictation-settings" class="settings-panel" hidden>
-          <div class="section-title"><div><p class="eyebrow">批改設定</p><h3>默書句子及格位</h3></div><span class="hint-pill">移植 GAS 版規則</span></div>
-          <div class="form-grid dictation-form">
-            <label class="field"><span>批改段落</span><select id="dictation-segment"><option value="1" selected>第一段</option><option value="2">第二段</option></select></label>
-            <label class="field wide"><span>默書句子</span><textarea id="dictation-answer" rows="2"></textarea></label>
-            <label class="field"><span>後備每行格數</span><input id="dictation-first-row" type="number" min="1" max="80" value="20"></label>
-            <label class="field wide"><span>標點索引（從 0 開始，以逗號分隔；標點不計分）</span><input id="punctuation-indexes" type="text" autocomplete="off"></label>
-          </div>
-          <div class="toolbar-row">
-            <button class="button" id="detect-punctuation" type="button">依句子找出標點</button>
-            <div class="mark-modes" role="group" aria-label="默書標記模式">
-              <button class="button mode-mark active" data-mark="circle" type="button" aria-pressed="true">紅圈</button>
-              <button class="button mode-mark" data-mark="arrow" type="button" aria-pressed="false">向上箭嘴</button>
-              <button class="button mode-mark" data-mark="miss" type="button" aria-pressed="false">漏字紅⇄黑</button>
-            </div>
-            <span class="muted" id="dictation-note">標點不可圈或標成漏字；箭嘴不扣分。</span>
-          </div>
-          <div class="dictation-calibration" aria-label="默書格位校準">
-            <label class="field">左右位移 <input id="dictation-dx" type="range" min="-200" max="200" value="0" step="1"></label>
-            <label class="field">上下位移 <input id="dictation-dy" type="range" min="-200" max="200" value="0" step="1"></label>
-            <label class="field">縮放 <input id="dictation-scale" type="range" min="70" max="140" value="100" step="1"></label>
-            <button class="button" id="reset-dictation-calibration" type="button">重置校準</button>
-          </div>
-          <p class="rotation-note">PDF 依頁面 rotation 轉正；找不到印刷格線時，可用後備模板與滑桿校準。</p>
-          <button class="button primary" id="start-dictation" type="button" disabled>開始批改</button>
+        <section id="dictation-entry" class="settings-panel" hidden>
+          <div class="section-title"><div><p class="eyebrow">默書</p><h3>批改設定會在第三步</h3></div><span class="hint-pill">本機處理</span></div>
+          <p class="muted">先載入 PDF，再進入第三步選擇段落、輸入答案句及批改方式。</p>
+          <button class="button primary" id="start-dictation" type="button" disabled>開始默書批改</button>
         </section>
       </section>
     </section>
@@ -179,6 +158,40 @@
 
       <section id="dictation-mode" class="mode-panel" hidden>
         <section class="panel review-panel">
+          <section id="dictation-settings" class="settings-panel dictation-review-settings">
+            <div class="section-title"><div><p class="eyebrow">第三步設定</p><h3>默書段落、答案句及標記</h3></div><span class="hint-pill">新模式預設；可切換舊版格位模式</span></div>
+            <div class="form-grid dictation-form">
+              <label class="field"><span>默書批改模式</span><select id="dictation-style"><option value="sentence" selected>答案句標記（新模式）</option><option value="grid">舊版格位模式（GAS 移植版）</option></select></label>
+              <label class="field"><span>批改段落</span><select id="dictation-segment"><option value="1" selected>第一段</option><option value="2">第二段</option></select></label>
+              <label class="field wide"><span>完整答案句</span><textarea id="dictation-answer" rows="2"></textarea></label>
+              <label class="field" id="dictation-first-row-field"><span>舊模式後備每行格數</span><input id="dictation-first-row" type="number" min="1" max="80" value="20"></label>
+            </div>
+            <p class="rotation-note">答案會移除空白及換行；標點自動識別，不計字。新模式按答案句批改；舊版格位模式保留原有格線及校準。</p>
+            <div class="toolbar-row" id="sentence-mark-toolbar">
+              <div class="mark-modes" role="group" aria-label="默書卷面標記模式">
+                <button class="button mode-mark active" data-mark="wrongCircle" type="button" aria-pressed="true">錯字圈</button>
+                <button class="button mode-mark" data-mark="extraCircle" type="button" aria-pressed="false">多字圈</button>
+                <button class="button mode-mark" data-mark="arrow" type="button" aria-pressed="false">上箭嘴</button>
+              </div>
+              <button class="button" id="undo-dictation" type="button" disabled>撤銷上一步</button>
+            </div>
+            <p class="muted" id="dictation-note">在頁面任何位置點擊放置標記；再次點擊同一標記可移除。</p>
+            <div class="toolbar-row" id="grid-mark-toolbar" hidden>
+              <div class="mark-modes" role="group" aria-label="舊版默書格位標記模式">
+                <button class="button mode-mark" data-mark="circle" type="button" aria-pressed="false">紅圈</button>
+                <button class="button mode-mark" data-mark="arrow" type="button" aria-pressed="false">向上箭嘴</button>
+                <button class="button mode-mark" data-mark="miss" type="button" aria-pressed="false">漏字</button>
+              </div>
+              <span class="muted">舊版模式沿用原有格位標記方式。</span>
+            </div>
+            <div class="dictation-calibration" id="dictation-calibration" aria-label="舊版默書格位校準" hidden>
+              <label class="field">左右位移 <input id="dictation-dx" type="range" min="-200" max="200" value="0" step="1"></label>
+              <label class="field">上下位移 <input id="dictation-dy" type="range" min="-200" max="200" value="0" step="1"></label>
+              <label class="field">縮放 <input id="dictation-scale" type="range" min="70" max="140" value="100" step="1"></label>
+              <button class="button" id="reset-dictation-calibration" type="button">重置校準</button>
+            </div>
+            <label class="inline-check"><input id="dictation-base-enabled" type="checkbox">啟用底分（全頁預設，亦可逐頁覆寫）</label>
+          </section>
           <div class="section-title">
             <div><p class="eyebrow">點擊批改</p><h3>默書 PDF</h3></div>
             <div class="page-controls">
@@ -188,13 +201,35 @@
             </div>
           </div>
           <div class="review-summary">
-            <div class="metric"><span>建議分數</span><strong id="dictation-score">10.0</strong></div>
+            <div class="metric"><span>最終分數</span><strong id="dictation-score">—</strong></div>
+            <div class="metric"><span>自動最終分</span><strong id="dictation-auto-score">—</strong></div>
             <div class="metric"><span>扣字數 N</span><strong id="dictation-deduction">0</strong></div>
+            <div class="metric"><span>批改狀態</span><strong id="dictation-page-status">未批改</strong></div>
             <label class="field student-id-field"><span>學號（可留空）</span><input id="dictation-student-id" type="text" maxlength="24" autocomplete="off" placeholder="預設空白"></label>
           </div>
+          <div class="toolbar-row dictation-review-actions">
+            <button class="button" id="mark-dictation-perfect" type="button">已批改（全對）</button>
+            <label class="field inline"><span>本頁底分</span><select id="dictation-page-base"><option value="inherit">跟隨全頁設定</option><option value="on">開啟</option><option value="off">關閉</option></select></label>
+            <span id="dictation-manual-badge" class="hint-pill" hidden>人手調整</span>
+          </div>
+          <section class="manual-adjust-panel" aria-label="默書人手調整">
+            <div class="section-title"><div><p class="eyebrow">可選人手調整</p><h3>覆寫數目或最終分</h3></div><span class="muted">留空代表自動計算</span></div>
+            <div class="manual-adjust-grid">
+              <label class="field"><span>錯字</span><span class="number-stepper"><button type="button" data-count-delta="wrong:-1" aria-label="減少錯字">−</button><input id="dictation-override-wrong" type="number" min="0" step="1" placeholder="自動"><button type="button" data-count-delta="wrong:1" aria-label="增加錯字">＋</button></span></label>
+              <label class="field"><span>多字</span><span class="number-stepper"><button type="button" data-count-delta="extra:-1" aria-label="減少多字">−</button><input id="dictation-override-extra" type="number" min="0" step="1" placeholder="自動"><button type="button" data-count-delta="extra:1" aria-label="增加多字">＋</button></span></label>
+              <label class="field"><span>漏字</span><span class="number-stepper"><button type="button" data-count-delta="miss:-1" aria-label="減少漏字">−</button><input id="dictation-override-miss" type="number" min="0" step="1" placeholder="自動"><button type="button" data-count-delta="miss:1" aria-label="增加漏字">＋</button></span></label>
+              <label class="field"><span>最終分（0–10，每次 0.5）</span><input id="dictation-override-score" type="number" min="0" max="10" step="0.5" placeholder="自動"></label>
+              <button class="button" id="restore-dictation-auto" type="button">還原自動計算</button>
+            </div>
+          </section>
+          <section id="dictation-answer-review-wrap" class="answer-review-wrap">
+            <h3>答案句（逐字標示）</h3>
+            <p class="muted small">按非標點字循環：正常 → 錯字 → 漏字 → 正常；錯字及漏字均標紅。</p>
+            <div id="dictation-answer-review" class="dictation-answer-review" role="group" aria-label="答案句逐字批改"></div>
+          </section>
           <div id="dictation-stage" class="pdf-stage"><p class="empty-state">載入 PDF 後，掃描頁會顯示在這裏。</p></div>
           <div class="dictation-grid-wrap"><h3>本頁格位</h3><div id="dictation-grid" class="dictation-grid"></div></div>
-          <p class="rule-note">N = |圈 ∪ 漏字|；分數 = max(0, min(10, 10 − 0.5N))，四捨五入到 0.5。標點（，、。）永不圈、永不當漏字紅。</p>
+          <p class="rule-note" id="dictation-rule-note">N = 錯字 + max(多字, 漏字)。原始分 = max(0, 10 − 0.5 × N)，四捨五入至 0.5；啟用底分時，正確字數 ≥ 5 為 2 分、≥ 10 為 3 分。</p>
         </section>
       </section>
 
