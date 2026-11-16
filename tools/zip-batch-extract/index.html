@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="在瀏覽器本機批量解開 ZIP，合併成一個 ZIP 下載。">
+  <title>ZIP 批量解壓工具｜Local Tools</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18334b;
+      --muted: #526779;
+      --line: #d5e0e8;
+      --paper: #fff;
+      --canvas: #f2f6f9;
+      --blue: #075b91;
+      --gold: #ffe09a;
+      --red: #982d25;
+      --green: #146b3a;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      color: var(--ink);
+      background: var(--canvas);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; min-height: 100vh; }
+    a { color: var(--blue); }
+    .page { width: min(100% - 28px, 920px); margin: 0 auto; padding: 22px 0 38px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: var(--ink); color: #fff; font-weight: 850; letter-spacing: -.06em; }
+    .brand h1 { margin: 0; font-size: clamp(21px, 4vw, 29px); line-height: 1.2; }
+    .brand p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .home-link { flex: none; padding: 9px 13px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 700; }
+    .home-link:focus-visible, button:focus-visible, a:focus-visible, input:focus-visible, .drop-zone:focus-visible { outline: 3px solid #7bb8df; outline-offset: 2px; }
+    main { display: grid; gap: 16px; }
+    .panel { padding: clamp(17px, 4vw, 26px); border: 1px solid var(--line); border-radius: 18px; background: var(--paper); box-shadow: 0 8px 24px #18334b0b; }
+    .privacy { display: flex; align-items: flex-start; gap: 12px; padding: 15px 17px; border: 1px solid #cfe4d8; border-radius: 14px; background: #f1faf4; color: #234d35; }
+    .privacy strong { display: block; margin-bottom: 3px; }
+    .privacy p { margin: 0; font-size: 14px; line-height: 1.55; }
+    .privacy-icon { flex: none; font-size: 21px; }
+    h2 { margin: 0 0 12px; font-size: 18px; }
+    .drop-zone { display: grid; place-items: center; gap: 7px; min-height: 172px; padding: 22px; border: 2px dashed #a9bdcc; border-radius: 15px; background: #f8fbfd; text-align: center; cursor: pointer; transition: background .15s, border-color .15s; }
+    .drop-zone:hover, .drop-zone.dragover { border-color: var(--blue); background: #eef7fc; }
+    .drop-icon { font-size: 33px; line-height: 1; }
+    .drop-title { font-weight: 800; }
+    .drop-hint { color: var(--muted); font-size: 13px; }
+    .file-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); border: 0; }
+    .drop-zone button { padding: 8px 13px; border: 0; border-radius: 9px; background: var(--blue); color: #fff; font: inherit; font-size: 14px; font-weight: 750; cursor: pointer; }
+    .queue-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 22px 0 9px; }
+    .queue-heading h2 { margin: 0; }
+    .queue-heading span { color: var(--muted); font-size: 13px; }
+    .queue { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .queue-empty { padding: 17px; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); text-align: center; }
+    .queue-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 12px 13px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+    .file-meta { min-width: 0; }
+    .file-name { overflow-wrap: anywhere; font-weight: 750; }
+    .file-size { margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .file-status { max-width: 210px; color: var(--muted); font-size: 12px; text-align: right; overflow-wrap: anywhere; }
+    .file-status[data-state="done"] { color: var(--green); font-weight: 700; }
+    .file-status[data-state="skipped"] { color: var(--red); font-weight: 700; }
+    .remove-button { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: #3d5363; font: inherit; font-size: 12px; cursor: pointer; }
+    .summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--muted); font-size: 13px; }
+    .warning { margin: 13px 0 0; padding: 12px 14px; border: 1px solid #e9c36e; border-radius: 11px; background: #fff8e7; color: #674700; line-height: 1.55; }
+    .warning[hidden] { display: none; }
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 17px; }
+    .primary-button, .download-link { display: inline-flex; align-items: center; justify-content: center; min-height: 43px; padding: 10px 16px; border: 0; border-radius: 10px; background: var(--ink); color: #fff; font: inherit; font-weight: 750; text-decoration: none; cursor: pointer; }
+    .primary-button:disabled { opacity: .5; cursor: not-allowed; }
+    .download-link { background: var(--gold); color: #3b2a00; }
+    .download-link[hidden] { display: none; }
+    .status-message { min-height: 1.5em; margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+    .status-message[data-error="true"] { color: var(--red); }
+    .progress-wrap { margin-top: 13px; }
+    progress { width: 100%; height: 12px; accent-color: var(--blue); }
+    .progress-label { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .report { max-height: 390px; overflow: auto; margin: 0; padding: 15px; border-radius: 11px; background: #f3f6f8; color: #243a4b; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .limitations { margin: 0; padding-left: 20px; color: var(--muted); font-size: 13px; line-height: 1.65; }
+    footer { padding: 13px 3px; color: var(--muted); font-size: 12px; text-align: center; }
+    @media (max-width: 560px) {
+      .page { width: min(100% - 18px, 920px); padding-top: 11px; }
+      .topbar { align-items: flex-start; }
+      .home-link { padding: 8px 10px; font-size: 12px; }
+      .brand-mark { width: 39px; height: 39px; }
+      .queue-item { grid-template-columns: minmax(0, 1fr) auto; }
+      .file-status { grid-column: 1; grid-row: 2; text-align: left; max-width: none; }
+      .remove-button { grid-column: 2; grid-row: 1 / span 2; }
+      .summary { display: grid; gap: 3px; }
+      .actions > * { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">ZIP</span>
+        <div>
+          <h1>ZIP 批量解壓工具</h1>
+          <p>多個 ZIP 合併成一個下載檔</p>
+        </div>
+      </div>
+      <a class="home-link" href="../../index.html">← 返回工具首頁</a>
+    </header>
+    <main>
+      <section class="privacy" aria-label="私隱說明">
+        <span class="privacy-icon" aria-hidden="true">🔒</span>
+        <div><strong>檔案只在本機處理</strong><p>ZIP 不會上載，也不會發出網絡請求。處理完成後，所有內容會重新打包成一個 ZIP。</p></div>
+      </section>
+      <section class="panel">
+        <h2>加入 ZIP 檔</h2>
+        <div class="drop-zone" id="drop-zone" tabindex="0" role="group" aria-label="ZIP 檔案拖放區">
+          <span class="drop-icon" aria-hidden="true">🗜️</span>
+          <span class="drop-title">拖放 ZIP 檔到這裡，或選取多個檔案</span>
+          <span class="drop-hint">可以分多次加入；只接受 .zip 檔</span>
+          <span><button id="choose-files" type="button">選取 ZIP 檔</button></span>
+        </div>
+        <input class="file-input" id="zip-files" type="file" accept=".zip,application/zip,application/x-zip-compressed" multiple aria-label="選取多個 ZIP 檔">
+        <div class="queue-heading"><h2>處理清單</h2><span id="queue-count">尚未加入檔案</span></div>
+        <ul class="queue" id="queue" aria-live="polite"><li class="queue-empty">尚未加入 ZIP 檔。</li></ul>
+        <div class="summary"><span id="total-size">總大小：0 B</span><span>輸出會保留每個 ZIP 的目錄結構</span></div>
+        <p class="warning" id="memory-warning" hidden>所有輸入 ZIP 合計超過 1 GB。大量檔案解壓和重新打包會佔用較多記憶體，瀏覽器可能變慢或無法完成；你仍可繼續。</p>
+        <div class="actions">
+          <button class="primary-button" id="process-button" type="button" disabled>開始批量解壓並合併</button>
+          <a class="download-link" id="download-link" hidden>下載合併 ZIP</a>
+        </div>
+        <p class="status-message" id="status-message" role="status" aria-live="polite"></p>
+        <div class="progress-wrap" id="progress-wrap" hidden>
+          <progress id="progress" max="100" value="0">0%</progress>
+          <div class="progress-label" id="progress-label">準備中</div>
+        </div>
+      </section>
+      <section class="panel" id="report-panel" hidden>
+        <h2>處理報告</h2>
+        <pre class="report" id="report" aria-live="polite"></pre>
+      </section>
+      <section class="panel">
+        <h2>使用及限制</h2>
+        <ul class="limitations">
+          <li>每個 ZIP 會放入以檔名命名的子資料夾；重名時會加上「(2)」、「(3)」等後綴。</li>
+          <li>有 UTF-8 旗標的檔名用 UTF-8；沒有旗標時會依次嘗試 UTF-8、Big5、GBK。</li>
+          <li>加密 ZIP、損壞或不支援的 ZIP 會略過，其他檔案仍會處理。</li>
+          <li>會略過含路徑穿越字串、絕對路徑、磁碟代號、反斜線的項目，以及符號連結。</li>
+          <li>不會自動解開 ZIP 內的 ZIP；加密 ZIP 不受 JSZip 支援。</li>
+          <li>檔案及解壓內容都留在瀏覽器記憶體；可處理大小受裝置可用記憶體限制。</li>
+        </ul>
+      </section>
+    </main>
+    <footer>Local Tools・檔案只在本機處理</footer>
+  </div>
+  <script src="../_vendor/jszip-3.10.1/jszip.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

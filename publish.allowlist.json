@@ -1427,6 +1427,24 @@
       "destination": "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",
       "publicMode": "cli-source",
       "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/zip-batch-extract/index.html",
+      "destination": "tools/zip-batch-extract/index.html",
+      "publicMode": "offline-single-file",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/zip-batch-extract/app.js",
+      "destination": "tools/zip-batch-extract/app.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/zip-batch-extract/README.md",
+      "destination": "tools/zip-batch-extract/README.md",
+      "publicMode": "cli-documentation",
+      "managedBy": "math-lish/local-tools"
     }
   ],
   "generatedFiles": [
@@ -1481,7 +1499,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.16.4",
+      "version": "2026.11.16.5",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1489,7 +1507,8 @@
         "tools/pdf-marking/index.html",
         "tools/pdf-splitter/index.html",
         "tools/hkdse-question-split/index.html",
-        "tools/conduct-grade-average/index.html"
+        "tools/conduct-grade-average/index.html",
+        "tools/zip-batch-extract/index.html"
       ],
       "files": [
         "tools/image-upscaler/index.html",
@@ -1515,7 +1534,10 @@
         "tools/_vendor/jszip-3.10.1/jszip.min.js",
         "tools/_vendor/jszip-3.10.1/LICENSE.markdown",
         "tools/hkdse-question-split/index.html",
-        "tools/conduct-grade-average/index.html"
+        "tools/conduct-grade-average/index.html",
+        "tools/zip-batch-extract/index.html",
+        "tools/zip-batch-extract/app.js",
+        "tools/zip-batch-extract/README.md"
       ],
       "transforms": {
         "injectOfflineHead": true
@@ -2133,6 +2155,54 @@
         }
       ],
       "libraries": []
+    },
+    {
+      "id": "zip-batch-extract",
+      "title": "ZIP 批量解壓工具",
+      "version": "2026.11.16.4",
+      "entry": "tools/zip-batch-extract/index.html",
+      "entries": [
+        "tools/zip-batch-extract/index.html"
+      ],
+      "files": [
+        "tools/zip-batch-extract/index.html",
+        "tools/zip-batch-extract/app.js",
+        "tools/zip-batch-extract/README.md",
+        "tools/_vendor/jszip-3.10.1/jszip.min.js",
+        "tools/_vendor/jszip-3.10.1/LICENSE.markdown"
+      ],
+      "transforms": {
+        "injectOfflineHead": true
+      },
+      "allowedTextUrls": [
+        {
+          "value": "https://ai-lish.github.io/local-tools/downloads/index.html#",
+          "kind": "hyperlink"
+        },
+        {
+          "value": "https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://stuartk.com/jszip",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://raw.github.com/Stuk/jszip/main/LICENSE.markdown",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/nodeca/pako/blob/main/LICENSE",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://stuk.github.io/jszip/documentation/howto/read_zip.html",
+          "kind": "license-text"
+        }
+      ],
+      "libraries": [
+        "jszip"
+      ]
     }
   ]
 }
