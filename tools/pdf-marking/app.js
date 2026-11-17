@@ -1080,25 +1080,37 @@
 
   function cleanChoicePage(source) {
     var identityFields = state.template.identity && state.template.identity.fields || [];
+    var currentSettings = choiceSettings();
+    var pageTemplate = geometry.expandChoiceTemplate(state.template, {
+      mcCount: currentSettings.mcCount, tfCount: currentSettings.tfCount
+    });
+    var cal = source.calibration || {};
+    var affine = omr.normalizeAffine(cal.affine, pageTemplate);
+    var calibration = { dx: Number(cal.dx) || 0, dy: Number(cal.dy) || 0,
+      angle: Number(cal.angle) || 0, scale: Number(cal.scale) || 1 };
+    if (affine) calibration.affine = affine;
     var requirements = {
       grade: identityFields.some(function (field) { return field.id === "class-grade"; }),
       form: identityFields.some(function (field) { return field.id === "class-form"; }),
       studentDigits: (identityFields.find(function (field) { return field.id === "student-number"; }) || { digits: 0 }).digits
     };
     var questions = Array.isArray(source.questions) ? source.questions.map(function (entry) {
+      var type = entry.type === "tf" ? "tf" : "mc";
+      var number = Number(entry.number) || 0;
+      var item = pageTemplate.items.find(function (candidate) { return candidate.type === type && candidate.number === number; });
+      var optionCount = item ? item.choices.length : (questionBlock(type) || { options: [] }).options.length;
       return {
-        type: entry.type === "tf" ? "tf" : "mc", number: Number(entry.number) || 0,
-        answer: normalizeTemplateAnswer(entry.answer, entry.type === "tf" ? "tf" : "mc"),
+        type: type, number: number,
+        answer: normalizeTemplateAnswer(entry.answer, type),
         status: ["read", "review", "blank", "manual"].indexOf(entry.status) >= 0 ? entry.status : "review",
-        reason: String(entry.reason || ""), reviewed: Boolean(entry.reviewed), focusDraftEdited: Boolean(entry.focusDraftEdited), values: Array.isArray(entry.values) ? entry.values.map(Number).slice(0, (questionBlock(entry.type === "tf" ? "tf" : "mc") || { options: [] }).options.length) : [],
-        localOffsets: Array.isArray(entry.localOffsets) ? entry.localOffsets.slice(0, (questionBlock(entry.type === "tf" ? "tf" : "mc") || { options: [] }).options.length).map(function (offset) {
+        reason: String(entry.reason || ""), reviewed: Boolean(entry.reviewed), focusDraftEdited: Boolean(entry.focusDraftEdited), values: Array.isArray(entry.values) ? entry.values.map(Number).slice(0, optionCount) : [],
+        localOffsets: Array.isArray(entry.localOffsets) ? entry.localOffsets.slice(0, optionCount).map(function (offset, index) {
           var dx = Number(offset && offset.dx); var dy = Number(offset && offset.dy);
-          return { dx: Number.isFinite(dx) ? Math.max(-0.01, Math.min(0.01, dx)) : 0,
-            dy: Number.isFinite(dy) ? Math.max(-0.01, Math.min(0.01, dy)) : 0 };
+          return geometry.clampAffineLocalOffset(item && item.choices[index], affine,
+            { dx: Number.isFinite(dx) ? dx : 0, dy: Number.isFinite(dy) ? dy : 0 }, 0.01);
         }) : []
       };
     }) : [];
-    var cal = source.calibration || {};
     return {
       questions: questions, classValue: String(source.classValue || "").toUpperCase().replace(/[^0-9A-F]/g, "").slice(0, 8),
       studentId: String(source.studentId || "").replace(/\D/g, "").slice(0, requirements.studentDigits || 12),
@@ -1113,7 +1125,7 @@
             return clean;
           }) : []
       },
-      calibration: { dx: Number(cal.dx) || 0, dy: Number(cal.dy) || 0, angle: Number(cal.angle) || 0, scale: Number(cal.scale) || 1 },
+      calibration: calibration,
       metadataCalibration: (function () {
         var metadataCal = source.metadataCalibration || cal;
         return { dx: Number(metadataCal.dx) || 0, dy: Number(metadataCal.dy) || 0,
@@ -1130,7 +1142,8 @@
         allPale: Boolean(source.thresholds && source.thresholds.allPale)
       },
       pageFlags: Array.isArray(source.pageFlags) ? source.pageFlags.filter(function (flag) {
-        return ["定位校正幅度較大，請檢查整頁對齊", "班別讀取未確認", "學號讀取未確認",
+        return ["定位校正幅度較大，請檢查整頁對齊", "定位校正後仍有較大殘差，請檢查整頁對齊",
+          "班別讀取未確認", "學號讀取未確認",
           "整頁定位失敗：可能是空白頁、方向錯誤或分組位置不符，請核對本頁"].indexOf(flag) >= 0;
       }) : [],
       classWasEdited: Boolean(source.classWasEdited), studentIdWasEdited: Boolean(source.studentIdWasEdited)

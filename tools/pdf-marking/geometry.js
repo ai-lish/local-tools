@@ -399,6 +399,31 @@
     return templates.expandChoiceTemplate(definition, { mcCount: mcCount, tfCount: tfCount });
   }
 
+  function affineOffsetForBubble(bubble, affine) {
+    var x = Number(bubble && bubble.x); var y = Number(bubble && bubble.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !affine) return { dx: 0, dy: 0 };
+    function evaluate(coefficients) {
+      if (!Array.isArray(coefficients) || coefficients.length !== 3 ||
+          !coefficients.every(function (value) { return Number.isFinite(Number(value)); })) return 0;
+      return Number(coefficients[0]) + Number(coefficients[1]) * x + Number(coefficients[2]) * y;
+    }
+    return { dx: evaluate(affine.dx), dy: evaluate(affine.dy) };
+  }
+
+  function clampAffineLocalOffset(bubble, affine, localOffset, maximumTotalOffset) {
+    var limit = Number.isFinite(Number(maximumTotalOffset)) ? Math.max(0, Number(maximumTotalOffset)) : 0.01;
+    var base = affineOffsetForBubble(bubble, affine);
+    var dx = Number(localOffset && localOffset.dx); var dy = Number(localOffset && localOffset.dy);
+    var localX = Math.max(-limit, Math.min(limit, Number.isFinite(dx) ? dx : 0));
+    var localY = Math.max(-limit, Math.min(limit, Number.isFinite(dy) ? dy : 0));
+    var totalX = base.dx + localX;
+    var totalY = base.dy + localY;
+    return {
+      dx: Math.max(-limit, Math.min(limit, totalX)) - base.dx,
+      dy: Math.max(-limit, Math.min(limit, totalY)) - base.dy
+    };
+  }
+
   function mapBubble(bubble, width, height, calibration, localOffset) {
     var cal = calibration || { dx: 0, dy: 0, angle: 0, scale: 1 };
     var x = bubble.x * width; var y = bubble.y * height;
@@ -406,9 +431,10 @@
     var scale = Number(cal.scale) || 1;
     var angle = (Number(cal.angle) || 0) * Math.PI / 180;
     var sx = (x - cx) * scale; var sy = (y - cy) * scale;
+    var affine = affineOffsetForBubble(bubble, cal.affine);
     return {
-      x: cx + sx * Math.cos(angle) - sy * Math.sin(angle) + (Number(cal.dx) || 0) * width + (Number(localOffset && localOffset.dx) || 0) * width,
-      y: cy + sx * Math.sin(angle) + sy * Math.cos(angle) + (Number(cal.dy) || 0) * height + (Number(localOffset && localOffset.dy) || 0) * height
+      x: cx + sx * Math.cos(angle) - sy * Math.sin(angle) + (Number(cal.dx) || 0) * width + affine.dx * width + (Number(localOffset && localOffset.dx) || 0) * width,
+      y: cy + sx * Math.sin(angle) + sy * Math.cos(angle) + (Number(cal.dy) || 0) * height + affine.dy * height + (Number(localOffset && localOffset.dy) || 0) * height
     };
   }
 
@@ -425,6 +451,8 @@
     dictationParams: templates.dictationParams,
     identityMaskRects: templates.identityMaskRects,
     omrTemplate: omrTemplate,
+    affineOffsetForBubble: affineOffsetForBubble,
+    clampAffineLocalOffset: clampAffineLocalOffset,
     mapBubble: mapBubble
   };
   if (typeof module !== "undefined" && module.exports) module.exports = root.PdfMarkingGeometry;

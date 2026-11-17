@@ -40,9 +40,11 @@
     return ringInkAtCenter(data, width, height, geometry.mapBubble(bubble, width, height, calibration), params);
   }
 
-  function refineBubbleCenter(data, width, height, bubble, calibration, params) {
+  function refineBubbleCenter(data, width, height, bubble, calibration, params, correctionBounds) {
     var configuration = params || BUILTIN_PARAMS;
     var expected = geometry.mapBubble(bubble, width, height, calibration);
+    var baseExpected = correctionBounds ? geometry.mapBubble(bubble, width, height, correctionBounds.baseCalibration) : null;
+    var maximumOffset = correctionBounds ? Number(correctionBounds.maxOffset) : 0;
     var searchRadius = width * configuration.localSearch;
     var step = Math.max(1, width * 0.0008);
     var steps = Math.ceil(searchRadius / step);
@@ -52,6 +54,9 @@
       for (var xStep = -steps; xStep <= steps; xStep += 1) {
         var dx = xStep * step;
         if (dx * dx + dy * dy > searchRadius * searchRadius) continue;
+        // localOffsets 在進度檔內維持 ±0.01；仿射位移與本地細修相加亦不得越界。
+        if (baseExpected && (Math.abs((expected.x + dx - baseExpected.x) / width) > maximumOffset ||
+            Math.abs((expected.y + dy - baseExpected.y) / height) > maximumOffset)) continue;
         var score = ringInkAtCenter(data, width, height, { x: expected.x + dx, y: expected.y + dy }, configuration);
         var offsetSquared = dx * dx + dy * dy;
         var bestOffsetSquared = best.dx * best.dx + best.dy * best.dy;
@@ -301,26 +306,155 @@
     return result;
   }
 
-  function detectPage(data, width, height, mcCount, tfCount, calibration, metadataCalibration, expandedTemplate) {
-    var template = expandedTemplate || geometry.omrTemplate(mcCount, tfCount);
-    var params = template.params || BUILTIN_PARAMS;
-    var applied = calibration || { dx: 0, dy: 0, angle: 0, scale: 1 };
-    var metadataApplied = metadataCalibration || applied;
+  var AFFINE_MIN_ANCHORS = 20;
+  var AFFINE_OUTLIER_LIMIT = 0.002;
+  var AFFINE_MAX_INTERCEPT = 0.02;
+  var AFFINE_MAX_SLOPE = 0.025;
+  var AFFINE_MAX_SHIFT = 0.008;
+  // 殘差以頁面寬／高正規化；超過 0.2% 代表局部定位仍可能影響覆核位置。
+  var AFFINE_RESIDUAL_WARNING_THRESHOLD = 0.002;
+
+  function median(values) {
+    if (!values.length) return 0;
+    var sorted = values.slice().sort(function (left, right) { return left - right; });
+    var middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+
+  function solve3x3(matrix, values) {
+    var rows = matrix.map(function (row, index) { return row.slice().concat([values[index]]); });
+    for (var column = 0; column < 3; column += 1) {
+      var pivot = column;
+      for (var candidate = column + 1; candidate < 3; candidate += 1) {
+        if (Math.abs(rows[candidate][column]) > Math.abs(rows[pivot][column])) pivot = candidate;
+      }
+      if (Math.abs(rows[pivot][column]) < 1e-10) return null;
+      var swap = rows[column]; rows[column] = rows[pivot]; rows[pivot] = swap;
+      var divisor = rows[column][column];
+      for (var entry = column; entry < 4; entry += 1) rows[column][entry] /= divisor;
+      for (var other = 0; other < 3; other += 1) {
+        if (other === column) continue;
+        var factor = rows[other][column];
+        for (var offset = column; offset < 4; offset += 1) rows[other][offset] -= factor * rows[column][offset];
+      }
+    }
+    return [rows[0][3], rows[1][3], rows[2][3]];
+  }
+
+  function fitAffineAxis(anchors, field) {
+    var matrix = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    var vector = [0, 0, 0];
+    anchors.forEach(function (point) {
+      var row = [1, point.x, point.y];
+      for (var left = 0; left < 3; left += 1) {
+        vector[left] += row[left] * point[field];
+        for (var right = 0; right < 3; right += 1) matrix[left][right] += row[left] * row[right];
+      }
+    });
+    return solve3x3(matrix, vector);
+  }
+
+  function predictedOffset(coefficients, point) {
+    return coefficients[0] + coefficients[1] * point.x + coefficients[2] * point.y;
+  }
+
+  function normalizeAffine(value, template) {
+    if (!value || !Array.isArray(value.dx) || !Array.isArray(value.dy) || value.dx.length !== 3 || value.dy.length !== 3) return null;
+    if (!value.dx.concat(value.dy).every(function (coefficient) {
+      return typeof coefficient === "number" && Number.isFinite(coefficient);
+    })) return null;
+    var affine = { dx: value.dx.map(Number), dy: value.dy.map(Number) };
+    if (!affine.dx.concat(affine.dy).every(Number.isFinite) ||
+        Math.abs(affine.dx[0]) > AFFINE_MAX_INTERCEPT || Math.abs(affine.dy[0]) > AFFINE_MAX_INTERCEPT ||
+        Math.abs(affine.dx[1]) > AFFINE_MAX_SLOPE || Math.abs(affine.dx[2]) > AFFINE_MAX_SLOPE ||
+        Math.abs(affine.dy[1]) > AFFINE_MAX_SLOPE || Math.abs(affine.dy[2]) > AFFINE_MAX_SLOPE) return null;
+    var bubbles = (template && template.items || []).reduce(function (all, item) { return all.concat(item.choices || []); }, []);
+    if (!bubbles.length) return null;
+    var maximumShift = 0;
+    bubbles.forEach(function (bubble) {
+      var point = { x: bubble.x, y: bubble.y };
+      maximumShift = Math.max(maximumShift,
+        Math.abs(predictedOffset(affine.dx, point)), Math.abs(predictedOffset(affine.dy, point)));
+    });
+    return maximumShift > AFFINE_MAX_SHIFT ? null : affine;
+  }
+
+  function fitAffineCorrection(data, width, height, template, calibration, params) {
+    var expandedParams = Object.assign({}, params, { localSearch: params.localSearch * 1.8 });
+    var anchors = [];
+    template.items.forEach(function (item) {
+      item.choices.forEach(function (bubble) {
+        var location = refineBubbleCenter(data, width, height, bubble, calibration, expandedParams);
+        if (location.ringInk < 0.5) return;
+        anchors.push({ x: bubble.x, y: bubble.y, dx: location.offsetX, dy: location.offsetY });
+      });
+    });
+    if (anchors.length < AFFINE_MIN_ANCHORS) return null;
+    var xSpan = Math.max.apply(Math, anchors.map(function (point) { return point.x; })) -
+      Math.min.apply(Math, anchors.map(function (point) { return point.x; }));
+    var ySpan = Math.max.apply(Math, anchors.map(function (point) { return point.y; })) -
+      Math.min.apply(Math, anchors.map(function (point) { return point.y; }));
+    if (xSpan < 0.2 || ySpan < 0.2) return null;
+    var dx = fitAffineAxis(anchors, "dx"); var dy = fitAffineAxis(anchors, "dy");
+    if (!dx || !dy) return null;
+    var inliers = anchors.filter(function (point) {
+      return Math.hypot(point.dx - predictedOffset(dx, point), point.dy - predictedOffset(dy, point)) <= AFFINE_OUTLIER_LIMIT;
+    });
+    if (inliers.length < AFFINE_MIN_ANCHORS || inliers.length / anchors.length < 0.7) return null;
+    dx = fitAffineAxis(inliers, "dx"); dy = fitAffineAxis(inliers, "dy");
+    if (!dx || !dy) return null;
+    var affine = normalizeAffine({ dx: dx, dy: dy }, template);
+    if (!affine) return null;
+    var residuals = inliers.map(function (point) {
+      return Math.hypot(point.dx - predictedOffset(affine.dx, point), point.dy - predictedOffset(affine.dy, point));
+    });
+    var maximumShift = 0;
+    template.items.forEach(function (item) {
+      item.choices.forEach(function (bubble) {
+        var offset = geometry.affineOffsetForBubble(bubble, affine);
+        maximumShift = Math.max(maximumShift, Math.abs(offset.dx), Math.abs(offset.dy));
+      });
+    });
+    if (maximumShift < 0.0005) return null;
+    return { affine: affine, anchorCount: anchors.length, inlierCount: inliers.length,
+      fitResidualMedian: median(residuals), maximumShift: maximumShift };
+  }
+
+  function isAffineResultWorse(gridResult, affineResult) {
+    return (!gridResult.pageFailure && affineResult.pageFailure) ||
+      affineResult.multipleCount > gridResult.multipleCount ||
+      (!gridResult.thresholds.allPale && affineResult.thresholds.allPale) ||
+      affineResult.reviewCount > gridResult.reviewCount;
+  }
+
+  function selectAffineResult(gridResult, affineResult) {
+    return isAffineResultWorse(gridResult, affineResult) ? gridResult : affineResult;
+  }
+
+  function analysePage(data, width, height, template, applied, metadataApplied, params, baseCalibration) {
+    var constrained = applied.affine ? { baseCalibration: baseCalibration, maxOffset: 0.01 } : null;
     var itemLocations = template.items.map(function (item) {
-      return item.choices.map(function (bubble) { return refineBubbleCenter(data, width, height, bubble, applied, params); });
+      return item.choices.map(function (bubble) {
+        return refineBubbleCenter(data, width, height, bubble, applied, params, constrained);
+      });
     });
     var itemValues = template.items.map(function (item, itemIndex) {
       return item.choices.map(function (bubble, bubbleIndex) {
         return measureBubbleAtCenter(data, width, height, itemLocations[itemIndex][bubbleIndex].center, params);
       });
     });
-    var thresholdCircleValues = template.items.reduce(function (all, item) {
-      return all.concat(item.choices.map(function (bubble) { return measureBubble(data, width, height, bubble, applied, params); }));
+    // 閾值與分類使用同一批（仿射及局部校正後）圈心，避免淡色頁沿用未校正座標而變成 allPale。
+    var thresholdCircleValues = itemLocations.reduce(function (all, locations) {
+      return all.concat(locations.map(function (location) {
+        return measureBubbleAtCenter(data, width, height, location.center, params);
+      }));
     }, []);
     var thresholdInfo = deriveThreshold(thresholdCircleValues);
+    var multipleCount = 0;
     var questions = template.items.map(function (item, index) {
       var options = item.choices.map(function (bubble) { return bubble.option; });
       var result = classifyItem(options, itemValues[index], thresholdInfo);
+      if (result.reason === "多於一個深圈") multipleCount += 1;
       result.number = item.number;
       result.type = item.type;
       result.reviewed = false;
@@ -333,14 +467,20 @@
       }
       return result;
     });
-    var multipleCount = questions.filter(function (item) { return item.reason === "多於一個深圈"; }).length;
-    var lowGridScore = Number.isFinite(Number(applied.gridScore)) && Number(applied.gridScore) < params.minGridScore;
-    var unexpectedGroupGapInk = Number.isFinite(Number(applied.groupGapInk)) && Number(applied.groupGapInk) >= params.maxGroupGapInk;
+    // 保留既有整頁失敗判準：只有最終顯示為多圈待覆核的題目才計入原有比例。
+    var pageMultipleCount = questions.filter(function (item) { return item.reason === "多於一個深圈"; }).length;
+    var lowGridScore = Number.isFinite(Number(applied.gridScore)) && applied.gridScore < params.minGridScore;
+    var unexpectedGroupGapInk = Number.isFinite(Number(applied.groupGapInk)) && applied.groupGapInk >= params.maxGroupGapInk;
     var pageFailure = Boolean(applied.alignmentBoundary) || lowGridScore || unexpectedGroupGapInk ||
-      (questions.length > 0 && multipleCount / questions.length >= 0.6);
+      (questions.length > 0 && pageMultipleCount / questions.length >= 0.6);
+    var highConfidenceResiduals = itemLocations.reduce(function (all, locations) {
+      return all.concat(locations.filter(function (location) { return location.ringInk >= 0.5; })
+        .map(function (location) { return Math.hypot(location.offsetX, location.offsetY); }));
+    }, []);
+    var residualMedian = median(highConfidenceResiduals);
     var pageFlags = [];
-    if (!pageFailure && (Math.abs(applied.dx) > 0.008 || Math.abs(applied.dy) > 0.008 || Math.abs(applied.angle) > 0.55 || Math.abs(applied.scale - 1) > 0.012)) {
-      pageFlags.push("定位校正幅度較大，請檢查整頁對齊");
+    if (!pageFailure && highConfidenceResiduals.length >= AFFINE_MIN_ANCHORS && residualMedian > AFFINE_RESIDUAL_WARNING_THRESHOLD) {
+      pageFlags.push("定位校正後仍有較大殘差，請檢查整頁對齊");
     }
     var requiresGrade = template.classGrade.length > 0;
     var requiresForm = template.classForm.length > 0;
@@ -378,10 +518,41 @@
       calibration: applied,
       metadataCalibration: metadataApplied,
       pageFailure: pageFailure,
+      multipleCount: multipleCount,
+      affineDiagnostics: { applied: Boolean(applied.affine), residualMedian: residualMedian,
+        residualCount: highConfidenceResiduals.length },
       thresholds: thresholdInfo,
       pageFlags: pageFlags,
       reviewCount: (pageFailure ? 0 : questions.filter(function (item) { return item.status === "review"; }).length) + pageFlags.length
     };
+  }
+
+  function detectPage(data, width, height, mcCount, tfCount, calibration, metadataCalibration, expandedTemplate) {
+    var template = expandedTemplate || geometry.omrTemplate(mcCount, tfCount);
+    var params = template.params || BUILTIN_PARAMS;
+    var baseCalibration = Object.assign({ dx: 0, dy: 0, angle: 0, scale: 1 }, calibration || {});
+    var existingAffine = normalizeAffine(baseCalibration.affine, template);
+    if (existingAffine) baseCalibration.affine = existingAffine;
+    else delete baseCalibration.affine;
+    var metadataApplied = metadataCalibration || baseCalibration;
+    var gridResult = analysePage(data, width, height, template, baseCalibration, metadataApplied, params, baseCalibration);
+    if (baseCalibration.affine || gridResult.pageFailure) return gridResult;
+    var fit = fitAffineCorrection(data, width, height, template, baseCalibration, params);
+    if (!fit) return gridResult;
+    var affineCalibration = Object.assign({}, baseCalibration, { affine: fit.affine });
+    var affineResult = analysePage(data, width, height, template, affineCalibration, metadataApplied, params, baseCalibration);
+    affineResult.affineDiagnostics = Object.assign({}, affineResult.affineDiagnostics, {
+      anchorCount: fit.anchorCount, inlierCount: fit.inlierCount, fitResidualMedian: fit.fitResidualMedian,
+      maximumShift: fit.maximumShift, fallback: false
+    });
+    if (selectAffineResult(gridResult, affineResult) === gridResult) {
+      gridResult.affineDiagnostics = Object.assign({}, gridResult.affineDiagnostics, {
+        anchorCount: fit.anchorCount, inlierCount: fit.inlierCount, fitResidualMedian: fit.fitResidualMedian,
+        maximumShift: fit.maximumShift, fallback: true
+      });
+      return gridResult;
+    }
+    return affineResult;
   }
 
   root.PdfMarkingOmr = {
@@ -390,6 +561,9 @@
     measureBubbleAtCenter: measureBubbleAtCenter,
     deriveThreshold: deriveThreshold,
     classifyItem: classifyItem,
+    normalizeAffine: normalizeAffine,
+    isAffineResultWorse: isAffineResultWorse,
+    selectAffineResult: selectAffineResult,
     gridFit: gridFit,
     detectPage: detectPage,
     MIN_GRID_SCORE: MIN_GRID_SCORE,
