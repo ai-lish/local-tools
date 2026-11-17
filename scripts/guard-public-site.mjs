@@ -8,7 +8,13 @@ import path from 'node:path';
 const root = process.cwd();
 const manifest = JSON.parse(await readFile(path.join(root, 'publish.allowlist.json'), 'utf8'));
 const siteRoot = path.resolve(root, manifest.publicRoot);
-const OFFLINE_CSP = "default-src 'self' file: data: blob: 'unsafe-inline'; connect-src 'none'; worker-src blob:; form-action 'none'";
+const OFFLINE_CSP_BASE = "default-src 'self' file: data: blob: 'unsafe-inline'; worker-src blob:; form-action 'none'";
+
+function offlineCsp(packageInfo) {
+  const apiHosts = ['pdf-marking', 'core-all'].includes(packageInfo.id)
+    ? 'https://generativelanguage.googleapis.com https://api.minimax.io' : "'none'";
+  return OFFLINE_CSP_BASE.replace('worker-src', `connect-src ${apiHosts}; worker-src`);
+}
 const generatedMemberNames = new Set(['START-HERE.html', 'index.html', 'README-OFFLINE.txt', 'VERSION.json', 'LICENSES/THIRD-PARTY-NOTICES.md']);
 const expected = new Set([
   ...manifest.entries.map((entry) => entry.destination.replaceAll('\\', '/')),
@@ -168,7 +174,7 @@ function injectOfflineHead(source, packageInfo, contentHash) {
   if (/\bwindow\.LT_OFFLINE\s*=/.test(source) || source.includes('LT_OFFLINE_FOOTER') || /http-equiv\s*=\s*["']Content-Security-Policy/i.test(source)) {
     throw new Error('source already contains offline metadata or CSP: ' + packageInfo.id);
   }
-  const metadata = `<meta http-equiv="Content-Security-Policy" content="${OFFLINE_CSP}">\n<script>window.LT_OFFLINE=${JSON.stringify({ id: packageInfo.id, version: packageInfo.version, hash: contentHash })};</script>\n`;
+  const metadata = `<meta http-equiv="Content-Security-Policy" content="${offlineCsp(packageInfo)}">\n<script>window.LT_OFFLINE=${JSON.stringify({ id: packageInfo.id, version: packageInfo.version, hash: contentHash })};</script>\n`;
   if (!/<head(?:\s[^>]*)?>/i.test(source) || !/<\/head\s*>/i.test(source)) throw new Error('offline entry has no head element: ' + packageInfo.id);
   if (!/<\/body\s*>/i.test(source)) throw new Error('offline entry has no body element: ' + packageInfo.id);
   const footer = `<script>/* LT_OFFLINE_FOOTER */(function(){var info=window.LT_OFFLINE;if(!info)return;var footer=document.createElement("footer");footer.style.cssText="margin:1rem auto;padding:.75rem;color:#526779;font:12px system-ui,sans-serif;text-align:center;position:relative;z-index:9999";footer.appendChild(document.createTextNode("離線版 "+info.version+"（"+info.hash+"） "));var link=document.createElement("a");link.href="https://ai-lish.github.io/local-tools/downloads/index.html#"+encodeURIComponent(info.id)+"="+encodeURIComponent(info.version);link.textContent="檢查更新";footer.appendChild(link);document.body.appendChild(footer);}());</script>`;

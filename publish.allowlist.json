@@ -67,6 +67,12 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/pdf-marking/ai-review.js",
+      "destination": "tools/pdf-marking/ai-review.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/pdf-marking/templates.js",
       "destination": "tools/pdf-marking/templates.js",
       "publicMode": "cli-source",
@@ -1511,7 +1517,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.17.3",
+      "version": "2026.11.17.5",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1538,6 +1544,7 @@
         "tools/pdf-marking/geometry.js",
         "tools/pdf-marking/omr.js",
         "tools/pdf-marking/pdf-export.js",
+        "tools/pdf-marking/ai-review.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.worker.min.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",
@@ -1710,6 +1717,10 @@
           "kind": "namespace"
         }
       ],
+      "allowedFetchUrls": [
+        "https://generativelanguage.googleapis.com/v1beta/models/",
+        "https://api.minimax.io/v1/chat/completions"
+      ],
       "libraries": [
         "pdfjs-dist",
         "pdf-lib",
@@ -1726,7 +1737,7 @@
     {
       "id": "pdf-marking",
       "title": "PDF 閱卷及批改工具",
-      "version": "2026.11.17.3",
+      "version": "2026.11.17.5",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -1745,6 +1756,7 @@
         "tools/pdf-marking/geometry.js",
         "tools/pdf-marking/omr.js",
         "tools/pdf-marking/pdf-export.js",
+        "tools/pdf-marking/ai-review.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.worker.min.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",
@@ -1906,6 +1918,10 @@
           "value": "http://www.xfa.org/schema/xfa-data/1.0/",
           "kind": "namespace"
         }
+      ],
+      "allowedFetchUrls": [
+        "https://generativelanguage.googleapis.com/v1beta/models/",
+        "https://api.minimax.io/v1/chat/completions"
       ],
       "libraries": [
         "pdfjs-dist",

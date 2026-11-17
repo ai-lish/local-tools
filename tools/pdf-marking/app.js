@@ -7,6 +7,7 @@
   var omr = window.PdfMarkingOmr;
   var pdfExport = window.PdfMarkingExport;
   var review = window.PdfMarkingReview;
+  var aiReview = window.PdfMarkingAiReview;
   var templateStore = window.PdfMarkingTemplateStore;
   var DEFAULT_DICTATION_ANSWER = "應當一無掛慮，只要凡事藉著禱告、祈求，和感謝，將你們所要的告訴神。";
   var DEFAULT_TEMPLATE = templates.BUILTIN_TEMPLATES[0];
@@ -27,6 +28,12 @@
     dictationStyle: "sentence", dictationBaseEnabled: false, dictationUndo: [],
     exportSort: "class-student", choiceClassSizeTouched: false
   };
+  // API credentials and AI suggestions intentionally live outside serializable grading state.
+  var aiMemory = { enabled: false, provider: "gemini", model: "gemini-3.8-flash", credential: "", busy: false };
+  var aiChoiceResults = Object.create(null);
+  var aiChoiceErrors = Object.create(null);
+  var aiDictationResults = Object.create(null);
+  var aiDictationErrors = Object.create(null);
   var byId = function (id) { return document.getElementById(id); };
   var els = {
     pdfFile: byId("pdf-file"), clearPdf: byId("clear-pdf"), fileStatus: byId("file-status"),
@@ -69,6 +76,12 @@
     dictationStudentId: byId("dictation-student-id"), dictationStage: byId("dictation-stage"),
     dictationGrid: byId("dictation-grid"), dictationNote: byId("dictation-note"),
     dictationRuleNote: byId("dictation-rule-note"), exportPdf: byId("export-pdf"), exportCsv: byId("export-csv"),
+    aiEnabled: byId("ai-review-enabled"), aiProvider: byId("ai-review-provider"), aiModel: byId("ai-review-model"),
+    aiKey: byId("ai-review-key"), aiTest: byId("ai-review-test"), aiClearKey: byId("ai-review-clear-key"),
+    aiStatus: byId("ai-review-status"), aiChoiceCurrent: byId("ai-review-choice-current"),
+    aiChoiceAll: byId("ai-review-choice-all"), aiChoiceSuggestion: byId("ai-review-choice-suggestion"),
+    aiDictationCurrent: byId("ai-review-dictation-current"), aiDictationAll: byId("ai-review-dictation-all"),
+    aiDictationActions: byId("ai-review-dictation-actions"), aiDictationResult: byId("ai-review-dictation-result"),
     copyExportTsv: byId("copy-export-tsv"), exportXlsx: byId("export-xlsx"),
     exportPreviewHead: byId("export-preview-head"), exportPreviewBody: byId("export-preview-body"),
     exportPreviewTable: byId("export-preview-table"), exportPreviewNote: byId("export-preview-note"),
@@ -89,6 +102,339 @@
 
   function setStatus(message, target) {
     (target || els.exportStatus).textContent = message;
+  }
+
+  function providerLabel(provider) {
+    return provider === "minimax" ? "MiniMax" : "Google Gemini";
+  }
+
+  function defaultModel(provider) {
+    return provider === "minimax" ? "MiniMax-M3.1-Flash" : "gemini-3.8-flash";
+  }
+
+  function validAiModel(value) {
+    return /^[A-Za-z0-9._:-]{1,100}$/.test(String(value || "").trim());
+  }
+
+  function aiReady() {
+    return aiMemory.enabled && Boolean(aiMemory.credential) && validAiModel(aiMemory.model);
+  }
+
+  function setAiStatus(message, isError) {
+    els.aiStatus.textContent = message;
+    els.aiStatus.classList.toggle("is-error", Boolean(isError));
+  }
+
+  function clearAiSuggestions() {
+    aiChoiceResults = Object.create(null);
+    aiChoiceErrors = Object.create(null);
+    aiDictationResults = Object.create(null);
+    aiDictationErrors = Object.create(null);
+    els.aiChoiceSuggestion.replaceChildren();
+    els.aiChoiceSuggestion.hidden = true;
+    els.aiDictationResult.replaceChildren();
+    els.aiDictationResult.hidden = true;
+  }
+
+  function updateAiControls() {
+    var choiceQueue = review.buildReviewQueue(state.choicePages, state.pageCount);
+    var focused = choiceQueue.some(function (entry) { return entry.key === state.focusKey; });
+    var dictationReady = Boolean(state.pdfDoc && state.mode === "dictation" && state.dictationStyle === "sentence" && state.dictationAnswer.length);
+    els.aiChoiceCurrent.disabled = !aiReady() || aiMemory.busy || state.mode !== "choice" || !focused;
+    els.aiChoiceAll.disabled = !aiReady() || aiMemory.busy || state.mode !== "choice" || !choiceQueue.length;
+    els.aiDictationCurrent.disabled = !aiReady() || aiMemory.busy || !dictationReady;
+    els.aiDictationAll.disabled = !aiReady() || aiMemory.busy || !dictationReady || !state.pageCount;
+    els.aiDictationActions.hidden = state.dictationStyle !== "sentence";
+    els.aiTest.disabled = !aiMemory.credential || !validAiModel(aiMemory.model) || aiMemory.busy;
+    els.aiClearKey.disabled = !aiMemory.credential || aiMemory.busy;
+    els.aiEnabled.disabled = aiMemory.busy;
+    els.aiProvider.disabled = aiMemory.busy;
+    els.aiModel.disabled = aiMemory.busy;
+    els.aiKey.disabled = aiMemory.busy;
+    els.pdfFile.disabled = aiMemory.busy;
+    els.clearPdf.disabled = !state.pdfDoc || aiMemory.busy;
+    els.startDictation.disabled = !state.pdfDoc || aiMemory.busy;
+    els.readOmr.disabled = !state.pdfDoc || aiMemory.busy;
+    els.choicePage.disabled = !state.pdfDoc || aiMemory.busy;
+    els.dictationPage.disabled = !state.pdfDoc || aiMemory.busy;
+    els.choicePrev.disabled = !state.pdfDoc || state.currentPage <= 1 || aiMemory.busy;
+    els.dictationPrev.disabled = !state.pdfDoc || state.currentPage <= 1 || aiMemory.busy;
+    els.choiceNext.disabled = !state.pdfDoc || state.currentPage >= state.pageCount || aiMemory.busy;
+    els.dictationNext.disabled = !state.pdfDoc || state.currentPage >= state.pageCount || aiMemory.busy;
+    els.dictationAnswer.disabled = aiMemory.busy;
+    els.dictationSegment.disabled = aiMemory.busy;
+    els.dictationStyle.disabled = aiMemory.busy;
+  }
+
+  function aiFailureMessage(error) {
+    var message = String(error && error.message || "");
+    if (message.indexOf("身份區") >= 0 || message.indexOf("身份欄位") >= 0 || message.indexOf("身份區") >= 0) return message;
+    return "無法安全產生裁切圖片，該項目未送出。";
+  }
+
+  function choiceFocusBounds(entry, sourceCanvas, viewport) {
+    var expanded = geometry.expandChoiceTemplate(state.template, choiceSettings());
+    var item = expanded.items.find(function (candidate) { return candidate.type === entry.type && candidate.number === entry.number; });
+    if (!item) throw new Error("題目圈格位置未能確認，已停止送出。");
+    var pageRecord = state.choicePages[entry.pageNumber];
+    var centers = item.choices.map(function (bubble, index) {
+      return geometry.mapBubble(bubble, viewport.width, viewport.height, pageRecord.calibration,
+        entry.question.localOffsets && entry.question.localOffsets[index]);
+    });
+    return review.focusCropBounds(centers, viewport.width * expanded.params.radius, sourceCanvas.width, sourceCanvas.height);
+  }
+
+  async function makeChoiceAiImage(entry) {
+    var pdfPage = await state.pdfDoc.getPage(entry.pageNumber);
+    var base = pdfPage.getViewport({ scale: 1 });
+    var rendered = await renderPdfToCanvas(entry.pageNumber, Math.min(1.65, 940 / base.width));
+    var bounds = choiceFocusBounds(entry, rendered.canvas, rendered.viewport);
+    return aiReview.createDeidentifiedCrop(rendered.canvas, bounds, state.template, {
+      templates: templates, geometry: geometry,
+      calibration: state.choicePages[entry.pageNumber].calibration
+    });
+  }
+
+  async function makeDictationAiImage(pageNumber, segmentNumber) {
+    var pdfPage = await state.pdfDoc.getPage(pageNumber);
+    var base = pdfPage.getViewport({ scale: 1 });
+    var rendered = await renderPdfToCanvas(pageNumber, Math.min(1.55, 940 / base.width));
+    var params = templates.dictationParams(state.template);
+    var segment = params.segments.find(function (entry) { return entry.id === segmentNumber; });
+    if (!segment || !params.grid || !Array.isArray(params.grid.scan.x)) {
+      throw new Error("默書作答區未能確認，已停止送出。");
+    }
+    var bounds = {
+      left: params.grid.scan.x[0] * rendered.canvas.width,
+      top: segment.band[0] * rendered.canvas.height,
+      right: params.grid.scan.x[1] * rendered.canvas.width,
+      bottom: segment.band[1] * rendered.canvas.height
+    };
+    return aiReview.createDeidentifiedCrop(rendered.canvas, bounds, state.template, {
+      templates: templates, geometry: geometry
+    });
+  }
+
+  function aiConfirmation(count) {
+    return window.confirm("即將以 " + providerLabel(aiMemory.provider) + " 送出 " + count + " 張去識別裁切圖。\n只含裁切圖、不含姓名／班別／學號。\n按「取消」會取消整批；繼續即會把裁切圖傳往所選服務。\n是否繼續？");
+  }
+
+  async function runPreparedAiBatch(task, entries, prepareImage, onSuccess, errorMap, errorKey) {
+    if (!aiReady() || aiMemory.busy) {
+      setAiStatus("請先開啟 AI 覆核並輸入有效 API key 及模型名稱。", true);
+      return;
+    }
+    aiMemory.busy = true;
+    updateAiControls();
+    setAiStatus("正在本機檢查及裁切圖片；尚未送出。", false);
+    var prepared = [];
+    var failed = 0;
+    for (var index = 0; index < entries.length; index += 1) {
+      var entry = entries[index];
+      try {
+        prepared.push({ entry: entry, image: await prepareImage(entry) });
+      } catch (error) {
+        errorMap[errorKey(entry)] = aiFailureMessage(error);
+        failed += 1;
+      }
+    }
+    if (!prepared.length) {
+      aiMemory.busy = false;
+      setAiStatus("沒有安全裁切圖可送出；" + failed + " 項已略過。", true);
+      updateAiControls();
+      renderCurrentMode();
+      return;
+    }
+    if (!aiConfirmation(prepared.length)) {
+      aiMemory.busy = false;
+      prepared.forEach(function (item) { item.image.dataUrl = ""; });
+      setAiStatus("已取消；沒有送出圖片。", false);
+      updateAiControls();
+      renderCurrentMode();
+      return;
+    }
+    setAiStatus("正在送出 0／" + prepared.length + " 張裁切圖；最多同時處理 2 張。", false);
+    var next = 0;
+    var completed = 0;
+    var succeeded = 0;
+    async function worker() {
+      while (next < prepared.length) {
+        var current = prepared[next++];
+        try {
+          var allowed = task === "choice" ? current.entry.options : undefined;
+          var result = await aiReview.request(aiMemory.provider, aiMemory.model, aiMemory.credential,
+            task, current.image, allowed);
+          if (result.ok) {
+            await onSuccess(current.entry, result);
+            delete errorMap[errorKey(current.entry)];
+            succeeded += 1;
+          } else {
+            errorMap[errorKey(current.entry)] = result.message || "AI 覆核失敗。";
+            failed += 1;
+          }
+        } catch (error) {
+          errorMap[errorKey(current.entry)] = "AI 覆核未能處理此項，請稍後再試。";
+          failed += 1;
+        } finally {
+          current.image.dataUrl = "";
+          completed += 1;
+          setAiStatus("已處理 " + completed + "／" + prepared.length + " 張；成功 " + succeeded + "，失敗或略過 " + failed + "。", false);
+        }
+      }
+    }
+    try {
+      await Promise.all(Array.from({ length: Math.min(2, prepared.length) }, worker));
+      setAiStatus("AI 覆核完成：成功 " + succeeded + " 張，失敗或略過 " + failed + "。請逐項核對建議。", failed > 0);
+    } finally {
+      aiMemory.busy = false;
+      updateAiControls();
+      renderCurrentMode();
+    }
+  }
+
+  async function testAiConnection() {
+    if (!aiMemory.credential || !validAiModel(aiMemory.model) || aiMemory.busy) {
+      setAiStatus("請輸入 API key 及有效模型名稱。", true);
+      return;
+    }
+    if (!window.confirm("連線測試只會送出一張程式即時產生的空白合成圖，不會使用 PDF 或學生資料。繼續？")) {
+      setAiStatus("已取消連線測試；沒有送出圖片。", false);
+      return;
+    }
+    aiMemory.busy = true;
+    updateAiControls();
+    try {
+      var blank = document.createElement("canvas");
+      blank.width = 64; blank.height = 64;
+      var context = blank.getContext("2d");
+      context.fillStyle = "#fff"; context.fillRect(0, 0, blank.width, blank.height);
+      var image = await aiReview.createDeidentifiedCrop(blank, { left: 0, top: 0, right: 64, bottom: 64 }, null,
+        { syntheticTestImage: true });
+      var result = await aiReview.request(aiMemory.provider, aiMemory.model, aiMemory.credential, "test", image);
+      image.dataUrl = ""; blank.width = 0; blank.height = 0;
+      setAiStatus(result.ok ? "連線成功；測試只使用空白合成圖。" : result.message, !result.ok);
+    } catch (error) {
+      setAiStatus(aiFailureMessage(error), true);
+    } finally {
+      aiMemory.busy = false;
+      updateAiControls();
+    }
+  }
+
+  function choiceAiEntries() {
+    return review.buildReviewQueue(state.choicePages, state.pageCount).map(function (entry) {
+      var expanded = geometry.expandChoiceTemplate(state.template, choiceSettings());
+      var item = expanded.items.find(function (candidate) {
+        return candidate.type === entry.type && candidate.number === entry.number;
+      });
+      return Object.assign({}, entry, { options: item ? item.choices.map(function (bubble) { return bubble.option; }) : [] });
+    }).filter(function (entry) { return entry.options.length > 0; });
+  }
+
+  async function runChoiceAi(allPending) {
+    var entries = choiceAiEntries();
+    if (!allPending) entries = entries.filter(function (entry) { return entry.key === state.focusKey; });
+    await runPreparedAiBatch("choice", entries, makeChoiceAiImage, function (entry, result) {
+      aiChoiceResults[entry.key] = result;
+    }, aiChoiceErrors, function (entry) { return entry.key; });
+  }
+
+  async function runDictationAi(allPages) {
+    var answerSnapshot = state.dictationAnswer;
+    var segmentSnapshot = state.dictationSegment;
+    var entries = [];
+    var first = allPages ? 1 : state.currentPage;
+    var last = allPages ? state.pageCount : state.currentPage;
+    for (var pageNumber = first; pageNumber <= last; pageNumber += 1) {
+      entries.push({ pageNumber: pageNumber, segment: segmentSnapshot,
+        key: segmentSnapshot + ":" + pageNumber });
+    }
+    await runPreparedAiBatch("dictation", entries, function (entry) {
+      return makeDictationAiImage(entry.pageNumber, entry.segment);
+    }, function (entry, result) {
+      var alignment = aiReview.alignDictationTranscription(answerSnapshot, result.transcription);
+      if (!alignment.ok) {
+        throw new Error(alignment.message || "未能建立逐字建議。");
+      }
+      aiDictationResults[entry.key] = { answer: answerSnapshot, transcription: result.transcription, alignment: alignment };
+    }, aiDictationErrors, function (entry) { return entry.key; });
+  }
+
+  function renderChoiceAiSuggestion(current) {
+    var container = els.aiChoiceSuggestion;
+    container.replaceChildren();
+    if (!current) { container.hidden = true; return; }
+    var result = aiChoiceResults[current.key];
+    var error = aiChoiceErrors[current.key];
+    if (!result && !error) { container.hidden = true; return; }
+    container.hidden = false;
+    var title = document.createElement("strong");
+    title.textContent = error ? "AI 覆核未完成" : "AI 建議";
+    var detail = document.createElement("p");
+    detail.textContent = error || ((result.selectedOptions.length ? result.selectedOptions.join("、") : "空白") +
+      " · 信心 " + Math.round(result.confidence * 100) + "%；請核對圈格後再決定是否採用。");
+    container.append(title, detail);
+    if (result) {
+      var adopt = document.createElement("button"); adopt.type = "button"; adopt.className = "button";
+      adopt.textContent = "採用 AI 建議（仍須確認）";
+      adopt.addEventListener("click", function () {
+        var question = state.choicePages[current.pageNumber] && state.choicePages[current.pageNumber].questions.find(function (entry) {
+          return entry.type === current.type && entry.number === current.number;
+        });
+        if (!question) return;
+        question.answer = result.selectedOptions.join("");
+        question.status = "review";
+        question.reviewed = false;
+        question.focusDraftEdited = true;
+        renderCurrentMode();
+      });
+      container.append(adopt);
+    }
+  }
+
+  function renderDictationAiResult() {
+    var container = els.aiDictationResult;
+    container.replaceChildren();
+    var key = state.dictationSegment + ":" + state.currentPage;
+    var result = aiDictationResults[key];
+    var error = aiDictationErrors[key];
+    if (state.dictationStyle !== "sentence" || (result && result.answer !== state.dictationAnswer) || (!result && !error)) {
+      container.hidden = true; return;
+    }
+    container.hidden = false;
+    var heading = document.createElement("strong");
+    heading.textContent = error ? "AI 讀取未完成" : "AI 轉錄建議 · 第 " + state.currentPage + " 頁";
+    var transcription = document.createElement("p");
+    transcription.textContent = error || "轉錄文字（只在本頁記憶體）：" + result.transcription;
+    container.append(heading, transcription);
+    if (!result) return;
+    var preview = document.createElement("div"); preview.className = "dictation-ai-diff";
+    model.dictationCharacters(state.dictationAnswer).forEach(function (character, index) {
+      var item = document.createElement("span");
+      var status = result.alignment.states[index] || "normal";
+      item.className = status === "wrong" ? "is-wrong" : status === "miss" ? "is-miss" : "";
+      item.textContent = character;
+      preview.append(item);
+    });
+    var extra = document.createElement("p");
+    extra.className = "muted small";
+    extra.textContent = "建議錯字 " + result.alignment.wrong + "、漏字 " + result.alignment.miss +
+      "、多字 " + result.alignment.extra + "；多字只作提示，須由老師自行在卷面加圈。";
+    var adopt = document.createElement("button"); adopt.type = "button"; adopt.className = "button";
+    adopt.textContent = "採用錯字及漏字建議";
+    var answerSnapshot = result.answer;
+    var segmentSnapshot = state.dictationSegment;
+    var pageSnapshot = state.currentPage;
+    adopt.addEventListener("click", function () {
+      if (state.dictationAnswer !== answerSnapshot || state.dictationSegment !== segmentSnapshot || state.currentPage !== pageSnapshot) return;
+      pushDictationUndo();
+      var page = dictationPageRecord();
+      page.answerStates = result.alignment.states.slice();
+      state.dictationPages[pageSnapshot] = page;
+      saveActiveDictationSegment();
+      renderCurrentMode();
+    });
+    container.append(preview, extra, adopt);
   }
 
   function templateById(id) {
@@ -295,6 +641,7 @@
     els.copyChoiceRoster.disabled = !loaded || state.mode !== "choice" || !Object.keys(state.choicePages).length || !keyIsReady();
     els.downloadProgress.disabled = !loaded;
     renderExportPreview();
+    updateAiControls();
   }
 
   function updatePageSelectors() {
@@ -387,6 +734,7 @@
       els.focusTitle.textContent = "沒有待覆核題目";
       els.focusReason.textContent = state.pdfDoc ? "所有已讀題目都已確認；整頁警告仍請檢查。" : "載入 PDF 後，待覆核題目會在這裏放大顯示。";
       els.focusPreview.replaceChildren(Object.assign(document.createElement("p"), { className: "empty-state", textContent: "目前沒有需要覆核的題目。" }));
+      renderChoiceAiSuggestion(null);
       return;
     }
     var question = current.question;
@@ -413,6 +761,7 @@
       });
       els.focusAnswerKeys.append(button);
     });
+    renderChoiceAiSuggestion(current);
   }
 
   function renderReviewList(page) {
@@ -726,6 +1075,7 @@
     els.overrideMiss.value = result.page.overrides.miss == null ? "" : String(result.page.overrides.miss);
     els.overrideScore.value = result.page.overrides.finalScore == null ? "" : String(result.page.overrides.finalScore);
     els.undoDictation.disabled = state.dictationUndo.length === 0;
+    renderDictationAiResult();
   }
 
   function renderAnswerReview() {
@@ -904,6 +1254,7 @@
         : "PDF 程式庫未載入；請連線後重新整理頁面。";
       setStatus(missingLibraryMessage, els.fileStatus); return;
     }
+    clearAiSuggestions();
     try {
       setStatus("正在本機開啟 PDF…", els.fileStatus);
       var bytes = new Uint8Array(await file.arrayBuffer());
@@ -1686,6 +2037,7 @@
 
   function endDemo() {
     state.demo = false;
+    clearAiSuggestions();
     els.demoBanner.hidden = true;
     state.pdfBytes = null; state.pdfDoc = null; state.pdfFingerprint = ""; state.pageCount = 0; state.currentPage = 1;
     state.choicePages = {}; state.choiceClassSizeTouched = false; state.dictationPages = {}; state.legacyDictationPages = {}; state.dictationSegments = {}; state.dictationUndo = []; state.focusKey = "";
@@ -1696,6 +2048,7 @@
 
   els.pdfFile.addEventListener("change", function () { loadPdf(els.pdfFile.files[0]); });
   els.clearPdf.addEventListener("click", function () {
+    clearAiSuggestions();
     state.demo = false; els.demoBanner.hidden = true;
     state.pdfBytes = null; state.pdfDoc = null; state.pdfFingerprint = ""; state.pageCount = 0; state.currentPage = 1;
     state.choicePages = {}; state.choiceClassSizeTouched = false; state.dictationPages = {}; state.legacyDictationPages = {}; state.dictationSegments = {}; state.dictationUndo = []; state.dictationSegment = 1; state.focusKey = "";
@@ -1720,6 +2073,38 @@
   els.templateFile.addEventListener("change", function () { importTemplateFile(els.templateFile.files[0]); });
   els.demoStart.addEventListener("click", startDemo);
   els.endDemo.addEventListener("click", endDemo);
+  els.aiEnabled.addEventListener("change", function () {
+    aiMemory.enabled = Boolean(els.aiEnabled.checked);
+    setAiStatus(aiMemory.enabled ? "AI 覆核已開啟；每次送出前仍會先確認裁切圖張數。" : "AI 覆核已關閉；PDF 仍只在本機處理。", false);
+    updateAiControls();
+  });
+  els.aiProvider.addEventListener("change", function () {
+    var previousDefault = defaultModel(aiMemory.provider);
+    aiMemory.provider = els.aiProvider.value === "minimax" ? "minimax" : "gemini";
+    if (els.aiModel.value.trim() === previousDefault) els.aiModel.value = defaultModel(aiMemory.provider);
+    aiMemory.model = els.aiModel.value.trim();
+    updateAiControls();
+  });
+  els.aiModel.addEventListener("input", function () {
+    aiMemory.model = els.aiModel.value.trim();
+    updateAiControls();
+  });
+  els.aiKey.addEventListener("input", function () {
+    aiMemory.credential = els.aiKey.value;
+    updateAiControls();
+  });
+  els.aiClearKey.addEventListener("click", function () {
+    aiMemory.credential = "";
+    els.aiKey.value = "";
+    clearAiSuggestions();
+    setAiStatus("API key 已清除；沒有寫入瀏覽器儲存。", false);
+    updateAiControls();
+  });
+  els.aiTest.addEventListener("click", testAiConnection);
+  els.aiChoiceCurrent.addEventListener("click", function () { runChoiceAi(false); });
+  els.aiChoiceAll.addEventListener("click", function () { runChoiceAi(true); });
+  els.aiDictationCurrent.addEventListener("click", function () { runDictationAi(false); });
+  els.aiDictationAll.addEventListener("click", function () { runDictationAi(true); });
   els.stepPills.forEach(function (pill) { pill.addEventListener("click", function () { setStep(Number(pill.dataset.step)); renderCurrentMode(); }); });
   els.focusConfirm.addEventListener("click", confirmFocusedQuestion);
   window.addEventListener("keydown", function (event) {
@@ -1829,7 +2214,7 @@
   els.dictationAnswer.addEventListener("focus", function () {
     state.dictationAnswerEditOriginal = { answer: state.dictationAnswer };
   });
-  els.dictationAnswer.addEventListener("input", function () { getDictationConfig(); renderCurrentMode(); });
+  els.dictationAnswer.addEventListener("input", function () { clearAiSuggestions(); getDictationConfig(); renderCurrentMode(); });
   els.dictationAnswer.addEventListener("change", finishDictationAnswerEdit);
   els.firstRow.addEventListener("input", function () { getDictationConfig(); renderCurrentMode(); });
   els.dictationSegment.addEventListener("change", function () {
@@ -1972,5 +2357,7 @@
   els.progressFile.addEventListener("change", function () { loadProgress(els.progressFile.files[0]); els.progressFile.value = ""; });
   window.addEventListener("resize", function () { if (state.pdfDoc) renderCurrentMode(); });
 
+  aiMemory.provider = els.aiProvider.value === "minimax" ? "minimax" : "gemini";
+  aiMemory.model = els.aiModel.value.trim();
   renderTemplateList(); configureTemplateMode(); setStep(1); renderCurrentMode(); updateControls(); updateStepper();
 })();

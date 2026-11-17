@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="只在瀏覽器本機讀取及批改 PDF。">
+  <meta name="description" content="在瀏覽器本機讀取及批改 PDF；AI 覆核須由用家選擇啟用。">
   <title>批改 PDF｜Local Tools</title>
   <link rel="stylesheet" href="styles.css">
   <script defer src="../_vendor/pdfjs-3.11.174/pdf.min.js"></script>
@@ -16,6 +16,7 @@
   <script defer src="omr.js"></script>
   <script defer src="pdf-export.js"></script>
   <script defer src="review.js"></script>
+  <script defer src="ai-review.js"></script>
   <script defer src="demo.js"></script>
   <script defer src="template-store.js"></script>
   <script defer src="template-editor.js"></script>
@@ -162,6 +163,22 @@
         <span class="hint-pill" id="review-step-status">載入 PDF 後開始批改</span>
       </div>
 
+      <section id="ai-review-settings" class="panel ai-review-settings" aria-label="AI 覆核設定">
+        <div class="section-title"><div><p class="eyebrow">第七步（選用）</p><h3>AI 覆核</h3></div><span class="hint-pill">預設關閉</span></div>
+        <label class="inline-check"><input id="ai-review-enabled" type="checkbox">啟用 AI 覆核</label>
+        <div class="form-grid ai-review-config">
+          <label class="field"><span>供應者</span><select id="ai-review-provider"><option value="gemini">Google Gemini</option><option value="minimax">MiniMax</option></select></label>
+          <label class="field"><span>模型名稱</span><input id="ai-review-model" type="text" value="gemini-3.8-flash" maxlength="100" autocomplete="off"></label>
+          <label class="field"><span>API key（只存於本頁記憶體）</span><input id="ai-review-key" type="password" maxlength="500" autocomplete="new-password" spellcheck="false"></label>
+          <div class="toolbar-row ai-review-key-actions">
+            <button class="button" id="ai-review-test" type="button">測試連線（空白合成圖）</button>
+            <button class="button" id="ai-review-clear-key" type="button">清除 key</button>
+          </div>
+        </div>
+        <p class="muted small">只有開啟此功能、輸入 key 並確認送出後，才會把通過身份區檢查的裁切圖傳往所選 AI 服務。圖片不含姓名、班別或學號；AI 建議只供老師核對。重新整理即清除 key。</p>
+        <p id="ai-review-status" class="ai-review-status" role="status" aria-live="polite">AI 覆核已關閉；PDF 仍只在本機處理。</p>
+      </section>
+
       <section id="choice-mode" class="mode-panel">
         <section class="panel review-panel">
           <div class="review-summary">
@@ -184,6 +201,11 @@
               <div class="focus-heading"><div><p class="eyebrow">目前覆核</p><h3 id="focus-title">尚未選取題目</h3></div><span id="focus-progress" class="hint-pill">0 題</span></div>
               <p id="focus-reason" class="muted">先自動讀圈，待覆核題目會在這裏放大顯示。</p>
               <div id="focus-preview" class="focus-preview"><p class="empty-state">放大題目圈格會顯示在這裏。</p></div>
+              <div class="toolbar-row ai-review-actions">
+                <button class="button" id="ai-review-choice-current" type="button" disabled>AI 覆核此題</button>
+                <button class="button" id="ai-review-choice-all" type="button" disabled>AI 覆核全部待覆核題</button>
+              </div>
+              <div id="ai-review-choice-suggestion" class="ai-review-result" hidden></div>
               <div id="focus-answer-keys" class="focus-answer-keys" role="group" aria-label="選擇作答"></div>
               <button class="button primary focus-confirm" id="focus-confirm" type="button" disabled>確認並下一題（Enter）</button>
             </section>
@@ -236,6 +258,11 @@
               <button class="button compact" id="dictation-next" type="button" disabled>下一頁</button>
             </div>
           </div>
+          <div id="ai-review-dictation-actions" class="ai-review-actions">
+            <button class="button" id="ai-review-dictation-current" type="button" disabled>本頁 AI 讀取</button>
+            <button class="button" id="ai-review-dictation-all" type="button" disabled>全部頁 AI 讀取</button>
+          </div>
+          <div id="ai-review-dictation-result" class="ai-review-result dictation-ai-result" hidden></div>
           <div class="review-summary">
             <div class="metric"><span>最終分數</span><strong id="dictation-score">—</strong></div>
             <div class="metric"><span>自動最終分</span><strong id="dictation-auto-score">—</strong></div>
@@ -323,7 +350,7 @@
         </details>
       </section>
     </section>
-    <footer>只在本機瀏覽器工作 · 不連接伺服器或 AI 服務 · 建議桌面瀏覽器</footer>
+    <footer>預設只在本機處理；只有輸入 API key 並按下 AI 覆核時，才會把去識別裁切圖送往所選服務 · 建議桌面瀏覽器</footer>
   </main>
 <script>
 window.addEventListener("load", function () {
