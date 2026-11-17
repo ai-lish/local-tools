@@ -113,8 +113,10 @@
       if (typeNumbers[block.type] >= limit) return false;
       typeNumbers[block.type] += 1;
       var number = typeNumbers[block.type]; var y = yValues[rowIndex];
-      var choices = block.columns[columnIndex].xs.map(function (x, optionIndex) {
-        return { x: x, y: y, type: block.type, number: number, option: block.options[optionIndex] };
+      var column = block.columns[columnIndex];
+      var optionLabels = column.options || block.options;
+      var choices = column.xs.map(function (x, optionIndex) {
+        return { x: x, y: y, type: block.type, number: number, option: optionLabels[optionIndex] };
       });
       choices.forEach(function (bubble) { bubbles.push(bubble); });
       items.push({ type: block.type, number: number, choices: choices });
@@ -126,18 +128,21 @@
       return boundedCount(direct, block.maxCount, block.maxCount);
     }
     def.blocks.forEach(function (block) {
-      var ys = rowValues(block.rows); var limit = countFor(block);
-      if (block.numbering === "row-major") {
-        for (var rowIndex = 0; rowIndex < ys.length && typeNumbers[block.type] < limit; rowIndex += 1) {
-          for (var columnIndex = 0; columnIndex < block.columns.length && typeNumbers[block.type] < limit; columnIndex += 1) {
-            appendQuestion(block, columnIndex, rowIndex, ys, limit);
-          }
-        }
-      } else {
-        for (var col = 0; col < block.columns.length && typeNumbers[block.type] < limit; col += 1) {
-          for (var row = 0; row < ys.length && typeNumbers[block.type] < limit; row += 1) appendQuestion(block, col, row, ys, limit);
-        }
-      }
+      var limit = countFor(block); var locations = [];
+      block.columns.forEach(function (column, columnIndex) {
+        var ys = rowValues(column.rows || block.rows);
+        ys.forEach(function (y, rowIndex) {
+          locations.push({ columnIndex: columnIndex, rowIndex: rowIndex, y: y,
+            x: column.xs.reduce(function (sum, value) { return sum + value; }, 0) / column.xs.length });
+        });
+      });
+      locations.sort(block.numbering === "row-major"
+        ? function (left, right) { return left.y - right.y || left.x - right.x || left.columnIndex - right.columnIndex; }
+        : function (left, right) { return left.columnIndex - right.columnIndex || left.rowIndex - right.rowIndex; });
+      locations.slice(0, limit).forEach(function (location) {
+        appendQuestion(block, location.columnIndex, location.rowIndex,
+          rowValues(block.columns[location.columnIndex].rows || block.rows), limit);
+      });
     });
 
     var gradeOptions = []; var formOptions = []; var idColumns = [];
@@ -177,21 +182,21 @@
     var bubble = def.bubble || {};
     var questionItems = [];
     (def.blocks || []).filter(function (block) { return block.type === "mc"; }).forEach(function (block) {
-      var ys = rowValues(block.rows);
-      var count = 0;
-      function add(columnIndex, rowIndex) {
-        questionItems.push({ choices: block.columns[columnIndex].xs.map(function (x) { return { x: x, y: ys[rowIndex] }; }) });
-        count += 1;
-      }
-      if (block.numbering === "row-major") {
-        for (var rowIndex = 0; rowIndex < ys.length && count < block.maxCount; rowIndex += 1) {
-          for (var columnIndex = 0; columnIndex < block.columns.length && count < block.maxCount; columnIndex += 1) add(columnIndex, rowIndex);
-        }
-      } else {
-        for (var column = 0; column < block.columns.length && count < block.maxCount; column += 1) {
-          for (var row = 0; row < ys.length && count < block.maxCount; row += 1) add(column, row);
-        }
-      }
+      var locations = [];
+      block.columns.forEach(function (column, columnIndex) {
+        rowValues(column.rows || block.rows).forEach(function (y, rowIndex) {
+          locations.push({ columnIndex: columnIndex, rowIndex: rowIndex, y: y,
+            x: column.xs.reduce(function (sum, value) { return sum + value; }, 0) / column.xs.length });
+        });
+      });
+      locations.sort(block.numbering === "row-major"
+        ? function (left, right) { return left.y - right.y || left.x - right.x; }
+        : function (left, right) { return left.columnIndex - right.columnIndex || left.rowIndex - right.rowIndex; });
+      locations.slice(0, block.maxCount).forEach(function (location) {
+        var column = block.columns[location.columnIndex];
+        var y = rowValues(column.rows || block.rows)[location.rowIndex];
+        questionItems.push({ choices: column.xs.map(function (x) { return { x: x, y: y }; }) });
+      });
     });
     var groupGapPoints = [];
     for (var itemIndex = 0; itemIndex < questionItems.length - 1; itemIndex += 1) {
@@ -213,9 +218,24 @@
       limits: clone(alignment.limits || { dx: 0.012, dy: 0.012 }),
       metadataSearchPixels: Number.isFinite(alignment.metadataSearchPixels) ? alignment.metadataSearchPixels : 15,
       rowShiftGuard: alignment.rowShiftGuard ? alignment.rowShiftGuard.mode : "group-gaps",
-      mcOptions: (def.blocks.find(function (block) { return block.type === "mc"; }) || { options: MC_OPTIONS.slice(0, 4) }).options.slice(),
-      tfOptions: (def.blocks.find(function (block) { return block.type === "tf"; }) || { options: TF_OPTIONS.slice() }).options.slice()
+      mcOptions: choiceOptionsFor(def, "mc", MC_OPTIONS.slice(0, 4)),
+      tfOptions: choiceOptionsFor(def, "tf", TF_OPTIONS.slice())
     };
+  }
+
+  function optionLabelsFor(definition, type, fallback) {
+    var labels = [];
+    (definition.blocks || []).filter(function (block) { return block.type === type; }).forEach(function (block) {
+      block.columns.forEach(function (column) {
+        (column.options || block.options).forEach(function (option) { if (labels.indexOf(option) < 0) labels.push(option); });
+      });
+    });
+    return labels.length ? labels : fallback.slice();
+  }
+
+  function choiceOptionsFor(definition, type, fallback) {
+    var safeFallback = Array.isArray(fallback) ? fallback : (type === "tf" ? TF_OPTIONS : MC_OPTIONS.slice(0, 4));
+    return optionLabelsFor(definition || BUILTIN_TEMPLATES[0], type, safeFallback);
   }
 
   function dictationParams(definition) {
@@ -258,12 +278,17 @@
           options: Array.isArray(block.options) ? block.options.slice() : block.options,
           maxCount: block.maxCount, numbering: block.numbering,
           columns: Array.isArray(block.columns) ? block.columns.map(function (column) {
-            return isObject(column) ? { xs: Array.isArray(column.xs) ? column.xs.slice() : column.xs } : column;
+            if (!isObject(column)) return column;
+            var cleanColumn = { xs: Array.isArray(column.xs) ? column.xs.slice() : column.xs };
+            if (column.options != null) cleanColumn.options = Array.isArray(column.options) ? column.options.slice() : column.options;
+            if (column.rows != null) cleanColumn.rows = sanitizeRowSpec(column.rows);
+            return cleanColumn;
           }) : block.columns,
           rows: sanitizeRowSpec(block.rows)
         };
       }) : raw.blocks;
-      if (isObject(raw.identity)) clean.identity = {
+      if (isObject(raw.identity)) {
+        clean.identity = {
         fields: Array.isArray(raw.identity.fields) ? raw.identity.fields.map(function (field) {
           if (!isObject(field)) return field;
           var result = { id: field.id, label: field.label };
@@ -278,7 +303,12 @@
           return isObject(mask) ? { id: mask.id, label: mask.label, x: mask.x, y: mask.y, w: mask.w, h: mask.h } : mask;
         }) : raw.identity.masks,
         noIdentityAreaDeclared: raw.identity.noIdentityAreaDeclared === true
-      };
+        };
+        if (isObject(raw.identity.manualFields)) clean.identity.manualFields = {
+          class: raw.identity.manualFields.class === true,
+          studentNumberDigits: raw.identity.manualFields.studentNumberDigits
+        };
+      }
       if (isObject(raw.alignment)) clean.alignment = {
         method: raw.alignment.method,
         search: isObject(raw.alignment.search) ? {
@@ -375,6 +405,20 @@
       if (!isObject(mask) || !safeText(mask.id || "mask", 80) || !["x", "y", "w", "h"].every(function (key) { return isFiniteIn(mask[key], 0, 1); }) ||
           mask.w <= 0 || mask.h <= 0 || mask.x + mask.w > 1 || mask.y + mask.h > 1) errors.push("身份遮蔽區必須完全位於頁面內。");
     });
+    if (identity.manualFields != null) {
+      var manual = identity.manualFields;
+      if (!isObject(manual) || typeof manual.class !== "boolean" ||
+          !Number.isInteger(manual.studentNumberDigits) || manual.studentNumberDigits < 0 || manual.studentNumberDigits > 12) {
+        errors.push("手寫身份欄位設定不正確。");
+      } else {
+        if (manual.class && !identity.masks.some(function (mask) { return /手寫班別/.test(String(mask && mask.label || "")); })) {
+          errors.push("手寫班別欄必須同時列入身份遮罩。");
+        }
+        if (manual.studentNumberDigits > 0 && !identity.masks.some(function (mask) { return /手寫學號/.test(String(mask && mask.label || "")); })) {
+          errors.push("手寫學號欄必須同時列入身份遮罩。");
+        }
+      }
+    }
     if (Array.isArray(identity.masks) && !identity.masks.length && identity.noIdentityAreaDeclared !== true) errors.push("請設定身份遮蔽區，或明確聲明此紙沒有身份資料區。");
   }
 
@@ -411,15 +455,25 @@
           if (!Number.isInteger(block.maxCount) || block.maxCount < 1 || block.maxCount > 250 ||
               ["column-major", "row-major"].indexOf(block.numbering) < 0) errors.push("題數上限或題號排列方式不正確。");
           if (!Array.isArray(block.columns) || !block.columns.length || block.columns.length > 20) errors.push("題目圈欄數不正確。");
-          else block.columns.forEach(function (column) {
-            if (!isObject(column) || !Array.isArray(column.xs) || !optionsValid || column.xs.length !== block.options.length ||
+          else block.columns.forEach(function (column, columnIndex) {
+            var columnOptions = isObject(column) && column.options != null ? column.options : block.options;
+            var columnOptionsValid = Array.isArray(columnOptions) && columnOptions.length >= 2 && columnOptions.length <= 6 && unique(columnOptions) &&
+              columnOptions.every(function (option) { return typeof option === "string" && (block.type === "tf" ? TF_OPTIONS.indexOf(option) >= 0 : MC_OPTIONS.indexOf(option) >= 0); });
+            if (!isObject(column) || !Array.isArray(column.xs) || !(column.options == null ? optionsValid : columnOptionsValid) || column.xs.length !== columnOptions.length ||
                 column.xs.some(function (x) { return !isFiniteIn(x, 0, 1); })) errors.push("每欄選項圈座標數須與選項數相同，且介乎 0 至 1。");
             else for (var xIndex = 1; xIndex < column.xs.length; xIndex += 1) {
               if (column.xs[xIndex] - column.xs[xIndex - 1] < (isObject(def.bubble) && Number.isFinite(def.bubble.radius) ? def.bubble.radius : 0.003) * 2.2) errors.push("同題選項圈之間距離不足。");
             }
+            if (isObject(column) && column.rows != null) {
+              var columnRows = validateRows(column.rows, "題目區「" + block.id + "」第 " + (columnIndex + 1) + " 欄", errors);
+              if (!columnRows.length) errors.push("每欄最少須有一行圈位。");
+            }
           });
           var ys = validateRows(block.rows, "題目區「" + block.id + "」", errors);
-          if (Array.isArray(block.columns) && block.maxCount > 0 && block.columns.length * ys.length < block.maxCount) errors.push("題目區圈格總數少於題數上限。");
+          var capacity = Array.isArray(block.columns) ? block.columns.reduce(function (sum, column) {
+            return sum + (isObject(column) && column.rows != null ? rowValues(column.rows).length : ys.length);
+          }, 0) : 0;
+          if (block.maxCount > 0 && capacity < block.maxCount) errors.push("題目區圈格總數少於題數上限。");
           if (safeText(block.label, 80) === false) errors.push("題目區標籤不可空白。");
         });
       }
@@ -515,6 +569,7 @@
     rowValues: rowValues,
     expandChoiceTemplate: expandChoiceTemplate,
     choiceParameters: choiceParameters,
+    choiceOptionsFor: choiceOptionsFor,
     dictationParams: dictationParams,
     identityMaskRects: identityMaskRects,
     validateTemplate: validateTemplate,

@@ -9,6 +9,7 @@
   var PROMPTS = {
     choice: "只查看圖片中圈格的實際填寫痕跡，不推測答案。回傳 JSON：{\"selectedOptions\":[\"A\"],\"confidence\":0.0}。空白請用空陣列；如有多個填寫，逐一列出。confidence 必須為 0 至 1。只回傳 JSON。",
     dictation: "請只轉錄圖片內可見的手寫文字，不要補寫、改正或推測；不確定的字請以問號表示。不要描述圖片。回傳 JSON：{\"transcription\":\"\"}。只回傳 JSON。",
+    layout: "只分析答題圈格的版面幾何，不要讀取、轉錄或描述姓名、班別、班號、科目、題目或任何其他文字。請只回傳 JSON：{\"answerColumns\":[{\"type\":\"mc\",\"rect\":{\"x\":0.1,\"y\":0.2,\"w\":0.3,\"h\":0.5},\"options\":[\"A\",\"B\",\"C\",\"D\",\"E\"],\"rows\":10,\"numbering\":\"column-major\"}],\"identityFields\":[]}。每個答案欄可用 type mc 或 tf；options 只回傳可見選項標籤；rows 是整數；numbering 只可為 column-major 或 row-major。identityFields 只可列出 class-grade-grid、class-form-grid、student-number-grid 的位置及 digits（如適用）。不可回傳轉錄文字、label、name、filename、page number、答案或解釋。只回傳 JSON。",
     test: "這是程式即時產生的空白合成圖片。請勿推測或描述個人資料，只回傳 JSON：{\"status\":\"ok\"}。"
   };
 
@@ -165,6 +166,87 @@
     return { mimeType: "image/png", dataUrl: dataUrl };
   }
 
+  function expandLayoutMask(rect, marginX, marginY) {
+    return {
+      left: clamp(rect.left - marginX, 0, 1), top: clamp(rect.top - marginY, 0, 1),
+      right: clamp(rect.right + marginX, 0, 1), bottom: clamp(rect.bottom + marginY, 0, 1)
+    };
+  }
+
+  async function createMaskedLayoutImage(sourceCanvas, definition, options) {
+    var settings = options || {};
+    var width = Number(sourceCanvas && sourceCanvas.width);
+    var height = Number(sourceCanvas && sourceCanvas.height);
+    if (!(width > 0) || !(height > 0) || !definition || !definition.identity ||
+        !Array.isArray(definition.identity.masks) || !Array.isArray(definition.identity.fields)) {
+      throw new Error("樣本頁或身份區設定無效，已停止送出。");
+    }
+    if (!definition.identity.masks.length && !definition.identity.fields.length && definition.identity.noIdentityAreaDeclared !== true) {
+      throw new Error("請先標示所有身份區，或確認此答題紙沒有身份區；已停止送出。");
+    }
+    if (definition.identity.masks.some(function (mask) {
+      return !mask || ![mask.x, mask.y, mask.w, mask.h].every(Number.isFinite) ||
+        mask.x < 0 || mask.y < 0 || mask.w <= 0 || mask.h <= 0 || mask.x + mask.w > 1 || mask.y + mask.h > 1;
+    })) {
+      throw new Error("身份遮罩範圍無效，已停止送出。");
+    }
+    var identityRects = buildIdentityRects(definition, {
+      templates: settings.templates || root.PdfMarkingTemplates,
+      geometry: settings.geometry || root.PdfMarkingGeometry,
+      pageWidth: width, pageHeight: height, calibration: settings.calibration
+    });
+    if ((definition.identity.masks.length || definition.identity.fields.length) && !identityRects.length) {
+      throw new Error("身份區位置未能核實，已停止送出。");
+    }
+    var marginX = 0.015;
+    var marginY = Math.min(1, 0.015 * width / height);
+    var masks = identityRects.map(function (rect) { return expandLayoutMask(rect, marginX, marginY); });
+    var scale = Math.min(1, 1600 / Math.max(width, height));
+    var outputWidth = Math.max(1, Math.round(width * scale));
+    var outputHeight = Math.max(1, Math.round(height * scale));
+    var canvas = document.createElement("canvas");
+    canvas.width = outputWidth; canvas.height = outputHeight;
+    var context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("無法建立去識別預覽，已停止送出。");
+    context.drawImage(sourceCanvas, 0, 0, outputWidth, outputHeight);
+    var pixelMasks = masks.map(function (rect) {
+      var left = Math.max(0, Math.floor(rect.left * outputWidth));
+      var top = Math.max(0, Math.floor(rect.top * outputHeight));
+      var right = Math.min(outputWidth, Math.ceil(rect.right * outputWidth));
+      var bottom = Math.min(outputHeight, Math.ceil(rect.bottom * outputHeight));
+      if (left >= right || top >= bottom) throw new Error("身份區遮罩位置無效，已停止送出。");
+      context.fillStyle = "#000000";
+      context.fillRect(left, top, right - left, bottom - top);
+      return { left: left, top: top, right: right, bottom: bottom };
+    });
+    var pixels;
+    try { pixels = context.getImageData(0, 0, outputWidth, outputHeight).data; }
+    catch (error) { canvas.width = 0; canvas.height = 0; throw new Error("無法核對身份區遮罩像素，已停止送出。"); }
+    for (var maskIndex = 0; maskIndex < pixelMasks.length; maskIndex += 1) {
+      var mask = pixelMasks[maskIndex];
+      for (var y = mask.top; y < mask.bottom; y += 1) {
+        for (var x = mask.left; x < mask.right; x += 1) {
+          var offset = (y * outputWidth + x) * 4;
+          if (pixels[offset] !== 0 || pixels[offset + 1] !== 0 || pixels[offset + 2] !== 0 || pixels[offset + 3] !== 255) {
+            canvas.width = 0; canvas.height = 0;
+            throw new Error("身份區遮罩像素核對失敗，已停止送出。");
+          }
+        }
+      }
+    }
+    var dataUrl;
+    try { dataUrl = await (settings.toDataUrl || canvasDataUrl)(canvas, "image/png"); }
+    finally { canvas.width = 0; canvas.height = 0; }
+    if (!/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/.test(dataUrl || "")) {
+      throw new Error("去識別預覽影像格式無效，已停止送出。");
+    }
+    var labels = definition.identity.masks.map(function (mask) { return String(mask.label || "身份區"); });
+    (definition.identity.fields || []).forEach(function (field) { labels.push(String(field.label || field.id || "身份圈格")); });
+    if (definition.identity.noIdentityAreaDeclared === true && !labels.length) labels.push("已確認沒有身份區");
+    return { mimeType: "image/png", dataUrl: dataUrl, width: outputWidth, height: outputHeight,
+      redactedAreas: labels, redactedRects: masks };
+  }
+
   function promptFor(task) {
     return PROMPTS[task] || "";
   }
@@ -191,7 +273,7 @@
             { text: promptFor(task) },
             { inline_data: { mime_type: mimeType, data: base64 } }
           ] }],
-          generationConfig: { responseMimeType: "application/json", maxOutputTokens: 512 }
+          generationConfig: { responseMimeType: "application/json", maxOutputTokens: task === "layout" ? 2048 : 512 }
         })
       };
     }
@@ -248,6 +330,76 @@
       return { ok: false, message: "AI 回覆包含不適用選項，未套用任何答案。" };
     }
     return { ok: true, selectedOptions: Array.from(new Set(selected)).sort(), confidence: parsed.confidence };
+  }
+
+  function normalizedSuggestionRect(value) {
+    var rect = value && (value.rect || value);
+    if (!rect || ![rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) ||
+        rect.x < 0 || rect.y < 0 || rect.w <= 0 || rect.h <= 0 ||
+        rect.x + rect.w > 1 || rect.y + rect.h > 1) return null;
+    return { left: rect.x, top: rect.y, right: rect.x + rect.w, bottom: rect.y + rect.h,
+      x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+  }
+
+  function rectsOverlap(first, second) {
+    return first.left <= second.right && first.right >= second.left &&
+      first.top <= second.bottom && first.bottom >= second.top;
+  }
+
+  function parseChoiceLayoutSuggestion(text, identityRects) {
+    var parsed = parseJsonObject(text);
+    if (!parsed || !Array.isArray(parsed.answerColumns) ||
+        (parsed.identityFields != null && !Array.isArray(parsed.identityFields))) {
+      return { ok: false, message: "AI 版面回覆格式無效，未套用建議。" };
+    }
+    var protectedRects = Array.isArray(identityRects) ? identityRects : [];
+    var answerColumns = []; var identityFields = []; var rejected = 0;
+    function isSafeRect(item) {
+      var rect = normalizedSuggestionRect(item);
+      if (!rect || protectedRects.some(function (protectedRect) { return rectsOverlap(rect, protectedRect); })) return null;
+      return rect;
+    }
+    parsed.answerColumns.slice(0, 40).forEach(function (item) {
+      if (!item || ["mc", "tf"].indexOf(item.type) < 0 || !Array.isArray(item.options) ||
+          !Number.isInteger(item.rows) || item.rows < 1 || item.rows > 250 ||
+          ["column-major", "row-major"].indexOf(item.numbering) < 0) { rejected += 1; return; }
+      var rect = isSafeRect(item);
+      var options = item.options.map(function (option) { return String(option).trim().toUpperCase(); });
+      var allowed = item.type === "tf" ? ["T", "F"] : ["A", "B", "C", "D", "E", "F"];
+      if (!rect || options.length < 2 || options.length > 6 ||
+          options.some(function (option) { return allowed.indexOf(option) < 0; }) ||
+          new Set(options).size !== options.length) { rejected += 1; return; }
+      answerColumns.push({ type: item.type, rect: { x: rect.x, y: rect.y, w: rect.w, h: rect.h },
+        options: options, rows: item.rows, numbering: item.numbering });
+    });
+    (parsed.identityFields || []).slice(0, 20).forEach(function (item) {
+      var allowedTypes = ["class-grade-grid", "class-form-grid", "student-number-grid"];
+      if (!item || allowedTypes.indexOf(item.type) < 0) { rejected += 1; return; }
+      var rect = isSafeRect(item);
+      var digits = item.type === "student-number-grid" ? Number(item.digits) : undefined;
+      if (!rect || identityFields.some(function (previous) {
+        return rectsOverlap(rect, normalizedSuggestionRect(previous));
+      }) || (item.type === "student-number-grid" && (!Number.isInteger(digits) || digits < 1 || digits > 12))) {
+        rejected += 1; return;
+      }
+      identityFields.push({ type: item.type, rect: { x: rect.x, y: rect.y, w: rect.w, h: rect.h },
+        digits: digits });
+    });
+    var safeAnswerColumns = answerColumns.filter(function (column) {
+      var rect = normalizedSuggestionRect(column.rect);
+      return !identityFields.some(function (field) {
+        return rectsOverlap(rect, normalizedSuggestionRect(field.rect));
+      });
+    });
+    rejected += answerColumns.length - safeAnswerColumns.length;
+    answerColumns = safeAnswerColumns;
+    if (parsed.answerColumns.length > 40 || (parsed.identityFields || []).length > 20) rejected += 1;
+    if (!answerColumns.length && !identityFields.length) {
+      return { ok: false, rejectedCount: rejected,
+        message: "AI 回覆沒有可用建議；" + rejected + " 個無效或與身份區重疊的項目已略過。" };
+    }
+    return { ok: true, answerColumns: answerColumns, identityFields: identityFields,
+      rejectedCount: rejected, message: rejected ? "已略過 " + rejected + " 個無效或與身份區重疊的項目。" : "建議位置已生成，請逐項核對。" };
   }
 
   function parseTranscription(text) {
@@ -328,6 +480,7 @@
   function parseProviderResponse(provider, task, response, allowedOptions) {
     var text = extractProviderText(provider, response);
     if (task === "choice") return parseChoiceSuggestion(text, allowedOptions || ["A", "B", "C", "D", "T", "F"]);
+    if (task === "layout") return parseChoiceLayoutSuggestion(text, allowedOptions || []);
     if (task === "dictation") return parseTranscription(text);
     return parseTestResponse(text);
   }
@@ -373,9 +526,11 @@
     buildIdentityRects: buildIdentityRects,
     assertCropSafe: assertCropSafe,
     createDeidentifiedCrop: createDeidentifiedCrop,
+    createMaskedLayoutImage: createMaskedLayoutImage,
     buildProviderRequest: buildProviderRequest,
     parseJsonObject: parseJsonObject,
     parseChoiceSuggestion: parseChoiceSuggestion,
+    parseChoiceLayoutSuggestion: parseChoiceLayoutSuggestion,
     parseTranscription: parseTranscription,
     parseTestResponse: parseTestResponse,
     parseProviderResponse: parseProviderResponse,

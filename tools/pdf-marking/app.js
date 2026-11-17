@@ -19,6 +19,7 @@
   var initialTemplate = findTemplateById(storedTemplateState.selectedTemplateId) || DEFAULT_TEMPLATE;
   var state = {
     mode: initialTemplate.kind, step: 1, templateId: initialTemplate.id, template: initialTemplate,
+    choiceWizardActive: true, choiceWizardStage: 1,
     pdfBytes: null, pdfDoc: null, pdfFingerprint: "", pageCount: 0, currentPage: 1,
     choicePages: {}, dictationPages: {}, legacyDictationPages: {}, activeMark: "wrongCircle", renderToken: 0,
     focusKey: "", demo: false,
@@ -41,7 +42,8 @@
     dictationMode: byId("dictation-mode"), choiceSettingsPanel: byId("choice-settings"),
     dictationSettingsPanel: byId("dictation-settings"), dictationEntry: byId("dictation-entry"), startDictation: byId("start-dictation"),
     step1: byId("step-1"), step2: byId("step-2"), step3: byId("step-3"), step1State: byId("step-1-state"),
-    step2State: byId("step-2-state"), step3State: byId("step-3-state"), stepPills: Array.from(document.querySelectorAll(".step-pill")),
+    step2State: byId("step-2-state"), step3State: byId("step-3-state"), stepper: byId("legacy-stepper"),
+    stepPills: Array.from(document.querySelectorAll(".step-pill[data-step]")),
     templateList: byId("template-list"), useTemplate: byId("use-template"), demoStart: byId("demo-start"),
     editTemplateLayout: byId("edit-template-layout"),
     templateStatus: byId("template-status"), selectedTemplateLabel: byId("selected-template-label"),
@@ -164,6 +166,7 @@
     els.dictationAnswer.disabled = aiMemory.busy;
     els.dictationSegment.disabled = aiMemory.busy;
     els.dictationStyle.disabled = aiMemory.busy;
+    if (choiceWizardUI) choiceWizardUI.refreshAiSettings();
   }
 
   function aiFailureMessage(error) {
@@ -512,10 +515,25 @@
 
   function setStep(step) {
     var next = Math.max(1, Math.min(3, Number(step) || 1));
-    if (next > 1 && !state.templateId) next = 1;
+    if (state.choiceWizardActive && state.choiceWizardStage !== 5) {
+      state.step = 1;
+      [els.step1, els.step2, els.step3].forEach(function (section) { section.hidden = true; });
+      els.stepper.hidden = true;
+      updateStepper();
+      return;
+    }
+    if (!state.choiceWizardActive && next > 1 && !state.templateId) next = 1;
     if (next === 3 && !state.pdfDoc) next = 2;
     state.step = next;
-    [els.step1, els.step2, els.step3].forEach(function (section, index) { section.hidden = index + 1 !== next; });
+    if (state.choiceWizardActive) {
+      els.step1.hidden = true;
+      els.step2.hidden = next !== 2;
+      els.step3.hidden = next !== 3;
+      els.stepper.hidden = true;
+    } else {
+      [els.step1, els.step2, els.step3].forEach(function (section, index) { section.hidden = index + 1 !== next; });
+      els.stepper.hidden = false;
+    }
     updateStepper();
     if (next === 3 && state.mode === "choice") {
       window.requestAnimationFrame(function () {
@@ -524,8 +542,8 @@
     }
   }
 
-  function configureTemplateMode() {
-    state.template = templateById(state.templateId);
+  function configureTemplateMode(templateOverride) {
+    state.template = templateOverride || templateById(state.templateId);
     state.mode = state.template.kind;
     var choice = state.mode === "choice";
     els.choiceSettingsPanel.hidden = !choice;
@@ -537,11 +555,12 @@
     if (choice) {
       var mc = questionBlock("mc"); var tf = questionBlock("tf");
       var identityFields = state.template.identity && state.template.identity.fields || [];
+      var manualIdentity = state.template.identity && state.template.identity.manualFields || {};
       var classFieldCount = identityFields.filter(function (field) { return field.id === "class-grade" || field.id === "class-form"; }).length;
       var studentField = identityFields.find(function (field) { return field.id === "student-number"; });
-      els.choiceClass.closest("label").hidden = classFieldCount === 0;
-      els.choiceStudentId.closest("label").hidden = !studentField;
-      els.choiceStudentId.maxLength = studentField ? studentField.digits : 12;
+      els.choiceClass.closest("label").hidden = classFieldCount === 0 && !manualIdentity.class;
+      els.choiceStudentId.closest("label").hidden = !studentField && !(Number(manualIdentity.studentNumberDigits) > 0);
+      els.choiceStudentId.maxLength = studentField ? studentField.digits : Number(manualIdentity.studentNumberDigits) || 12;
       els.choiceStudentId.inputMode = "numeric";
       els.mcCount.max = String(mc ? mc.maxCount : 0); els.mcCount.closest("label").hidden = !mc;
       els.tfCount.max = String(tf ? tf.maxCount : 0); els.tfCount.closest("label").hidden = !tf;
@@ -551,8 +570,8 @@
       if (!tf) { els.tfCount.value = "0"; els.tfKey.value = ""; }
       if (mc && Number(els.mcCount.value) > mc.maxCount) els.mcCount.value = String(mc.maxCount);
       if (tf && Number(els.tfCount.value) > tf.maxCount) els.tfCount.value = String(tf.maxCount);
-      if (mc) els.mcKey.placeholder = "例如 " + mc.options.join("");
-      if (tf) els.tfKey.placeholder = "例如 " + tf.options.join("");
+      if (mc) els.mcKey.placeholder = "例如 " + templates.choiceOptionsFor(state.template, "mc", mc.options).join("");
+      if (tf) els.tfKey.placeholder = "例如 " + templates.choiceOptionsFor(state.template, "tf", tf.options).join("");
     }
     els.selectedTemplateLabel.textContent = state.template.name;
     renderTemplateList();
@@ -567,19 +586,30 @@
 
   function choiceSettings() {
     var mcBlock = questionBlock("mc"); var tfBlock = questionBlock("tf");
-    var mcChoices = mcBlock ? mcBlock.options : ["A", "B", "C", "D"];
-    var tfChoices = tfBlock ? tfBlock.options : ["T", "F"];
+    var mcChoices = mcBlock ? templates.choiceOptionsFor(state.template, "mc", mcBlock.options) : ["A", "B", "C", "D"];
+    var tfChoices = tfBlock ? templates.choiceOptionsFor(state.template, "tf", tfBlock.options) : ["T", "F"];
     var mcCount = mcBlock ? numberInput(els.mcCount, mcBlock.maxCount, 0, mcBlock.maxCount) : 0;
     var tfCount = tfBlock ? numberInput(els.tfCount, tfBlock.maxCount, 0, tfBlock.maxCount) : 0;
     var mc = model.parseKey(els.mcKey.value, mcCount, mcChoices);
     var tf = model.parseKey(els.tfKey.value, tfCount, tfChoices);
+    var expanded = templates.expandChoiceTemplate(state.template, { mcCount: mcCount, tfCount: tfCount });
+    var mcItems = expanded.items.filter(function (item) { return item.type === "mc"; });
+    var tfItems = expanded.items.filter(function (item) { return item.type === "tf"; });
+    var mcQuestionOptionsValid = mc.values.every(function (answer, index) {
+      return !answer || (mcItems[index] && mcItems[index].choices.some(function (choice) { return choice.option === answer; }));
+    });
+    var tfQuestionOptionsValid = tf.values.every(function (answer, index) {
+      return !answer || (tfItems[index] && tfItems[index].choices.some(function (choice) { return choice.option === answer; }));
+    });
     var mcPoints = model.parsePoints(els.mcPoints.value, mcCount);
     var tfPoints = model.parsePoints(els.tfPoints.value, tfCount);
     return {
       mcCount: mcCount, tfCount: tfCount, mcKey: mc.values, tfKey: tf.values,
       mcPoints: mcPoints.values, tfPoints: tfPoints.values, mcOptions: mcChoices, tfOptions: tfChoices,
-      valid: mc.ok && tf.ok && mcPoints.ok && tfPoints.ok,
-      message: [mc, tf, mcPoints, tfPoints].filter(function (entry) { return !entry.ok; }).map(function (entry) { return entry.message; }).join(" ")
+      valid: mc.ok && tf.ok && mcPoints.ok && tfPoints.ok && mcQuestionOptionsValid && tfQuestionOptionsValid,
+      message: [mc, tf, mcPoints, tfPoints].filter(function (entry) { return !entry.ok; }).map(function (entry) { return entry.message; })
+        .concat(mcQuestionOptionsValid ? [] : ["選擇題答案包含該題沒有的選項。"])
+        .concat(tfQuestionOptionsValid ? [] : ["是非題答案包含該題沒有的選項。"]).join(" ")
     };
   }
 
@@ -1310,12 +1340,13 @@
         var fit = omr.gridFit(rendered.data.data, rendered.canvas.width, rendered.canvas.height, template);
         var detected = omr.detectPage(rendered.data.data, rendered.canvas.width, rendered.canvas.height,
           settings.mcCount, settings.tfCount, fit.calibration, fit.metadataCalibration, template);
+        var identityRequirements = window.PdfMarkingChoiceWizard.identityRequirements(state.template, detected.identityRequirements);
         var page = {
           questions: detected.questions,
           classValue: detected.classValue,
           studentId: detected.studentId,
           metadata: detected.metadata,
-          identityRequirements: detected.identityRequirements,
+          identityRequirements: identityRequirements,
           calibration: detected.calibration,
           metadataCalibration: detected.metadataCalibration,
           thresholds: detected.thresholds,
@@ -1328,9 +1359,7 @@
         totalQuestions += page.questions.length;
         if (page.pageFailure) pageFailureCount += 1;
         else totalReviews += page.questions.filter(function (question) { return question.status === "review"; }).length;
-        var requirements = detected.identityRequirements || { grade: true, form: true, studentDigits: 2 };
-        if ((requirements.grade && page.metadata.grade.status !== "read") || (requirements.form && page.metadata.form.status !== "read") ||
-            page.metadata.idDigits.some(function (entry) { return entry.status !== "read"; })) metadataReviewPages += 1;
+        if (!model.choiceIdentityConfirmed(page)) metadataReviewPages += 1;
         rendered.canvas.width = 1; rendered.canvas.height = 1;
       }
       var identityWarnings = refreshChoiceIdentityWarnings();
@@ -1649,11 +1678,11 @@
     var calibration = { dx: Number(cal.dx) || 0, dy: Number(cal.dy) || 0,
       angle: Number(cal.angle) || 0, scale: Number(cal.scale) || 1 };
     if (affine) calibration.affine = affine;
-    var requirements = {
+    var requirements = window.PdfMarkingChoiceWizard.identityRequirements(state.template, {
       grade: identityFields.some(function (field) { return field.id === "class-grade"; }),
       form: identityFields.some(function (field) { return field.id === "class-form"; }),
       studentDigits: (identityFields.find(function (field) { return field.id === "student-number"; }) || { digits: 0 }).digits
-    };
+    });
     var questions = Array.isArray(source.questions) ? source.questions.map(function (entry) {
       var type = entry.type === "tf" ? "tf" : "mc";
       var number = Number(entry.number) || 0;
@@ -1927,12 +1956,31 @@
     }
   }
 
+  var choiceWizardUI = null;
+  var aiSettingsPanel = byId("ai-review-settings");
+  var aiSettingsHome = aiSettingsPanel.parentNode;
+  var aiSettingsNext = aiSettingsPanel.nextSibling;
+  function placeAiSettingsForWizard(stage) {
+    if (stage === 2) byId("choice-wizard-ai-settings-slot").append(aiSettingsPanel);
+    else if (aiSettingsPanel.parentNode !== aiSettingsHome) aiSettingsHome.insertBefore(aiSettingsPanel, aiSettingsNext);
+  }
+  var legacyStepHome = els.step2.parentNode;
+  var legacyStep3Next = els.step3.nextSibling;
+  function moveLegacyStepsToWizard() {
+    var slot = byId("choice-wizard-grade-slot");
+    slot.append(els.step2, els.step3);
+  }
+  function restoreLegacySteps() {
+    legacyStepHome.insertBefore(els.step3, legacyStep3Next);
+    legacyStepHome.insertBefore(els.step2, els.step3);
+  }
+
   var templateEditorUI = window.PdfMarkingTemplateEditorUI.create({
     templates: templates,
     geometry: geometry,
     omr: omr,
     editor: window.PdfMarkingTemplateEditor,
-    getSelectedTemplate: function () { return templateById(state.templateId); },
+    getSelectedTemplate: function () { return state.template || templateById(state.templateId); },
     onSave: function (definition) {
       var next = customTemplates.filter(function (entry) { return entry.id !== definition.id; });
       next.push(definition);
@@ -1940,8 +1988,11 @@
       if (!saved.ok) return saved;
       customTemplates = next;
       state.templateId = definition.id;
+      state.template = definition;
+      state.mode = "choice";
       templateStore.savePreference(window, definition.id);
-      renderTemplateList(); updateStepper();
+      configureTemplateMode(definition);
+      if (choiceWizardUI) choiceWizardUI.onTemplateSaved(definition);
       return { ok: true, template: definition, message: saved.message };
     },
     onExport: function (definition) {
@@ -1949,7 +2000,108 @@
       var safeId = definition.id.replace(/[^a-z0-9._-]/gi, "-");
       createDownload(downloadName("pdf-marking-template-" + safeId + ".json"), new Blob([text], { type: "application/json;charset=utf-8" }));
     },
-    onClose: function () { renderTemplateList(); updateStepper(); }
+    onClose: function () {
+      if (choiceWizardUI) choiceWizardUI.onEditorClosed();
+      renderTemplateList(); updateStepper();
+    }
+  });
+
+  choiceWizardUI = window.PdfMarkingChoiceWizardUI.create({
+    templates: templates,
+    geometry: geometry,
+    getTemplates: function () { return templates.BUILTIN_TEMPLATES.concat(customTemplates); },
+    getSelectedTemplate: function () { return state.template || templateById(state.templateId); },
+    getEditorDraft: function () { return templateEditorUI.getDraft(); },
+    isTemplateSaved: function (id) { return Boolean(findTemplateById(id)); },
+    getAiSettings: function () {
+      return { ready: aiReady() && !aiMemory.busy, provider: aiMemory.provider,
+        providerLabel: providerLabel(aiMemory.provider), model: aiMemory.model };
+    },
+    createLayoutImage: function (canvas, definition) {
+      return aiReview.createMaskedLayoutImage(canvas, definition, { templates: templates, geometry: geometry,
+        calibration: { dx: 0, dy: 0, angle: 0, scale: 1 } });
+    },
+    requestAiLayout: async function (image) {
+      if (!aiReady() || aiMemory.busy) return { ok: false, message: "AI 覆核設定未就緒；沒有送出圖片。" };
+      aiMemory.busy = true; updateAiControls();
+      try {
+        return await aiReview.request(aiMemory.provider, aiMemory.model, aiMemory.credential,
+          "layout", image, image.redactedRects);
+      } finally {
+        aiMemory.busy = false; updateAiControls();
+      }
+    },
+    saveTemplate: function () {
+      var button = byId("template-editor-save");
+      if (!button || button.disabled) {
+        byId("choice-wizard-template-save-status").textContent = "請先完成範本位置設定。";
+        return;
+      }
+      button.click();
+      byId("choice-wizard-template-save-status").textContent = byId("template-editor-status").textContent;
+    },
+    exportTemplate: function () {
+      var button = byId("template-editor-export");
+      if (!button || button.disabled) {
+        byId("choice-wizard-template-save-status").textContent = "請先完成範本位置設定。";
+        return;
+      }
+      button.click();
+      byId("choice-wizard-template-save-status").textContent = byId("template-editor-status").textContent;
+    },
+    importTemplate: function (file, input) {
+      importTemplateFile(file, { input: input, choiceOnly: true, onImported: function (definition) {
+        if (choiceWizardUI) choiceWizardUI.onTemplateImported(definition);
+      } });
+    },
+    setNumbering: function (type, numbering) { return templateEditorUI.setNumbering(type, numbering); },
+    hasLoadedPdf: function () { return Boolean(state.pdfDoc); },
+    openEditor: function (definition, sampleFile) {
+      templateEditorUI.open(definition);
+      templateEditorUI.loadSample(sampleFile);
+    },
+    onSelectTemplate: function (definition) {
+      if (!definition || definition.kind !== "choice") return false;
+      var changed = state.templateId !== definition.id;
+      var hasWork = Object.keys(state.choicePages).length > 0;
+      if (changed && state.pdfDoc && hasWork && !window.confirm("更換範本會清除目前選擇題讀圈結果；PDF 仍會保留。要繼續嗎？")) return false;
+      if (changed && state.pdfDoc && hasWork) { state.choicePages = {}; state.focusKey = ""; }
+      state.templateId = definition.id; state.template = definition; state.mode = "choice";
+      configureTemplateMode(definition);
+      var mc = definition.blocks.find(function (block) { return block.type === "mc"; });
+      var tf = definition.blocks.find(function (block) { return block.type === "tf"; });
+      if (changed) {
+        els.mcCount.value = String(mc ? mc.maxCount : 0);
+        els.tfCount.value = String(tf ? tf.maxCount : 0);
+        els.mcKey.value = ""; els.tfKey.value = "";
+      }
+      renderCurrentMode(); updateStepper();
+      return true;
+    },
+    onWizardStage: function (stage) {
+      placeAiSettingsForWizard(stage);
+      state.choiceWizardActive = true;
+      state.choiceWizardStage = stage;
+      if (stage === 5) {
+        moveLegacyStepsToWizard();
+        setStep(2);
+      } else {
+        restoreLegacySteps();
+        setStep(1);
+      }
+    },
+    onShowLegacy: function (mode, definition) {
+      placeAiSettingsForWizard(0);
+      restoreLegacySteps();
+      state.choiceWizardActive = false; state.choiceWizardStage = 0;
+      if (mode === "choice" && definition) {
+        state.templateId = definition.id; state.template = definition; state.mode = "choice";
+        configureTemplateMode(definition); setStep(2); renderCurrentMode();
+      } else {
+        setMode("dictation"); setStep(1); renderCurrentMode();
+      }
+      updateStepper();
+    }
   });
 
   function templateSummary(definition) {
@@ -1961,15 +2113,22 @@
     return "默書 " + definition.segments.length + " 段；印刷格線定位；沿用 GAS 半分制";
   }
 
-  async function importTemplateFile(file) {
+  async function importTemplateFile(file, importOptions) {
     if (!file) return;
+    var settings = importOptions || {};
+    var input = settings.input || els.templateFile;
+    var status = settings.choiceOnly ? byId("choice-wizard-source-status") : els.templateStatus;
     try {
       var parsed = templates.parseTemplateJson(await file.text());
       if (!parsed.ok) {
-        els.templateStatus.textContent = parsed.errors.join(" ");
+        status.textContent = parsed.errors.join(" ");
         return;
       }
       var incoming = parsed.template;
+      if (settings.choiceOnly && incoming.kind !== "choice") {
+        status.textContent = "此匯入位置只接受選擇題範本 JSON。";
+        return;
+      }
       var existing = findTemplateById(incoming.id);
       var preview = "範本預覽：「" + incoming.name + "」\n" + templateSummary(incoming) +
         (parsed.warnings && parsed.warnings.length ? "\n提示：" + parsed.warnings.join(" ") : "") + "\n按確定加入範本清單。";
@@ -1979,11 +2138,12 @@
       customTemplates.push(incoming);
       var saved = templateStore.saveTemplates(window, templates, customTemplates);
       renderTemplateList();
-      els.templateStatus.textContent = "範本已加入。" + (saved.ok ? saved.message : saved.message + " 請匯出 JSON 保留副本。");
+      status.textContent = "範本已加入。" + (saved.ok ? saved.message : saved.message + " 請匯出 JSON 保留副本。");
+      if (typeof settings.onImported === "function") settings.onImported(incoming);
     } catch (error) {
-      els.templateStatus.textContent = error && error.message ? error.message : "範本檔無法讀取。";
+      status.textContent = error && error.message ? error.message : "範本檔無法讀取。";
     } finally {
-      els.templateFile.value = "";
+      input.value = "";
     }
   }
 
@@ -2360,4 +2520,5 @@
   aiMemory.provider = els.aiProvider.value === "minimax" ? "minimax" : "gemini";
   aiMemory.model = els.aiModel.value.trim();
   renderTemplateList(); configureTemplateMode(); setStep(1); renderCurrentMode(); updateControls(); updateStepper();
+  choiceWizardUI.start();
 })();

@@ -395,6 +395,17 @@
       resetTest(); setStatus("已重設為開始編輯時的原範本位置。", false);
       renderControls();
     }
+    function setNumbering(type, numbering) {
+      if (!session || ["column-major", "row-major"].indexOf(numbering) < 0) return false;
+      var block = session.draft.blocks.find(function (entry) { return entry.type === type; });
+      if (!block || block.numbering === numbering) return Boolean(block);
+      pushUndo(session.draft);
+      block.numbering = numbering;
+      resetTest();
+      setStatus("題號排列已調整；請重新測試讀圈。", false);
+      renderOverlay(); updateValidation();
+      return true;
+    }
     function pointerDown(event) {
       if (!session || !samplePage || event.pointerType === "touch" || event.button !== 0) return;
       var group = selectedGroup(); var rect = elements["template-editor-overlay"].getBoundingClientRect();
@@ -468,7 +479,8 @@
       var selected = options.getSelectedTemplate();
       if (selected && selected.kind === "choice") open(selected);
     });
-    return { open: open, close: close, getDraft: function () { return session ? clone(session.draft) : null; } };
+    return { open: open, close: close, loadSample: loadSample, setNumbering: setNumbering,
+      getDraft: function () { return session ? clone(session.draft) : null; } };
   }
 
   root.PdfMarkingTemplateEditorUI = { create: create };

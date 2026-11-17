@@ -37,7 +37,12 @@
     var block = blockById(definition, group.blockId);
     if (!block) return [];
     if (group.kind === "mc-column") {
-      return crossPoints(block.columns[group.columnIndex].xs.slice(), rowValues(block.rows));
+      var column = block.columns[group.columnIndex];
+      return crossPoints(column.xs.slice(), rowValues(column.rows || block.rows));
+    }
+    if (group.kind === "mc-column-rows" || group.kind === "tf-column-rows") {
+      var rowColumn = block.columns[group.columnIndex];
+      return crossPoints(rowColumn.xs.slice(), rowValues(rowColumn.rows || block.rows));
     }
     if (group.kind === "mc-rows") {
       var rows = block.rows && block.rows.mode === "list" ? block.rows.groups[group.groupIndex] || [] : [];
@@ -64,13 +69,17 @@
     });
     (definition.blocks || []).forEach(function (block) {
       if (block.type === "mc") {
-        block.columns.forEach(function (_, index) {
+        block.columns.forEach(function (column, index) {
           groups.push(buildGroup(definition, {
             id: "mc-column:" + block.id + ":" + index, kind: "mc-column", blockId: block.id, columnIndex: index,
             label: "選擇題第 " + (index + 1) + " 欄（選項圈）", color: "#236ba6"
           }));
+          if (column.rows) groups.push(buildGroup(definition, {
+            id: "mc-column-rows:" + block.id + ":" + index, kind: "mc-column-rows", blockId: block.id, columnIndex: index,
+            label: "選擇題第 " + (index + 1) + " 欄（行位）", color: "#b56a1b"
+          }));
         });
-        if (block.rows && block.rows.mode === "list") block.rows.groups.forEach(function (_, index) {
+        if (block.rows && block.rows.mode === "list" && block.columns.some(function (column) { return !column.rows; })) block.rows.groups.forEach(function (_, index) {
           groups.push(buildGroup(definition, {
             id: "mc-rows:" + block.id + ":" + index, kind: "mc-rows", blockId: block.id, groupIndex: index,
             label: "選擇題第 " + (index + 1) + " 題組（行位）", color: "#b56a1b"
@@ -81,6 +90,12 @@
           id: "tf:" + block.id, kind: "tf", blockId: block.id,
           label: "是非題（全部圈位）", color: "#744aa3"
         }));
+        block.columns.forEach(function (column, index) {
+          if (column.rows) groups.push(buildGroup(definition, {
+            id: "tf-column-rows:" + block.id + ":" + index, kind: "tf-column-rows", blockId: block.id, columnIndex: index,
+            label: "是非題第 " + (index + 1) + " 欄（行位）", color: "#b56a1b"
+          }));
+        });
       }
     });
     return groups;
@@ -100,6 +115,9 @@
     }
     var block = blockById(definition, group.blockId);
     if (group.kind === "mc-column") return { xs: block.columns[group.columnIndex].xs, row: null };
+    if (group.kind === "mc-column-rows" || group.kind === "tf-column-rows") {
+      return { xs: block.columns[group.columnIndex].xs, row: block.columns[group.columnIndex].rows || block.rows };
+    }
     if (group.kind === "mc-rows") return {
       xs: block.columns.reduce(function (all, column) { return all.concat(column.xs); }, []),
       row: block.rows.groups[group.groupIndex]
@@ -125,7 +143,7 @@
     if (!group) return { ok: false, message: "找不到所選圈位組。", deltaX: 0, deltaY: 0 };
     var boundsValue = shiftBounds(definition, group);
     if (!boundsValue) return { ok: false, message: "所選組沒有有效座標。", deltaX: 0, deltaY: 0 };
-    var canMoveX = group.kind !== "mc-rows";
+    var canMoveX = group.kind !== "mc-rows" && group.kind !== "mc-column-rows" && group.kind !== "tf-column-rows";
     var canMoveY = group.kind !== "mc-column";
     var dx = canMoveX ? Math.max(-boundsValue.minX, Math.min(1 - boundsValue.maxX, Number(deltaX) || 0)) : 0;
     var dy = canMoveY ? Math.max(-boundsValue.minY, Math.min(1 - boundsValue.maxY, Number(deltaY) || 0)) : 0;
@@ -137,6 +155,11 @@
       shiftLinearOrList(field.rows, dy);
     } else if (group.kind === "mc-column") {
       definition.blocks.find(function (block) { return block.id === group.blockId; }).columns[group.columnIndex].xs = coords.xs.map(function (x) { return x + dx; });
+    } else if (group.kind === "mc-column-rows" || group.kind === "tf-column-rows") {
+      var rowBlock = definition.blocks.find(function (block) { return block.id === group.blockId; });
+      var rowColumn = rowBlock.columns[group.columnIndex];
+      if (!rowColumn.rows) rowColumn.rows = clone(rowBlock.rows);
+      shiftLinearOrList(rowColumn.rows, dy);
     } else if (group.kind === "mc-rows") {
       definition.blocks.find(function (block) { return block.id === group.blockId; }).rows.groups[group.groupIndex] = coords.row.map(function (y) { return y + dy; });
     } else if (group.kind === "tf") {
@@ -159,6 +182,7 @@
       var block = blockById(definition, group.blockId);
       if (group.kind === "mc-column") optionValues = block.columns[group.columnIndex].xs;
       if (group.kind === "tf") { optionValues = block.columns[0] ? block.columns[0].xs : []; row = block.rows; }
+      if (group.kind === "mc-column-rows" || group.kind === "tf-column-rows") row = block.columns[group.columnIndex].rows || block.rows;
       if (group.kind === "mc-rows") row = { mode: "list", groups: [block.rows.groups[group.groupIndex] || []] };
     }
     var optionSpacing = optionValues.length > 1 ? (optionValues[optionValues.length - 1] - optionValues[0]) / (optionValues.length - 1) : null;
@@ -221,6 +245,7 @@
     } else {
       var block = blockById(definition, group.blockId);
       if (group.kind === "tf") row = block.rows;
+      if (group.kind === "mc-column-rows" || group.kind === "tf-column-rows") row = block.columns[group.columnIndex].rows || block.rows;
       if (group.kind === "mc-rows") rowValuesToSet = block.rows.groups[group.groupIndex];
     }
     if (row && row.mode === "linear" && row.count > 1) {

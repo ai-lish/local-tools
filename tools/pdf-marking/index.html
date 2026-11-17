@@ -21,6 +21,8 @@
   <script defer src="template-store.js"></script>
   <script defer src="template-editor.js"></script>
   <script defer src="template-editor-ui.js"></script>
+  <script defer src="choice-wizard.js"></script>
+  <script defer src="choice-wizard-ui.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -36,7 +38,7 @@
       <div>
         <p class="eyebrow">瀏覽器本機工具</p>
         <h1>批改 PDF</h1>
-        <p>跟着三個步驟選範本、載入 PDF，再覆核及匯出。PDF、答案和成績只在這部電腦處理。</p>
+        <p>選擇批改類別，建立或載入範本，再批改及匯出。PDF、答案和成績只在這部電腦處理。</p>
       </div>
     </section>
 
@@ -46,7 +48,131 @@
       <button class="button compact" id="end-demo" type="button">結束示範</button>
     </div>
 
-    <nav class="stepper" aria-label="批改步驟">
+    <section id="choice-wizard" class="choice-wizard" aria-label="選擇題五步流程">
+      <div class="choice-wizard-heading">
+        <div><p class="eyebrow">本機批改流程</p><h2>選擇題範本及批改</h2></div>
+        <span class="privacy-badge">🔒 樣本 PDF 只在記憶體處理</span>
+      </div>
+      <nav class="stepper choice-wizard-stepper" id="choice-wizard-stepper" aria-label="選擇題五個步驟">
+        <button class="step-pill current" type="button" data-wizard-step="1"><span class="step-number">1</span><span><strong>類別</strong><small>選擇批改方式</small></span></button>
+        <button class="step-pill" type="button" data-wizard-step="2"><span class="step-number">2</span><span><strong>樣本及範本</strong><small>標示答案及身份區</small></span></button>
+        <button class="step-pill" type="button" data-wizard-step="3"><span class="step-number">3</span><span><strong>題數及位置</strong><small>調整圈位</small></span></button>
+        <button class="step-pill" type="button" data-wizard-step="4"><span class="step-number">4</span><span><strong>答案</strong><small>點選或整批輸入</small></span></button>
+        <button class="step-pill" type="button" data-wizard-step="5"><span class="step-number">5</span><span><strong>批改及匯出</strong><small>讀圈、覆核及匯出</small></span></button>
+      </nav>
+
+      <section class="choice-wizard-panel panel" data-wizard-panel="1" aria-labelledby="choice-wizard-step-1">
+        <p class="eyebrow">第一步</p><h2 id="choice-wizard-step-1">選擇批改類別</h2>
+        <p class="muted">默書會沿用原有批改流程；選擇題可建立新範本或直接使用現有範本。</p>
+        <div class="choice-wizard-category-grid">
+          <button class="choice-wizard-category" id="choice-wizard-select-choice" type="button"><strong>選擇題</strong><span>建立答題紙範本、設定答案及讀圈批改</span></button>
+          <button class="choice-wizard-category" id="choice-wizard-select-dictation" type="button"><strong>默書</strong><span>進入現有默書標記及批改流程</span></button>
+        </div>
+      </section>
+
+      <section class="choice-wizard-panel panel" data-wizard-panel="2" aria-labelledby="choice-wizard-step-2" hidden>
+        <p class="eyebrow">第二步</p><h2 id="choice-wizard-step-2">匯入樣本及建立範本</h2>
+        <p class="privacy-note">樣本只在本機記憶體短暫處理；不會上載、保存、寫入範本或送往 AI。文字區只會加入遮罩，不會 OCR。</p>
+        <div class="choice-wizard-source-row">
+          <label class="field"><span>由現有範本開始</span><select id="choice-wizard-template"></select></label>
+          <button class="button" id="choice-wizard-use-existing" type="button">載入現有範本</button>
+          <button class="button" id="choice-wizard-start-create" type="button">由樣本建立新範本</button>
+          <button class="button" id="choice-wizard-direct-use" type="button">直接使用現有範本批改</button>
+          <label class="button file-button" for="choice-wizard-template-file">匯入範本 JSON<input id="choice-wizard-template-file" type="file" accept="application/json,.json"></label>
+        </div>
+        <div class="choice-wizard-controls">
+          <label class="button file-button" for="choice-wizard-pdf-file">載入本機答題紙 PDF<input id="choice-wizard-pdf-file" type="file" accept="application/pdf,.pdf"></label>
+          <label class="field"><span>樣本頁碼</span><input id="choice-wizard-page" type="number" min="1" step="1" value="1" disabled></label>
+          <label class="field"><span>建立範本名稱</span><input id="choice-wizard-name" type="text" maxlength="100" value="自訂選擇題答題紙"></label>
+        </div>
+        <section id="choice-wizard-builder" class="choice-wizard-builder" hidden>
+          <p class="muted small">選擇區域類型，再在樣本頁拖拉畫框。選取已有框可移動；拖右下角可改大小；亦可刪除。</p>
+          <div class="choice-wizard-zone-controls">
+            <label class="field"><span>新區域類型</span><select id="choice-wizard-zone-type">
+              <option value="text-name">文字遮罩：姓名</option><option value="text-subject">文字遮罩：科目</option><option value="text-other">文字遮罩：其他</option>
+              <option value="class-grade-grid">班別圈格：年級（1–6）</option><option value="class-form-grid">班別圈格：字母（A–F）</option>
+              <option value="student-number-grid">班號圈格：數字</option><option value="class-handwrite">手寫班別（遮罩）</option>
+              <option value="student-handwrite">手寫班號（遮罩）</option><option value="answer-mc">選擇題答案欄</option><option value="answer-tf">是非題答案欄</option>
+            </select></label>
+            <label class="field"><span>選擇題選項</span><select id="choice-wizard-options"><option value="ABCD">A–D</option><option value="ABCDE">A–E</option><option value="ABCDEF">A–F</option></select></label>
+            <label class="field"><span>每欄預設題數</span><input id="choice-wizard-rows" type="number" min="1" max="250" value="20"></label>
+            <label class="field"><span>學號位數（圈格／手寫）</span><input id="choice-wizard-digits" type="number" min="1" max="12" value="4"></label>
+            <label class="field"><span>題號排列</span><select id="choice-wizard-numbering"><option value="column-major">按欄</option><option value="row-major">按行</option></select></label>
+            <button class="button" id="choice-wizard-delete-zone" type="button" disabled>刪除所選範圍</button>
+          </div>
+          <div class="choice-wizard-frame" id="choice-wizard-frame">
+            <canvas id="choice-wizard-canvas" hidden></canvas>
+            <svg id="choice-wizard-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" role="img" aria-label="樣本頁範圍標示區" tabindex="0"></svg>
+            <p id="choice-wizard-empty" class="empty-state">請先載入本機答題紙 PDF。</p>
+          </div>
+          <div id="choice-wizard-zone-list" class="choice-wizard-zone-list"></div>
+          <label id="choice-wizard-no-identity-wrap" class="inline-check" hidden><input id="choice-wizard-no-identity" type="checkbox"><span>我確認此答題紙沒有姓名等身份區</span></label>
+          <label id="choice-wizard-identities-complete-wrap" class="inline-check" hidden><input id="choice-wizard-identities-complete" type="checkbox"><span>我已標示全部身份區（姓名、班別、班號及其他文字區）</span></label>
+          <p id="choice-wizard-builder-status" class="status-message" role="status"></p>
+          <button class="button primary" id="choice-wizard-build-template" type="button" disabled>建立範本並調整位置</button>
+        </section>
+        <section class="choice-wizard-ai-layout panel" aria-labelledby="choice-wizard-ai-heading">
+          <div class="section-title"><div><p class="eyebrow">選用</p><h3 id="choice-wizard-ai-heading">AI 建議版面</h3></div><span class="hint-pill">教師逐項確認</span></div>
+          <p class="privacy-note">先在樣本頁標示所有身份區，或確認沒有身份區。送出前會顯示實際遮罩預覽；只有按「確認送出」才會使用現有 AI 設定傳送。AI 只回傳圈格位置，不轉錄文字。</p>
+          <div id="choice-wizard-ai-settings-slot"></div>
+          <div class="toolbar-row"><button class="button" id="choice-wizard-ai-prepare" type="button" disabled>預覽去識別圖片及 AI 建議</button><span id="choice-wizard-ai-status" class="status-message" role="status">請先載入樣本及標示身份區。</span></div>
+          <section id="choice-wizard-ai-confirmation" class="choice-wizard-ai-confirmation" aria-labelledby="choice-wizard-ai-confirm-heading" hidden>
+            <h4 id="choice-wizard-ai-confirm-heading">確認送出實際影像</h4>
+            <p id="choice-wizard-ai-provider" class="muted"></p>
+            <p id="choice-wizard-ai-masks" class="muted"></p>
+            <div class="choice-wizard-ai-preview"><img id="choice-wizard-ai-preview-image" alt="已遮走身份區的實際送出影像預覽"></div>
+            <div class="toolbar-row"><button class="button primary" id="choice-wizard-ai-confirm" type="button">確認送出</button><button class="button" id="choice-wizard-ai-cancel" type="button">取消</button></div>
+          </section>
+          <div id="choice-wizard-ai-suggestions" class="choice-wizard-ai-suggestions" aria-live="polite"></div>
+        </section>
+        <p id="choice-wizard-source-status" class="status-message" role="status">請載入一頁本機樣本 PDF，或選擇現有範本。</p>
+        <div class="wizard-navigation"><button class="button" type="button" data-wizard-back="1">返回</button><button class="button primary" id="choice-wizard-next-from-source" type="button" disabled>下一步：題數及位置</button></div>
+      </section>
+
+      <section class="choice-wizard-panel panel" data-wizard-panel="3" aria-labelledby="choice-wizard-step-3" hidden>
+        <p class="eyebrow">第三步</p><h2 id="choice-wizard-step-3">題數及位置</h2>
+        <p class="muted">題數會按欄或按行自動分配。可在 PR #69 範本編輯器拖拉圈位、調整選項間距及行距，並測試樣本讀圈。</p>
+        <div id="choice-wizard-count-slot" class="choice-wizard-count-slot"></div>
+        <div class="choice-wizard-numbering-row">
+          <label class="field"><span>選擇題題號</span><select id="choice-wizard-mc-numbering"><option value="column-major">按欄</option><option value="row-major">按行</option></select></label>
+          <label class="field"><span>是非題題號</span><select id="choice-wizard-tf-numbering"><option value="column-major">按欄</option><option value="row-major">按行</option></select></label>
+          <button class="button" id="choice-wizard-apply-numbering" type="button">套用題號排列</button>
+        </div>
+        <p id="choice-wizard-count-status" class="status-message" role="status"></p>
+        <div id="choice-wizard-editor-slot" class="choice-wizard-editor-slot"></div>
+        <section class="choice-wizard-template-handoff panel" aria-labelledby="choice-wizard-template-handoff-heading">
+          <h3 id="choice-wizard-template-handoff-heading">保存範本供下次使用</h3>
+          <p class="muted">範本只包含座標及設定，不含樣本影像、答案、AI 回應或學生資料。</p>
+          <div class="toolbar-row"><button class="button primary" id="choice-wizard-save-template" type="button">儲存到此瀏覽器</button><button class="button" id="choice-wizard-export-template" type="button">匯出範本 JSON（下次使用）</button></div>
+          <p id="choice-wizard-template-save-status" class="status-message" role="status"></p>
+        </section>
+        <p id="choice-wizard-position-status" class="status-message" role="status"></p>
+        <div class="wizard-navigation"><button class="button" type="button" data-wizard-back="2">返回樣本</button><button class="button primary" id="choice-wizard-next-to-answers" type="button">下一步：設定答案</button></div>
+      </section>
+
+      <section class="choice-wizard-panel panel" data-wizard-panel="4" aria-labelledby="choice-wizard-step-4" hidden>
+        <p class="eyebrow">第四步</p><h2 id="choice-wizard-step-4">點擊圈格設定答案</h2>
+        <p class="muted">每題點一個選項；再點同一圈可取消。未設定題目會明確標示，亦可在下方整批輸入答案。</p>
+        <label class="field choice-wizard-answer-page"><span>樣本頁碼</span><input id="choice-wizard-answer-page" type="number" min="1" step="1" value="1"></label>
+        <div class="choice-wizard-frame choice-wizard-answer-frame" id="choice-wizard-answer-frame">
+          <canvas id="choice-wizard-answer-canvas" hidden></canvas>
+          <div id="choice-wizard-answer-overlay" class="choice-wizard-answer-overlay"></div>
+          <p class="empty-state" id="choice-wizard-answer-empty">請先完成第三步並載入樣本。</p>
+        </div>
+        <div id="choice-wizard-answer-inputs" class="choice-wizard-answer-inputs"></div>
+        <p id="choice-wizard-answer-status" class="status-message" role="status"></p>
+        <div class="wizard-navigation"><button class="button" type="button" data-wizard-back="3">返回位置</button><button class="button primary" id="choice-wizard-next-to-grade" type="button" disabled>下一步：批改及匯出</button></div>
+      </section>
+
+      <section class="choice-wizard-panel panel" data-wizard-panel="5" aria-labelledby="choice-wizard-step-5" hidden>
+        <p class="eyebrow">第五步</p><h2 id="choice-wizard-step-5">批改及匯出</h2>
+        <p class="muted">選擇實際批改 PDF 後開始讀圈；答案可返回第四步調整。後續覆核及匯出沿用原有流程。</p>
+        <div class="wizard-navigation choice-wizard-grade-navigation"><button class="button" id="choice-wizard-back-to-answers" type="button">返回第四步修改答案</button><button class="button" id="choice-wizard-back-to-category" type="button">返回第一步</button></div>
+        <div id="choice-wizard-grade-slot" class="choice-wizard-grade-slot"></div>
+      </section>
+    </section>
+
+    <nav class="stepper" id="legacy-stepper" aria-label="批改步驟">
       <button class="step-pill current" type="button" data-step="1" aria-current="step">
         <span class="step-number">1</span><span><strong>選範本</strong><small id="step-1-state">選擇答題紙類型</small></span>
       </button>
