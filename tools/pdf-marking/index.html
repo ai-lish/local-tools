@@ -9,6 +9,7 @@
   <script defer src="../_vendor/pdfjs-3.11.174/pdf.min.js"></script>
   <script defer src="../_vendor/pdfjs-3.11.174/pdf.worker.embedded.js"></script>
   <script defer src="../_vendor/pdf-lib-1.17.1/pdf-lib.min.js"></script>
+  <script defer src="../_vendor/jszip-3.10.1/jszip.min.js"></script>
   <script defer src="model.js"></script>
   <script defer src="templates.js"></script>
   <script defer src="geometry.js"></script>
@@ -246,10 +247,37 @@
         <div class="toolbar-row export-actions">
           <button class="button" id="export-pdf" type="button" disabled>下載已批改 PDF</button>
           <button class="button" id="export-csv" type="button" disabled>下載分數 CSV</button>
+          <button class="button" id="copy-export-tsv" type="button" disabled>複製全表</button>
+          <button class="button" id="export-xlsx" type="button" disabled>匯出 Excel（.xlsx）</button>
           <button class="button" id="download-progress" type="button" disabled>下載進度檔</button>
           <label class="button file-button" for="progress-file">載入進度檔<input id="progress-file" type="file" accept="application/json,.json"></label>
           <span class="muted" id="export-status" role="status"></span>
         </div>
+        <details id="export-preview-details" class="export-preview-details">
+          <summary>成績預覽（即時更新）</summary>
+          <div class="export-preview-controls">
+            <div class="toolbar-row">
+              <button class="button compact active" id="export-sort-class" type="button" aria-pressed="true">按班別、學號</button>
+              <button class="button compact" id="export-sort-page" type="button" aria-pressed="false">按頁碼</button>
+            </div>
+            <label id="choice-class-size-field" class="field inline" hidden>
+              <span>全班人數</span><input id="choice-class-size" type="number" min="0" max="10000" step="1" value="0" inputmode="numeric">
+            </label>
+            <button class="button compact" id="copy-choice-roster" type="button" hidden disabled>複製作答（按學號）</button>
+          </div>
+          <p class="muted small" id="export-preview-note">載入 PDF 並讀取／批改後，這裏會顯示與 CSV 相同的資料列。核對提示只供畫面辨識，不會加入匯出內容。</p>
+          <div class="export-preview-scroll">
+            <table id="export-preview-table" class="export-preview-table">
+              <thead><tr id="export-preview-head"></tr></thead>
+              <tbody id="export-preview-body"><tr><td class="muted" colspan="2">尚無可預覽的成績。</td></tr></tbody>
+            </table>
+          </div>
+          <div id="copy-fallback-wrap" class="copy-fallback-wrap" hidden>
+            <label class="field"><span id="copy-fallback-label">剪貼簿不可用，請手動複製以下內容</span>
+              <textarea id="copy-fallback" rows="5" readonly></textarea>
+            </label>
+          </div>
+        </details>
       </section>
     </section>
     <footer>只在本機瀏覽器工作 · 不連接伺服器或 AI 服務 · 建議桌面瀏覽器</footer>

@@ -162,6 +162,20 @@ h3 { font-size: 14px; }
 .rule-note { margin-top: 12px; padding: 9px 11px; border-left: 3px solid var(--gold); color: #59697a; background: var(--gold-soft); font-size: 12px; }
 .export-actions { margin-top: 0; }
 .export-panel { margin-top: 5px; }
+.export-preview-details { min-width: 0; margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.export-preview-details > summary { cursor: pointer; color: var(--navy); font-weight: 800; }
+.export-preview-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin: 12px 0 8px; min-width: 0; }
+.export-preview-controls > .toolbar-row { margin: 0; }
+.export-preview-scroll { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-inline: contain; border: 1px solid var(--line); border-radius: 8px; }
+.export-preview-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 12px; }
+.export-preview-table th, .export-preview-table td { padding: 7px 9px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.export-preview-table th { position: sticky; top: 0; color: #fff; background: var(--navy); }
+.export-preview-table tbody tr { cursor: pointer; }
+.export-preview-table tbody tr:hover, .export-preview-table tbody tr:focus { background: var(--blue-soft); outline: 2px solid var(--blue); outline-offset: -2px; }
+.export-preview-table tbody tr:last-child td { border-bottom: 0; }
+.preview-status-label { display: inline-block; margin-left: 5px; padding: 2px 6px; border: 1px solid #aebbc7; border-radius: 999px; color: var(--navy); background: #f3f6f8; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.copy-fallback-wrap { margin-top: 10px; }
+.copy-fallback-wrap textarea { width: 100%; min-width: 0; }
 footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: center; }
 
 [hidden] { display: none !important; }
@@ -253,6 +267,11 @@ footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: cent
   .identity-grid { flex-direction: column; }
   .review-items { grid-template-columns: 1fr; }
   .file-status { flex-wrap: wrap; }
+  .export-preview-controls { align-items: stretch; }
+  .export-preview-controls .field.inline { flex: 1 1 120px; min-width: 0; }
+  .export-preview-controls .field.inline input { width: 100%; min-width: 0; }
+  .export-preview-controls > .toolbar-row { flex-wrap: wrap; }
+  .export-preview-controls > .toolbar-row .button { flex: 1 1 auto; }
 }
 @media (max-width: 480px) {
   .dictation-sentence-sticky { top: 5px; padding: 7px; border-radius: 9px; }

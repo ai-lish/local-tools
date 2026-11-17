@@ -24,7 +24,8 @@
     dictationSegment: 1, dictationSegments: {},
     dictationAnswer: DEFAULT_DICTATION_ANSWER, firstRow: 20, punctuation: model.autoPunctuation(DEFAULT_DICTATION_ANSWER),
     dictationCalibration: { dx: 0, dy: 0, scale: 1 }, dictationAnswerEditOriginal: null,
-    dictationStyle: "sentence", dictationBaseEnabled: false, dictationUndo: []
+    dictationStyle: "sentence", dictationBaseEnabled: false, dictationUndo: [],
+    exportSort: "class-student", choiceClassSizeTouched: false
   };
   var byId = function (id) { return document.getElementById(id); };
   var els = {
@@ -67,6 +68,13 @@
     dictationStudentId: byId("dictation-student-id"), dictationStage: byId("dictation-stage"),
     dictationGrid: byId("dictation-grid"), dictationNote: byId("dictation-note"),
     dictationRuleNote: byId("dictation-rule-note"), exportPdf: byId("export-pdf"), exportCsv: byId("export-csv"),
+    copyExportTsv: byId("copy-export-tsv"), exportXlsx: byId("export-xlsx"),
+    exportPreviewHead: byId("export-preview-head"), exportPreviewBody: byId("export-preview-body"),
+    exportPreviewTable: byId("export-preview-table"), exportPreviewNote: byId("export-preview-note"),
+    exportSortClass: byId("export-sort-class"), exportSortPage: byId("export-sort-page"),
+    choiceClassSizeField: byId("choice-class-size-field"), choiceClassSize: byId("choice-class-size"),
+    copyChoiceRoster: byId("copy-choice-roster"), copyFallbackWrap: byId("copy-fallback-wrap"),
+    copyFallback: byId("copy-fallback"), copyFallbackLabel: byId("copy-fallback-label"),
     downloadProgress: byId("download-progress"), progressFile: byId("progress-file"), exportStatus: byId("export-status")
   };
 
@@ -275,7 +283,16 @@
       (state.mode === "dictation" && !dictationReady);
     els.exportCsv.disabled = !loaded || (state.mode === "choice" && (!Object.keys(state.choicePages).length || !keyIsReady())) ||
       (state.mode === "dictation" && !dictationReady);
+    var exportReady = loaded && (state.mode === "choice"
+      ? Object.keys(state.choicePages).length > 0 && keyIsReady()
+      : dictationReady);
+    els.copyExportTsv.disabled = !exportReady;
+    els.exportXlsx.disabled = !exportReady || !window.JSZip;
+    els.copyChoiceRoster.hidden = state.mode !== "choice";
+    els.choiceClassSizeField.hidden = state.mode !== "choice";
+    els.copyChoiceRoster.disabled = !loaded || state.mode !== "choice" || !Object.keys(state.choicePages).length || !keyIsReady();
     els.downloadProgress.disabled = !loaded;
+    renderExportPreview();
   }
 
   function updatePageSelectors() {
@@ -895,6 +912,7 @@
       state.demo = Boolean(file.isDemo);
       els.demoBanner.hidden = !state.demo;
       state.choicePages = {};
+      state.choiceClassSizeTouched = false;
       var blankPages = {}; var blankLegacyPages = {};
       for (var i = 1; i <= state.pageCount; i += 1) {
         blankPages[i] = model.blankDictationV4Page(DEFAULT_DICTATION_ANSWER);
@@ -1020,6 +1038,195 @@
       records[pageNo] = dictationScoreRecordForPage(pageNo);
     }
     return model.buildDictationCsv(records, state.pageCount, config.segment);
+  }
+
+  function buildCurrentExportData() {
+    if (state.mode === "choice") {
+      var settings = choiceSettings();
+      return { mode: "choice", settings: settings,
+        rows: model.buildChoiceRows({ pages: state.choicePages, pageCount: state.pageCount, settings: settings }) };
+    }
+    var config = getDictationConfig();
+    var records = {};
+    for (var pageNo = 1; pageNo <= state.pageCount; pageNo += 1) records[pageNo] = dictationScoreRecordForPage(pageNo);
+    return { mode: "dictation", config: config, rows: model.buildDictationRows(records, state.pageCount, config.segment) };
+  }
+
+  function choiceMaximumReadId() {
+    var maximum = 0;
+    Object.keys(state.choicePages).forEach(function (key) {
+      var value = String(state.choicePages[key] && state.choicePages[key].studentId || "").trim();
+      if (/^\d+$/.test(value) && Number.isSafeInteger(Number(value))) maximum = Math.max(maximum, Number(value));
+    });
+    return maximum;
+  }
+
+  function previewStatusLabels(data, row) {
+    var labels = [];
+    var pageNumber = Number(row[0]);
+    if (data.mode === "choice") {
+      var page = state.choicePages[pageNumber] || state.choicePages[String(pageNumber)] || null;
+      if (!String(row[3] == null ? "" : row[3]).trim()) labels.push("分數留空");
+      if (Number(row[5]) > 0 || page && page.pageFailure) labels.push("待覆核");
+      if (row[6] !== "是") labels.push("班別／學號未確認");
+      if (page && (page.classWasEdited || page.studentIdWasEdited ||
+          (page.questions || []).some(function (question) { return question.status === "manual"; }))) labels.push("人手調整");
+    } else {
+      if (row[3] !== "已批改") labels.push("未批改", "分數留空");
+      if (row[14] === "是") labels.push("人手調整");
+    }
+    return labels;
+  }
+
+  function compareExportRows(data, left, right) {
+    if (state.exportSort === "page") return Number(left[0]) - Number(right[0]);
+    var classIndex = data.mode === "choice" ? 1 : -1;
+    var studentIndex = 2;
+    if (classIndex >= 0) {
+      var classOrder = String(left[classIndex] || "").localeCompare(String(right[classIndex] || ""), "zh-Hant", { numeric: true, sensitivity: "base" });
+      if (classOrder) return classOrder;
+    }
+    var studentOrder = String(left[studentIndex] || "").localeCompare(String(right[studentIndex] || ""), "zh-Hant", { numeric: true, sensitivity: "base" });
+    return studentOrder || Number(left[0]) - Number(right[0]);
+  }
+
+  function sortedExportRows(data) {
+    return [data.rows[0]].concat(data.rows.slice(1).sort(function (left, right) { return compareExportRows(data, left, right); }));
+  }
+
+  function renderExportPreview() {
+    if (!els.exportPreviewHead || !els.exportPreviewBody) return;
+    var data;
+    try {
+      data = buildCurrentExportData();
+    } catch (error) {
+      data = { mode: state.mode, rows: [] };
+      els.exportPreviewNote.textContent = error && error.message ? error.message : "目前設定未能建立預覽。";
+    }
+    if (!state.choiceClassSizeTouched && data.mode === "choice") els.choiceClassSize.value = String(choiceMaximumReadId());
+    els.exportSortClass.classList.toggle("active", state.exportSort === "class-student");
+    els.exportSortClass.setAttribute("aria-pressed", state.exportSort === "class-student" ? "true" : "false");
+    els.exportSortPage.classList.toggle("active", state.exportSort === "page");
+    els.exportSortPage.setAttribute("aria-pressed", state.exportSort === "page" ? "true" : "false");
+    els.exportPreviewHead.replaceChildren();
+    els.exportPreviewBody.replaceChildren();
+    if (!data.rows.length) {
+      var failedRow = document.createElement("tr");
+      var failedCell = document.createElement("td");
+      failedCell.colSpan = 2; failedCell.className = "muted";
+      failedCell.textContent = els.exportPreviewNote.textContent || "目前未能建立預覽。";
+      failedRow.appendChild(failedCell); els.exportPreviewBody.appendChild(failedRow);
+      return;
+    }
+    els.exportPreviewNote.textContent = "資料欄與下載分數 CSV 共用同一組列；頁碼旁的提示只供畫面辨識，不會加入複製或下載。";
+    data.rows[0].forEach(function (value) {
+      var heading = document.createElement("th"); heading.scope = "col"; heading.textContent = String(value);
+      els.exportPreviewHead.appendChild(heading);
+    });
+    if (data.rows.length === 1) {
+      var empty = document.createElement("tr"); var emptyCell = document.createElement("td");
+      emptyCell.colSpan = data.rows[0].length; emptyCell.className = "muted";
+      emptyCell.textContent = state.pdfDoc ? "尚無成績列。" : "載入 PDF 並讀取／批改後，這裏會顯示預覽。";
+      empty.appendChild(emptyCell); els.exportPreviewBody.appendChild(empty); return;
+    }
+    sortedExportRows(data).slice(1).forEach(function (row) {
+      var tableRow = document.createElement("tr");
+      tableRow.tabIndex = 0; tableRow.setAttribute("role", "button");
+      var labels = previewStatusLabels(data, row);
+      tableRow.setAttribute("aria-label", "前往第 " + String(row[0]) + " 頁覆核" + (labels.length ? "；" + labels.join("、") : ""));
+      tableRow.dataset.page = String(row[0]);
+      row.forEach(function (value, columnIndex) {
+        var cell = document.createElement("td");
+        cell.dataset.exportValue = String(value == null ? "" : value);
+        cell.textContent = String(value == null ? "" : value);
+        if (columnIndex === 0 && labels.length) {
+          labels.forEach(function (label) {
+            var badge = document.createElement("span"); badge.className = "preview-status-label"; badge.textContent = label;
+            cell.appendChild(badge);
+          });
+        }
+        tableRow.appendChild(cell);
+      });
+      tableRow.addEventListener("click", function () { openExportPreviewPage(Number(tableRow.dataset.page)); });
+      tableRow.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openExportPreviewPage(Number(tableRow.dataset.page)); }
+      });
+      els.exportPreviewBody.appendChild(tableRow);
+    });
+  }
+
+  function openExportPreviewPage(pageNumber) {
+    if (!state.pdfDoc || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > state.pageCount) return;
+    state.currentPage = pageNumber;
+    setStep(3); renderCurrentMode();
+    window.requestAnimationFrame(function () { els.step3.scrollIntoView({ behavior: "smooth", block: "start" }); });
+  }
+
+  function copyFallback(text, label, reason) {
+    els.copyFallbackWrap.hidden = false;
+    els.copyFallbackLabel.textContent = label + "；剪貼簿不可用（" + reason + "），請手動複製以下內容。";
+    els.copyFallback.value = text;
+    els.copyFallback.focus(); els.copyFallback.select();
+    setStatus("內容已選取；請使用複製指令手動複製。", els.exportStatus);
+  }
+
+  async function copyExportText(text, label) {
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") throw new Error("瀏覽器未提供剪貼簿權限");
+      await navigator.clipboard.writeText(text);
+      els.copyFallbackWrap.hidden = true;
+      setStatus(label + "已複製到剪貼簿。", els.exportStatus);
+    } catch (error) {
+      copyFallback(text, label, error && error.message ? error.message : "權限被拒");
+    }
+  }
+
+  function copyAllExportRows() {
+    if (state.mode === "choice") {
+      var settings = choiceSettings();
+      if (!settings.valid) { setStatus(settings.message || "請先輸入完整答案。", els.exportStatus); return; }
+      if (!confirmChoiceExport(settings)) return;
+    }
+    var data = buildCurrentExportData();
+    copyExportText(model.serializeTsv(sortedExportRows(data)), "全表 TSV ");
+  }
+
+  function copyChoiceRoster() {
+    var settings = choiceSettings();
+    if (!settings.valid) { setStatus(settings.message || "請先輸入完整答案。", els.exportStatus); return; }
+    var result = model.buildChoiceRosterTsv({ pages: state.choicePages, pageCount: state.pageCount, settings: settings,
+      classSize: Number(els.choiceClassSize.value) });
+    if (!result.ok) {
+      var duplicateDetail = (result.duplicates || []).map(function (entry) {
+        return "學號 " + entry.studentId + "：第 " + entry.pages.join("、") + " 頁";
+      }).join("；");
+      window.alert(duplicateDetail || result.reason || "無法建立按學號作答列。");
+      setStatus(result.reason || "無法建立按學號作答列。", els.exportStatus); return;
+    }
+    var confirmations = [];
+    if (result.identityPages.length) confirmations.push("班別／學號未確認：第 " + result.identityPages.join("、") + " 頁");
+    if (result.pendingPages.length) confirmations.push("題目仍待覆核：第 " + result.pendingPages.join("、") + " 頁");
+    if (result.overflowPages.length) confirmations.push("學號超出全班人數設定，將不會複製：第 " + result.overflowPages.join("、") + " 頁");
+    if (confirmations.length && !window.confirm(confirmations.join("\n") + "\n仍要複製嗎？")) return;
+    copyExportText(result.text, "按學號作答 TSV ");
+  }
+
+  async function exportXlsx() {
+    if (state.mode === "choice") {
+      var settings = choiceSettings();
+      if (!settings.valid) { setStatus(settings.message || "請先輸入完整答案。", els.exportStatus); return; }
+      if (!confirmChoiceExport(settings)) return;
+    }
+    try {
+      var data = buildCurrentExportData();
+      var numericColumns = data.mode === "choice" ? [0, 3, 4, 5] : [0, 1, 4, 5, 6, 7, 8, 10, 11, 12, 13];
+      var bytes = await model.buildXlsx(data.rows, numericColumns, "blob");
+      var name = data.mode === "choice" ? "pdf-marking-choice-scores.xlsx" : "pdf-marking-dictation-scores.xlsx";
+      createDownload(downloadName(name), bytes);
+      setStatus("XLSX 已使用本機 SpreadsheetML 產生，下載已開始。", els.exportStatus);
+    } catch (error) {
+      setStatus(error && error.message ? error.message : "XLSX 匯出失敗。", els.exportStatus);
+    }
   }
 
   function currentProgress() {
@@ -1454,7 +1661,7 @@
     state.demo = false;
     els.demoBanner.hidden = true;
     state.pdfBytes = null; state.pdfDoc = null; state.pdfFingerprint = ""; state.pageCount = 0; state.currentPage = 1;
-    state.choicePages = {}; state.dictationPages = {}; state.legacyDictationPages = {}; state.dictationSegments = {}; state.dictationUndo = []; state.focusKey = "";
+    state.choicePages = {}; state.choiceClassSizeTouched = false; state.dictationPages = {}; state.legacyDictationPages = {}; state.dictationSegments = {}; state.dictationUndo = []; state.focusKey = "";
     els.pdfFile.value = ""; els.fileStatus.textContent = "尚未載入 PDF"; els.pageCount.textContent = ""; els.fileDot.classList.remove("ready");
     els.omrStatus.textContent = "示範已結束；可選擇自己的本機 PDF。";
     renderCurrentMode(); setStep(1); updateControls(); updateStepper();
@@ -1464,7 +1671,7 @@
   els.clearPdf.addEventListener("click", function () {
     state.demo = false; els.demoBanner.hidden = true;
     state.pdfBytes = null; state.pdfDoc = null; state.pdfFingerprint = ""; state.pageCount = 0; state.currentPage = 1;
-    state.choicePages = {}; state.dictationPages = {}; state.legacyDictationPages = {}; state.dictationSegments = {}; state.dictationUndo = []; state.dictationSegment = 1; state.focusKey = "";
+    state.choicePages = {}; state.choiceClassSizeTouched = false; state.dictationPages = {}; state.legacyDictationPages = {}; state.dictationSegments = {}; state.dictationUndo = []; state.dictationSegment = 1; state.focusKey = "";
     state.dictationAnswer = DEFAULT_DICTATION_ANSWER; state.firstRow = 20;
     state.punctuation = model.autoPunctuation(DEFAULT_DICTATION_ANSWER);
     state.dictationCalibration = { dx: 0, dy: 0, scale: 1 };
@@ -1519,6 +1726,7 @@
       }
       refreshChoiceIdentityWarnings();
       renderChoiceSummary(page);
+      renderExportPreview();
     });
   });
   function pushDictationUndo() {
@@ -1718,9 +1926,16 @@
   els.dictationStudentId.addEventListener("input", function () {
     var page = activeMutableDictationPage(); page.studentId = els.dictationStudentId.value;
     saveActiveMutableDictationPage(page);
+    renderExportPreview();
   });
   els.exportPdf.addEventListener("click", exportCurrentPdf);
   els.exportCsv.addEventListener("click", exportCsv);
+  els.copyExportTsv.addEventListener("click", copyAllExportRows);
+  els.copyChoiceRoster.addEventListener("click", copyChoiceRoster);
+  els.exportXlsx.addEventListener("click", exportXlsx);
+  els.exportSortClass.addEventListener("click", function () { state.exportSort = "class-student"; renderExportPreview(); });
+  els.exportSortPage.addEventListener("click", function () { state.exportSort = "page"; renderExportPreview(); });
+  els.choiceClassSize.addEventListener("input", function () { state.choiceClassSizeTouched = true; renderExportPreview(); });
   els.downloadProgress.addEventListener("click", function () {
     var progress = currentProgress();
     createDownload(downloadName("pdf-marking-progress.json"), new Blob([JSON.stringify(progress, null, 2)], { type: "application/json;charset=utf-8" }));

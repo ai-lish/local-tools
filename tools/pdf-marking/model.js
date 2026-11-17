@@ -404,7 +404,7 @@
     return /^[=+\-@]/.test(text) ? "'" + text : text;
   }
 
-  function buildDictationCsv(records, pageCount, segmentNumber) {
+  function buildDictationRows(records, pageCount, segmentNumber) {
     var rows = [["頁碼", "段落", "學號", "狀態", "錯字", "多字", "漏字", "N", "正確字數", "底分開關", "底分", "原始分", "自動最終分", "最終分", "人手調整"]];
     for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
       var record = records[pageNumber] || records[String(pageNumber)];
@@ -421,7 +421,11 @@
         isReviewed ? record.finalScore.toFixed(1) : "", record.manualAdjusted ? "是" : "否"
       ]);
     }
-    return "\ufeff" + rows.map(function (row) {
+    return rows;
+  }
+
+  function buildDictationCsv(records, pageCount, segmentNumber) {
+    return "\ufeff" + buildDictationRows(records, pageCount, segmentNumber).map(function (row) {
       return row.map(function (value) { return csvQuote(safeCsvValue(value)); }).join(",");
     }).join("\r\n");
   }
@@ -661,7 +665,7 @@
     return '"' + String(value == null ? "" : value).replace(/"/g, '""') + '"';
   }
 
-  function buildChoiceCsv(config) {
+  function buildChoiceRows(config) {
     var settings = config.settings;
     var rows = [["頁碼", "班別", "學號", "分數", "未作答題數", "待覆核題數", "班別／學號已確認"]];
     for (var mc = 1; mc <= settings.mcCount; mc += 1) rows[0].push(String(mc).padStart(2, "0") + "作答", String(mc).padStart(2, "0") + "對錯");
@@ -672,7 +676,7 @@
       var tfAnswers = choiceAnswersForSettings(page, "tf", settings.tfCount);
       var score = page && !page.pageFailure ? scoreQuestions({ answers: answers, tfAnswers: tfAnswers },
         settings.mcKey, settings.tfKey, settings.mcPoints, settings.tfPoints) : null;
-      var questionsPending = choiceReviewSummary({ [pageNumber]: page }, 1, settings.mcCount, settings.tfCount).questionsPending;
+      var questionsPending = choiceReviewSummary({ 1: page }, 1, settings.mcCount, settings.tfCount).questionsPending;
       var blankCount = 0;
       answers.forEach(function (answer, index) {
         var question = choiceQuestionForSettings(page, "mc", index + 1);
@@ -695,11 +699,157 @@
       });
       rows.push(row);
     }
-    return "\ufeff" + rows.map(function (row) { return row.map(csvQuote).join(","); }).join("\r\n");
+    return rows;
+  }
+
+  function buildChoiceCsv(config) {
+    return "\ufeff" + buildChoiceRows(config).map(function (row) { return row.map(csvQuote).join(","); }).join("\r\n");
   }
 
   function formatCsvNumber(value) {
     return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+  }
+
+  function serializeTsv(rows) {
+    return (rows || []).map(function (row) {
+      return row.map(function (value) { return safeCsvValue(value); }).join("\t");
+    }).join("\r\n");
+  }
+
+  function buildChoiceRosterTsv(config) {
+    var pages = config.pages || {};
+    var pageCount = Math.max(0, Number(config.pageCount) || 0);
+    var settings = config.settings || {};
+    var mcCount = Math.max(0, Number(settings.mcCount) || 0);
+    var tfCount = Math.max(0, Number(settings.tfCount) || 0);
+    var maxReadId = 0;
+    var pageByStudentId = new Map();
+    var duplicatePages = [];
+    var identityPages = [];
+    var pendingPages = [];
+    var overflowPages = [];
+
+    for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      var page = pages[pageNumber] || pages[String(pageNumber)] || null;
+      if (!page) {
+        identityPages.push(pageNumber);
+        pendingPages.push(pageNumber);
+        continue;
+      }
+      var id = String(page.studentId || "").trim();
+      var numericId = /^\d+$/.test(id) && Number.isSafeInteger(Number(id)) ? Number(id) : 0;
+      if (!choiceIdentityConfirmed(page) || !numericId) identityPages.push(pageNumber);
+      if (page.pageFailure || choiceReviewSummary({ 1: page }, 1, mcCount, tfCount).questionsPending > 0) pendingPages.push(pageNumber);
+      if (!numericId || numericId < 1) continue;
+      maxReadId = Math.max(maxReadId, numericId);
+      var existing = pageByStudentId.get(numericId);
+      if (existing) {
+        existing.pages.push(pageNumber);
+        duplicatePages.push(pageNumber);
+      } else {
+        pageByStudentId.set(numericId, { pageNumber: pageNumber, page: page, pages: [pageNumber] });
+      }
+    }
+
+    var classSize = Number(config.classSize);
+    if (!Number.isSafeInteger(classSize) || classSize < 0 || classSize > 10000) {
+      return { ok: false, reason: "全班人數須為 0 至 10,000 的整數。", maxReadId: maxReadId,
+        duplicatePages: duplicatePages, identityPages: identityPages, pendingPages: pendingPages, overflowPages: overflowPages };
+    }
+    pageByStudentId.forEach(function (entry, studentId) {
+      if (studentId > classSize) overflowPages.push(entry.pageNumber);
+    });
+    var duplicateEntries = Array.from(pageByStudentId.entries()).filter(function (entry) { return entry[1].pages.length > 1; })
+      .map(function (entry) { return { studentId: String(entry[0]), pages: entry[1].pages.slice() }; });
+    if (duplicateEntries.length) {
+      duplicatePages = duplicateEntries.reduce(function (all, entry) { return all.concat(entry.pages); }, []);
+      return { ok: false, reason: "同一學號對應多於一頁，請先修正。", maxReadId: maxReadId,
+        duplicatePages: Array.from(new Set(duplicatePages)).sort(function (a, b) { return a - b; }),
+        duplicates: duplicateEntries, identityPages: identityPages, pendingPages: pendingPages, overflowPages: overflowPages };
+    }
+
+    var rows = [];
+    for (var student = 1; student <= classSize; student += 1) {
+      var match = pageByStudentId.get(student);
+      if (!match) {
+        rows.push(Array(mcCount + tfCount).fill(""));
+        continue;
+      }
+      var mcAnswers = choiceAnswersForSettings(match.page, "mc", mcCount);
+      var tfAnswers = choiceAnswersForSettings(match.page, "tf", tfCount);
+      rows.push(mcAnswers.concat(tfAnswers).map(function (answer) { return String(answer || "").trim() ? answer : "X"; }));
+    }
+    return { ok: true, text: serializeTsv(rows), rows: rows, maxReadId: maxReadId,
+      duplicatePages: [], identityPages: identityPages, pendingPages: pendingPages,
+      overflowPages: overflowPages.sort(function (a, b) { return a - b; }) };
+  }
+
+  function xmlEscape(value) {
+    return String(value == null ? "" : value)
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, "�")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+  }
+
+  function spreadsheetColumnName(index) {
+    var result = "";
+    var value = index + 1;
+    while (value > 0) {
+      var remainder = (value - 1) % 26;
+      result = String.fromCharCode(65 + remainder) + result;
+      value = Math.floor((value - 1) / 26);
+    }
+    return result;
+  }
+
+  function buildXlsx(rows, numericColumns, outputType) {
+    var Zip = root.JSZip;
+    if (!Zip) return Promise.reject(new Error("JSZip 未載入；請確認離線套件完整。"));
+    var sourceRows = rows || [];
+    var numeric = new Set(numericColumns || []);
+    var columnCount = sourceRows.reduce(function (maximum, row) { return Math.max(maximum, row.length); }, 0);
+    var sheetRows = sourceRows.map(function (row, rowIndex) {
+      var cells = [];
+      for (var column = 0; column < columnCount; column += 1) {
+        var value = row[column] == null ? "" : row[column];
+        var reference = spreadsheetColumnName(column) + (rowIndex + 1);
+        if (rowIndex > 0 && numeric.has(column) && String(value).trim() !== "") {
+          var numericValue = Number(value);
+          if (!Number.isFinite(numericValue)) throw new Error("數值欄含有非數字資料。");
+          cells.push('<c r="' + reference + '"><v>' + String(numericValue) + "</v></c>");
+        } else if (String(value) === "") {
+          cells.push('<c r="' + reference + '"/>');
+        } else {
+          cells.push('<c r="' + reference + '" t="inlineStr"><is><t xml:space="preserve">' +
+            xmlEscape(safeCsvValue(value)) + "</t></is></c>");
+        }
+      }
+      return '<row r="' + (rowIndex + 1) + '">' + cells.join("") + "</row>";
+    }).join("");
+    var zip = new Zip();
+    zip.file("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+      "</Types>");
+    zip.file("_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+      "</Relationships>");
+    zip.file("xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<bookViews><workbookView activeTab="0"/></bookViews><sheets><sheet name="成績" sheetId="1" r:id="rId1"/></sheets></workbook>');
+    zip.file("xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+      "</Relationships>");
+    zip.file("xl/worksheets/sheet1.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' +
+      '<sheetFormatPr defaultRowHeight="15"/><sheetData>' + sheetRows + "</sheetData></worksheet>");
+    return zip.generateAsync({ type: outputType || "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   }
 
   function toggleDictationMark(page, index, mode, punctuation) {
@@ -769,13 +919,19 @@
     dictationV4Record: dictationV4Record,
     sanitizeDictationV4Pages: sanitizeDictationV4Pages,
     migrateLegacyDictationProgress: migrateLegacyDictationProgress,
+    buildDictationRows: buildDictationRows,
     buildDictationCsv: buildDictationCsv,
+    safeCsvValue: safeCsvValue,
+    serializeTsv: serializeTsv,
+    buildXlsx: buildXlsx,
     toggleDictationMark: toggleDictationMark,
     choiceAnswersForSettings: choiceAnswersForSettings,
     choiceIdentityConfirmed: choiceIdentityConfirmed,
     choiceIdentityWarnings: choiceIdentityWarnings,
     choiceReviewSummary: choiceReviewSummary,
     choiceAnswerStatus: choiceAnswerStatus,
+    buildChoiceRows: buildChoiceRows,
+    buildChoiceRosterTsv: buildChoiceRosterTsv,
     buildChoiceCsv: buildChoiceCsv,
     sanitizeProgress: sanitizeProgress
   };

@@ -1499,7 +1499,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.17",
+      "version": "2026.11.17.2",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1668,6 +1668,30 @@
           "kind": "hyperlink"
         },
         {
+          "value": "http://schemas.openxmlformats.org/package/2006/content-types",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/package/2006/relationships",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+          "kind": "namespace"
+        },
+        {
           "value": "http://www.xfa.org/schema/xfa-data/1.0/",
           "kind": "namespace"
         }
@@ -1688,7 +1712,7 @@
     {
       "id": "pdf-marking",
       "title": "PDF 閱卷及批改工具",
-      "version": "2026.11.17",
+      "version": "2026.11.17.2",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -1710,7 +1734,9 @@
         "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",
         "tools/_vendor/pdfjs-3.11.174/LICENSE",
         "tools/_vendor/pdf-lib-1.17.1/pdf-lib.min.js",
-        "tools/_vendor/pdf-lib-1.17.1/LICENSE.md"
+        "tools/_vendor/pdf-lib-1.17.1/LICENSE.md",
+        "tools/_vendor/jszip-3.10.1/jszip.min.js",
+        "tools/_vendor/jszip-3.10.1/LICENSE.markdown"
       ],
       "transforms": {
         "injectOfflineHead": true
@@ -1817,13 +1843,58 @@
           "kind": "license-text"
         },
         {
+          "value": "https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://stuartk.com/jszip",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://raw.github.com/Stuk/jszip/main/LICENSE.markdown",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/nodeca/pako/blob/main/LICENSE",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://stuk.github.io/jszip/documentation/howto/read_zip.html",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/package/2006/content-types",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/package/2006/relationships",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+          "kind": "namespace"
+        },
+        {
           "value": "http://www.xfa.org/schema/xfa-data/1.0/",
           "kind": "namespace"
         }
       ],
       "libraries": [
         "pdfjs-dist",
-        "pdf-lib"
+        "pdf-lib",
+        "jszip"
       ],
       "offlineRewrites": [
         {
