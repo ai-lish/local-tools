@@ -18,6 +18,8 @@
   <script defer src="review.js"></script>
   <script defer src="demo.js"></script>
   <script defer src="template-store.js"></script>
+  <script defer src="template-editor.js"></script>
+  <script defer src="template-editor-ui.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -61,17 +63,58 @@
           <div><p class="eyebrow">第一步</p><h2 id="step-1-heading">選擇批改範本</h2></div>
           <span class="hint-pill">範本決定批改方式</span>
         </div>
-        <p class="muted">選擇題範本用來讀圈；默書範本可選新式答案句批改或舊版格位批改。自訂範本只會保存在這部電腦的瀏覽器。</p>
-        <div id="template-list" class="template-list" role="radiogroup" aria-label="可用範本"></div>
-        <div class="template-actions">
-          <button class="button primary" id="use-template" type="button">使用此範本</button>
-          <button class="button" id="demo-start" type="button">試玩示範（不需要檔案）</button>
-          <label class="button file-button" for="template-file">匯入範本 JSON<input id="template-file" type="file" accept="application/json,.json"></label>
-          <button class="button" id="export-template" type="button" disabled>匯出所選範本</button>
-          <button class="button danger-button" id="delete-template" type="button" disabled>刪除自訂範本</button>
+        <div id="template-selection-panel">
+          <p class="muted">選擇題範本用來讀圈；默書範本可選新式答案句批改或舊版格位批改。自訂範本只會保存在這部電腦的瀏覽器。</p>
+          <div id="template-list" class="template-list" role="radiogroup" aria-label="可用範本"></div>
+          <div class="template-actions">
+            <button class="button primary" id="use-template" type="button">使用此範本</button>
+            <button class="button" id="edit-template-layout" type="button" disabled>編輯範本位置</button>
+            <button class="button" id="demo-start" type="button">試玩示範（不需要檔案）</button>
+            <label class="button file-button" for="template-file">匯入範本 JSON<input id="template-file" type="file" accept="application/json,.json"></label>
+            <button class="button" id="export-template" type="button" disabled>匯出所選範本</button>
+            <button class="button danger-button" id="delete-template" type="button" disabled>刪除自訂範本</button>
+          </div>
+          <p id="template-status" class="status-message" role="status">請選擇一款範本；內置範本可直接使用。</p>
+          <p class="privacy-note">範本與介面偏好只存於瀏覽器；不會儲存學生資料、答案、批改進度或任何金鑰。</p>
         </div>
-        <p id="template-status" class="status-message" role="status">請選擇一款範本；內置範本可直接使用。</p>
-        <p class="privacy-note">範本與介面偏好只存於瀏覽器；不會儲存學生資料、答案、批改進度或任何金鑰。</p>
+        <section id="template-editor-panel" class="panel template-editor-panel" aria-labelledby="template-editor-heading" hidden>
+          <div class="section-title">
+            <div><p class="eyebrow">範本位置</p><h3 id="template-editor-heading">選擇題範本視覺編輯器</h3></div>
+            <button class="button compact" id="template-editor-close" type="button">返回範本清單</button>
+          </div>
+          <p id="template-editor-copy-note" class="muted small"></p>
+          <p class="privacy-note">樣本 PDF 只在記憶體短暫處理；不會上載、保存或寫入範本。調整只會修改圈位及既有範本設定。</p>
+          <div class="template-editor-controls">
+            <label class="button file-button" for="template-editor-pdf-file">載入本機答題紙 PDF<input id="template-editor-pdf-file" type="file" accept="application/pdf,.pdf"></label>
+            <label class="field template-editor-page-field"><span>樣本頁碼</span><input id="template-editor-page-number" type="number" min="1" step="1" value="1" disabled></label>
+            <label class="field template-editor-group-field"><span>選擇要調整的組</span><select id="template-editor-group" disabled></select></label>
+            <label class="field template-editor-spacing-field"><span>選項間距</span><input id="template-editor-option-spacing" type="number" min="0.0001" max="1" step="0.001" disabled></label>
+            <label class="field template-editor-spacing-field"><span>行距</span><input id="template-editor-row-spacing" type="number" min="0.0001" max="1" step="0.001" disabled></label>
+            <label id="template-editor-all-columns-wrap" class="inline-check" hidden><input id="template-editor-all-columns" type="checkbox"><span>全部選擇題欄同時套用</span></label>
+            <div class="template-editor-actions">
+              <button class="button" id="template-editor-undo" type="button" disabled>撤銷</button>
+              <button class="button" id="template-editor-reset" type="button" disabled>重設為原範本</button>
+              <button class="button primary" id="template-editor-test" type="button" disabled>以樣本測試讀圈</button>
+            </div>
+          </div>
+          <p id="template-editor-instructions" class="muted small">載入一頁答題紙作底圖。選擇圈位組後，在底圖上按住拖拉可移動；聚焦底圖後可用方向鍵微調，Shift 加方向鍵每次移動 0.005。</p>
+          <div class="template-editor-frame" id="template-editor-frame">
+            <canvas id="template-editor-canvas" hidden></canvas>
+            <svg id="template-editor-overlay" viewBox="0 0 1 1" role="img" aria-label="答題紙範本圈位疊圖" tabindex="0"></svg>
+            <p id="template-editor-empty" class="empty-state">請載入本機答題紙 PDF。</p>
+          </div>
+          <p id="template-editor-page-status" class="status-message" role="status"></p>
+          <section class="template-editor-result" aria-labelledby="template-editor-result-heading">
+            <h4 id="template-editor-result-heading">樣本讀圈結果</h4>
+            <p id="template-editor-result" class="muted small">測試後會顯示班別、學號、首十題答案及待覆核數。</p>
+          </section>
+          <div class="template-editor-save-row">
+            <label class="field"><span>自訂範本名稱</span><input id="template-editor-name" type="text" maxlength="100" autocomplete="off"></label>
+            <button class="button primary" id="template-editor-save" type="button">儲存為自訂範本</button>
+            <button class="button" id="template-editor-export" type="button">匯出 JSON</button>
+          </div>
+          <p id="template-editor-status" class="status-message" role="status"></p>
+        </section>
       </section>
     </section>
 

@@ -36,6 +36,7 @@
     step1: byId("step-1"), step2: byId("step-2"), step3: byId("step-3"), step1State: byId("step-1-state"),
     step2State: byId("step-2-state"), step3State: byId("step-3-state"), stepPills: Array.from(document.querySelectorAll(".step-pill")),
     templateList: byId("template-list"), useTemplate: byId("use-template"), demoStart: byId("demo-start"),
+    editTemplateLayout: byId("edit-template-layout"),
     templateStatus: byId("template-status"), selectedTemplateLabel: byId("selected-template-label"),
     templateFile: byId("template-file"), exportTemplate: byId("export-template"), deleteTemplate: byId("delete-template"),
     demoBanner: byId("demo-banner"), endDemo: byId("end-demo"), reviewStepStatus: byId("review-step-status"),
@@ -134,6 +135,7 @@
       els.templateList.append(card);
     });
     var selected = templateById(state.templateId);
+    els.editTemplateLayout.disabled = selected.kind !== "choice";
     els.exportTemplate.disabled = false;
     els.deleteTemplate.disabled = selected.source !== "custom";
     els.selectedTemplateLabel.textContent = selected.name;
@@ -1574,6 +1576,31 @@
     }
   }
 
+  var templateEditorUI = window.PdfMarkingTemplateEditorUI.create({
+    templates: templates,
+    geometry: geometry,
+    omr: omr,
+    editor: window.PdfMarkingTemplateEditor,
+    getSelectedTemplate: function () { return templateById(state.templateId); },
+    onSave: function (definition) {
+      var next = customTemplates.filter(function (entry) { return entry.id !== definition.id; });
+      next.push(definition);
+      var saved = templateStore.saveTemplates(window, templates, next);
+      if (!saved.ok) return saved;
+      customTemplates = next;
+      state.templateId = definition.id;
+      templateStore.savePreference(window, definition.id);
+      renderTemplateList(); updateStepper();
+      return { ok: true, template: definition, message: saved.message };
+    },
+    onExport: function (definition) {
+      var text = templates.serializeTemplate(definition);
+      var safeId = definition.id.replace(/[^a-z0-9._-]/gi, "-");
+      createDownload(downloadName("pdf-marking-template-" + safeId + ".json"), new Blob([text], { type: "application/json;charset=utf-8" }));
+    },
+    onClose: function () { renderTemplateList(); updateStepper(); }
+  });
+
   function templateSummary(definition) {
     if (definition.kind === "choice") {
       return definition.blocks.map(function (block) {
@@ -1687,6 +1714,7 @@
   els.readOmr.addEventListener("click", function () { readAllPages(); });
   els.startDictation.addEventListener("click", function () { if (state.pdfDoc) { setStep(3); renderCurrentMode(); } });
   els.useTemplate.addEventListener("click", useSelectedTemplate);
+  els.editTemplateLayout.addEventListener("click", function () { templateEditorUI.open(templateById(state.templateId)); });
   els.exportTemplate.addEventListener("click", exportSelectedTemplate);
   els.deleteTemplate.addEventListener("click", deleteSelectedTemplate);
   els.templateFile.addEventListener("change", function () { importTemplateFile(els.templateFile.files[0]); });
