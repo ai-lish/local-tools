@@ -10,6 +10,7 @@
     for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
       var page = pages && pages[pageNumber];
       if (!page) continue;
+      if (Array.isArray(page.pageFlags) && page.pageFlags.indexOf("答案卷頁：不計分、不匯出") >= 0) continue;
       if (page.pageFailure) {
         queue.push({ kind: "page", pageNumber: pageNumber, type: "page", number: 0,
           answer: "整頁", reason: Array.isArray(page.alignmentDiagnostics && page.alignmentDiagnostics.reasons)

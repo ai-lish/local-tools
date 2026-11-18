@@ -446,6 +446,116 @@
     answers[index] = answers[index] === choice ? "" : choice;
     return answers.map(function (answer) { return answer || "?"; }).join("");
   }
+  function pdfTextLines(items, tolerance) {
+    var limit = Math.max(0.5, Number(tolerance) || 2.5);
+    var positioned = (items || []).map(function (item, index) {
+      var transform = item && item.transform;
+      return {
+        text: String(item && item.str || "").trim(),
+        x: transform && Number.isFinite(Number(transform[4])) ? Number(transform[4]) : index,
+        y: transform && Number.isFinite(Number(transform[5])) ? Number(transform[5]) : 0,
+        index: index
+      };
+    }).filter(function (item) { return item.text; }).sort(function (a, b) {
+      return b.y - a.y || a.x - b.x || a.index - b.index;
+    });
+    var lines = [];
+    positioned.forEach(function (item) {
+      var line = lines.find(function (candidate) { return Math.abs(candidate.y - item.y) <= limit; });
+      if (!line) {
+        line = { y: item.y, items: [] };
+        lines.push(line);
+      }
+      line.items.push(item);
+      line.y = line.items.reduce(function (sum, part) { return sum + part.y; }, 0) / line.items.length;
+    });
+    return lines.sort(function (a, b) { return b.y - a.y; }).map(function (line) {
+      return line.items.sort(function (a, b) { return a.x - b.x || a.index - b.index; })
+        .map(function (item) { return item.text; }).join(" ");
+    });
+  }
+  function parseAnswerKeyText(text, questionCount, allowedOptions) {
+    var count = Math.max(0, Math.min(250, Math.floor(Number(questionCount) || 0)));
+    var options = Array.from(new Set((allowedOptions || []).map(function (option) { return String(option).trim().toUpperCase(); })));
+    var normalized = String(text == null ? "" : text).normalize("NFKC").toUpperCase();
+    var answers = {};
+    var rejectedCount = 0;
+    var unmatchedCount = 0;
+    var conflicts = new Set();
+    var lines = normalized.split(/\r?\n/);
+    var consumed = new Set();
+    var expression = /(?:^|[^0-9])([0-9]{1,3})[ \t]*[.、)）:：]?[ \t]*(?:答案[ \t]*[:：]?[ \t]*)?([A-Z])(?=$|[^A-Z])/g;
+    var numberHeader = /^(?:題號|題目|QUESTION(?:[ \t]+(?:NO\.?|NUMBER))?|Q)[ \t]*[:：]?[ \t]*/;
+    var answerHeader = /^(?:答案|ANS(?:WER)?S?)[ \t]*[:：]?[ \t]*/;
+    function tokens(line) { return line.trim().split(/[ \t,，、;；|]+/).filter(Boolean); }
+    function rowKind(line) {
+      var value = line.trim();
+      if (!value) return { type: "empty", values: [] };
+      if (/^(?:題號|題目|QUESTION(?:[ \t]+(?:NO\.?|NUMBER))?|Q)(?:[ \t]*[:：]?[ \t]*(?:答案|ANS(?:WER)?S?))?$/.test(value) ||
+          /^(?:答案|ANS(?:WER)?S?)$/.test(value)) return { type: "header", values: [] };
+      var numberValue = value.replace(numberHeader, "");
+      var numberTokens = tokens(numberValue);
+      if (numberTokens.length && numberTokens.every(function (token) { return /^[0-9]{1,3}[.、)）:：]?$/.test(token); })) {
+        return { type: "numbers", values: numberTokens.map(function (token) { return Number(token.replace(/[.、)）:：]$/, "")); }) };
+      }
+      var answerValue = value.replace(answerHeader, "");
+      var answerTokens = tokens(answerValue);
+      if (answerTokens.length && answerTokens.every(function (token) { return /^[A-Z]$/.test(token); })) {
+        return { type: "letters", values: answerTokens };
+      }
+      return { type: "other", values: [] };
+    }
+    var rows = lines.map(rowKind);
+    function addAnswer(questionValue, answer) {
+      var question = Number(questionValue);
+      if (!Number.isInteger(question) || question < 1 || question > count || options.indexOf(answer) < 0) {
+        rejectedCount += 1;
+        return;
+      }
+      if (conflicts.has(question)) { rejectedCount += 1; return; }
+      if (Object.prototype.hasOwnProperty.call(answers, question)) {
+        rejectedCount += 1;
+        if (answers[question] !== answer) {
+          delete answers[question];
+          conflicts.add(question);
+        }
+        return;
+      }
+      answers[question] = answer;
+    }
+    rows.forEach(function (row, index) {
+      if (row.type === "header" || consumed.has(index)) { consumed.add(index); return; }
+      if (row.type === "numbers") {
+        var next = index + 1;
+        while (next < rows.length && (rows[next].type === "header" || rows[next].type === "empty")) { consumed.add(next); next += 1; }
+        if (next < rows.length && rows[next].type === "letters") {
+          consumed.add(index); consumed.add(next);
+          if (row.values.length === rows[next].values.length) {
+            row.values.forEach(function (question, offset) { addAnswer(question, rows[next].values[offset]); });
+          } else {
+            unmatchedCount += Math.max(row.values.length, rows[next].values.length);
+            rejectedCount += Math.max(row.values.length, rows[next].values.length);
+          }
+        } else {
+          consumed.add(index);
+          unmatchedCount += row.values.length;
+          rejectedCount += row.values.length;
+        }
+      } else if (row.type === "letters") {
+        consumed.add(index);
+        unmatchedCount += row.values.length;
+        rejectedCount += row.values.length;
+      }
+    });
+    lines.forEach(function (line, index) {
+      if (consumed.has(index)) return;
+      expression.lastIndex = 0;
+      var match;
+      while ((match = expression.exec(line))) addAnswer(match[1], match[2]);
+    });
+    return { answers: answers, rejectedCount: rejectedCount, matchedCount: Object.keys(answers).length,
+      unmatchedCount: unmatchedCount, conflictingQuestions: Array.from(conflicts).sort(function (a, b) { return a - b; }) };
+  }
   function identityRequirements(definition, detected) {
     var base = Object.assign({ grade: false, form: false, studentDigits: 0 }, detected || {});
     var manual = definition && definition.identity && definition.identity.manualFields || {};
@@ -455,6 +565,7 @@
   }
 
   var api = { createTemplateFromZones: createTemplateFromZones, keyArray: keyArray, toggleAnswer: toggleAnswer,
+    pdfTextLines: pdfTextLines, parseAnswerKeyText: parseAnswerKeyText,
     identityRequirements: identityRequirements, isLayoutPrivacyZone: isLayoutPrivacyZone, isIdentityGridZone: isIdentityGridZone,
     layoutPrivacyDecisionReady: layoutPrivacyDecisionReady, createLayoutPrivacyDefinition: createLayoutPrivacyDefinition,
     normalizeGridOptions: normalizeGridOptions, answerOptions: answerOptions, answerRows: answerRows,

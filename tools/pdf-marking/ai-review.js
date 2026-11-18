@@ -8,6 +8,7 @@
   var PUNCTUATION = "，、。？！；：「」『』（）《》〈〉…—·,.?!;:'\"()";
   var PROMPTS = {
     choice: "只查看圖片中圈格的實際填寫痕跡，不推測答案。回傳 JSON：{\"selectedOptions\":[\"A\"],\"confidence\":0.0}。空白請用空陣列；如有多個填寫，逐一列出。confidence 必須為 0 至 1。只回傳 JSON。",
+    answerKey: "只讀取頁面上清晰列出的選擇題標準答案，不猜測不清楚的內容。只回傳 JSON：{\"answers\":[{\"q\":1,\"a\":\"A\"}]}。q 必須是題號整數，a 必須是單一選項字母。不要回傳解釋或其他內容。",
     dictation: "請只轉錄圖片內可見的手寫文字，不要補寫、改正或推測；不確定的字請以問號表示。不要描述圖片。回傳 JSON：{\"transcription\":\"\"}。只回傳 JSON。",
     identity: "只讀取提示所指定的一組身份資料，不描述或轉錄其他內容。只回傳 JSON；圈格欄位只可回報固定選項及填寫狀態，手寫欄位只可回報指定的班別或班號。",
     layout: "只分析答案及身份代號圈格的版面幾何。圈格可見的固定標籤只可辨認班別年級數字 1–9、班別字母 A–Z；不要讀取或推測圈內填寫內容。班別年級及字母圈格必須回傳 options，按標籤由上而下列出；不得用 digits 代替。學號 digits 是學號位數，即數字圈格的欄數，不是 0–9 的行數；學號欄只回傳 digits。每個圈格框須緊貼該組圈格外緣。不得讀取、轉錄或描述姓名、手寫班別／班號、科目、題目或任何其他文字。請只回傳 JSON：{\"answerColumns\":[{\"type\":\"mc\",\"rect\":{\"x\":0.1,\"y\":0.2,\"w\":0.3,\"h\":0.5},\"options\":[\"A\",\"B\",\"C\",\"D\",\"E\"],\"rows\":10,\"groupSize\":5,\"numbering\":\"column-major\"}],\"identityFields\":[{\"type\":\"class-grade-grid\",\"rect\":{\"x\":0.1,\"y\":0.2,\"w\":0.1,\"h\":0.3},\"options\":[\"1\",\"2\",\"3\",\"4\",\"5\",\"6\"]},{\"type\":\"class-form-grid\",\"rect\":{\"x\":0.3,\"y\":0.2,\"w\":0.1,\"h\":0.3},\"options\":[\"A\",\"B\",\"C\",\"D\",\"E\"]},{\"type\":\"student-number-grid\",\"rect\":{\"x\":0.5,\"y\":0.2,\"w\":0.2,\"h\":0.3},\"digits\":4}]}。每個答案欄可用 type mc 或 tf；options 只回傳可見選項標籤；rows 是整數；groupSize 可選，為 1 至 rows 的整數；numbering 只可為 column-major 或 row-major。identityFields 只可列出 class-grade-grid、class-form-grid、student-number-grid 的位置；班別年級及字母 options 須為 2 至 12 個不重複的可見標籤，學號欄只附 1 至 12 位 digits。不可回傳轉錄文字、label、name、filename、page number、答案或解釋。只回傳 JSON。",
@@ -528,6 +529,7 @@
   function budgetExhaustionMessage(task) {
     if (task === "layout") return "AI 用盡回覆額度仍未完成分析（只有思考內容），未套用建議。建議改用 Gemini，或直接手動拉框。";
     if (task === "choice") return "AI 用盡回覆額度仍未完成選擇題分析（只有思考內容），未套用答案建議。";
+    if (task === "answerKey") return "AI 用盡回覆額度仍未完成答案表讀取（只有思考內容），未套用答案。";
     if (task === "dictation") return "AI 用盡回覆額度仍未完成默書轉錄（只有思考內容），未套用轉錄建議。";
     if (task === "identity") return "AI 用盡回覆額度仍未完成身份核對（只有思考內容），未套用識別建議。";
     return "AI 用盡回覆額度仍未完成測試（只有思考內容）。";
@@ -558,6 +560,24 @@
       return { ok: false, message: "AI 回覆包含不適用選項，未套用任何答案。" };
     }
     return { ok: true, selectedOptions: Array.from(new Set(selected)).sort(), confidence: parsed.confidence };
+  }
+
+  function parseAnswerKeySuggestion(text, questionCount, allowedOptions) {
+    var parsed = parseJsonObject(text);
+    if (!parsed || !Array.isArray(parsed.answers)) return { ok: false, message: "AI 答案表回覆格式無效，未套用任何答案。" };
+    var count = Math.max(0, Math.min(250, Math.floor(Number(questionCount) || 0)));
+    var allowed = Array.from(new Set((allowedOptions || []).map(function (option) { return String(option).trim().toUpperCase(); })));
+    var seen = new Set(); var answers = []; var rejectedCount = 0;
+    parsed.answers.forEach(function (entry) {
+      var question = entry && entry.q;
+      var answer = entry && typeof entry.a === "string" ? entry.a.trim().toUpperCase() : "";
+      if (!Number.isInteger(question) || question < 1 || question > count || allowed.indexOf(answer) < 0 || seen.has(question)) {
+        rejectedCount += 1; return;
+      }
+      seen.add(question); answers.push({ q: question, a: answer });
+    });
+    answers.sort(function (first, second) { return first.q - second.q; });
+    return { ok: true, answers: answers, rejectedCount: rejectedCount };
   }
 
   function normalizedSuggestionRect(value) {
@@ -797,6 +817,8 @@
   function parseProviderResponse(provider, task, response, allowedOptions, identityContext) {
     var text = extractProviderText(provider, response);
     if (task === "choice") return parseChoiceSuggestion(text, allowedOptions || ["A", "B", "C", "D", "T", "F"]);
+    if (task === "answerKey") return parseAnswerKeySuggestion(text, identityContext && identityContext.questionCount,
+      identityContext && identityContext.allowedOptions);
     if (task === "layout") return parseChoiceLayoutSuggestion(text, allowedOptions || []);
     if (task === "identity") return parseIdentitySuggestion(text, identityContext);
     if (task === "dictation") return parseTranscription(text);
@@ -856,6 +878,7 @@
     buildProviderRequest: buildProviderRequest,
     parseJsonObject: parseJsonObject,
     parseChoiceSuggestion: parseChoiceSuggestion,
+    parseAnswerKeySuggestion: parseAnswerKeySuggestion,
     parseChoiceLayoutSuggestion: parseChoiceLayoutSuggestion,
     parseIdentitySuggestion: parseIdentitySuggestion,
     parseTranscription: parseTranscription,

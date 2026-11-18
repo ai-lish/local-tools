@@ -7,6 +7,7 @@
     var api = root.PdfMarkingChoiceWizard;
     var templates = options.templates;
     var geometry = options.geometry;
+    var omr = options.omr;
     var get = function (id) { return document.getElementById(id); };
     var wizard = get("choice-wizard");
     var legacyStepper = get("legacy-stepper");
@@ -38,6 +39,17 @@
     var aiSuggestions = [];
     var preparedAiImage = null;
     var aiRequestBusy = false;
+    var answerSourceDocument = null;
+    var localAnswerDocument = null;
+    var answerSourceFile = null;
+    var referenceDocument = null;
+    var referenceFile = null;
+    var importedAnswers = [];
+    var referenceImage = null;
+    var referenceBaseCanvas = null;
+    var referenceMaskRects = [];
+    var maskDrawing = null;
+    var referencePreviewToken = 0;
     var clickMode = null;
     var baseClickCalibration = null;
 
@@ -102,7 +114,7 @@
         get("choice-wizard-tf-numbering").disabled = !tfBlock;
         updateCountStatus();
       }
-      if (stage === 4) renderAnswerPage();
+      if (stage === 4) { renderAnswerPage(); updateAnswerSourceAvailability(); }
       options.onWizardStage(stage);
     }
     function showLegacy(mode, definition) {
@@ -831,6 +843,279 @@
       setStatus("choice-wizard-answer-status", missing.length ? "尚未設定：" + missing.slice(0, 12).join("、") + (missing.length > 12 ? "等 " + missing.length + " 題" : "") : "所有題目已設定答案。", Boolean(missing.length));
       get("choice-wizard-next-to-grade").disabled = Boolean(missing.length);
     }
+    function pageDocument(file) {
+      if (!root.pdfjsLib || !root.LT_PDF_WORKER_SRC) throw new Error("PDF 程式庫未載入；請檢查完整解壓的工具套件。");
+      return file.arrayBuffer().then(function (buffer) {
+        return root.pdfjsLib.getDocument({ data: new Uint8Array(buffer), isEvalSupported: false }).promise;
+      });
+    }
+    function destroyDocument(documentValue) {
+      if (documentValue && typeof documentValue.destroy === "function") documentValue.destroy();
+    }
+    function gradingPdfInfo() {
+      return typeof options.getCurrentPdf === "function" ? options.getCurrentPdf() : null;
+    }
+    function updateAnswerSourceAvailability() {
+      var source = get("choice-answer-source");
+      var grading = source.querySelector('option[value="grading"]');
+      var info = gradingPdfInfo();
+      var excludedPage = typeof options.getExcludedAnswerPage === "function" ? options.getExcludedAnswerPage() : 0;
+      grading.disabled = !info || !info.document || !info.pageCount;
+      if (excludedPage && !grading.disabled) source.value = "grading";
+      get("choice-answer-file-wrap").hidden = source.value !== "local";
+      get("choice-answer-exclude-wrap").hidden = source.value !== "grading";
+      if (source.value === "grading" && !grading.disabled) {
+        answerSourceDocument = info.document; answerSourceFile = null;
+        get("choice-answer-page").max = String(info.pageCount);
+        if (excludedPage) get("choice-answer-page").value = String(excludedPage);
+        get("choice-answer-exclude-page").checked = Boolean(excludedPage && Number(get("choice-answer-page").value) === excludedPage);
+      } else if (source.value === "grading" && grading.disabled) {
+        source.value = "local"; get("choice-answer-file-wrap").hidden = false;
+        get("choice-answer-exclude-wrap").hidden = true;
+        answerSourceDocument = null; answerSourceFile = null;
+      } else answerSourceDocument = localAnswerDocument;
+      get("choice-answer-read-omr").disabled = !answerSourceDocument || !selectedDefinition();
+      get("choice-answer-page").disabled = !answerSourceDocument;
+    }
+    async function renderImportPage(documentValue, pageNumber, maxSide) {
+      var total = Number(documentValue && documentValue.numPages) || 0;
+      var pageNo = Math.floor(Number(pageNumber));
+      if (!Number.isInteger(pageNo) || pageNo < 1 || pageNo > total) throw new Error("頁碼超出 PDF 範圍。");
+      var page = await documentValue.getPage(pageNo);
+      var base = page.getViewport({ scale: 1 });
+      var viewport = page.getViewport({ scale: Math.min(2.2, maxSide / Math.max(base.width, base.height)) });
+      var canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
+      return { page: page, canvas: canvas };
+    }
+    function currentAnswerBlocks() {
+      var definition = selectedDefinition();
+      var counts = { mcCount: Number(get("mc-count").value) || 0, tfCount: Number(get("tf-count").value) || 0 };
+      if (!definition) return { definition: null, expanded: { items: [] }, counts: counts };
+      return { definition: definition, expanded: templates.expandChoiceTemplate(definition, counts), counts: counts };
+    }
+    function answerTypeFor(questionNumber, answer, expanded) {
+      var matches = (expanded.items || []).filter(function (item) { return item.number === questionNumber &&
+        item.choices.some(function (choice) { return choice.option === answer; }); });
+      return matches.length === 1 ? matches[0].type : "";
+    }
+    function renderImportedAnswers(records, message) {
+      var context = currentAnswerBlocks();
+      importedAnswers = records || [];
+      var byKey = Object.create(null);
+      importedAnswers.forEach(function (entry) { byKey[entry.type + ":" + entry.number] = entry; });
+      var body = get("choice-answer-import-rows");
+      body.replaceChildren();
+      context.expanded.items.forEach(function (item) {
+        var source = byKey[item.type + ":" + item.number] || { type: item.type, number: item.number, answer: "", status: "待老師設定" };
+        var row = document.createElement("tr");
+        var questionCell = document.createElement("td"); questionCell.textContent = (item.type === "mc" ? "選擇題 " : "是非題 ") + item.number;
+        var answerCell = document.createElement("td");
+        var select = document.createElement("select"); select.setAttribute("aria-label", questionCell.textContent + "答案");
+        var blank = document.createElement("option"); blank.value = ""; blank.textContent = "待老師設定"; select.append(blank);
+        Array.from(new Set(item.choices.map(function (choice) { return choice.option; }))).forEach(function (optionValue) {
+          var option = document.createElement("option"); option.value = optionValue; option.textContent = optionValue; select.append(option);
+        });
+        select.value = item.choices.some(function (choice) { return choice.option === source.answer; }) ? source.answer : "";
+        select.addEventListener("change", function () {
+          var current = byKey[item.type + ":" + item.number] || { type: item.type, number: item.number };
+          current.answer = select.value; current.status = select.value ? "老師確認" : "待老師設定";
+          byKey[item.type + ":" + item.number] = current;
+          importedAnswers = Object.keys(byKey).map(function (key) { return byKey[key]; });
+          statusCell.textContent = current.status;
+        });
+        answerCell.append(select);
+        var statusCell = document.createElement("td"); statusCell.textContent = source.status || (source.answer ? "已讀取" : "待老師設定");
+        row.append(questionCell, answerCell, statusCell); body.append(row);
+      });
+      get("choice-answer-import-results").hidden = false;
+      get("choice-answer-import-apply").disabled = !context.expanded.items.length;
+      setStatus("choice-answer-import-status", message || "請逐題核對；未讀取的題目可在表格選擇答案。", false);
+    }
+    async function readAnswerSheet() {
+      var info = gradingPdfInfo();
+      if (get("choice-answer-source").value === "grading") {
+        if (!info || !info.document) { setStatus("choice-answer-import-status", "目前沒有已載入的批改 PDF。", true); return; }
+        answerSourceDocument = info.document;
+      }
+      if (!answerSourceDocument || !selectedDefinition()) return;
+      var pageNumber = Number(get("choice-answer-page").value) || 1;
+      var context = currentAnswerBlocks();
+      var canvas = null;
+      try {
+        setStatus("choice-answer-import-status", "正在本機讀取答案卷…", false);
+        var rendered = await renderImportPage(answerSourceDocument, pageNumber, 1800);
+        canvas = rendered.canvas;
+        var image = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+        var template = geometry.expandChoiceTemplate(context.definition, context.counts);
+        var fit = omr.gridFit(image, canvas.width, canvas.height, template);
+        var detected = omr.detectPage(image, canvas.width, canvas.height, context.counts.mcCount,
+          context.counts.tfCount, fit.calibration, fit.metadataCalibration, template);
+        var records = context.expanded.items.map(function (item) {
+          var found = detected.questions.find(function (question) { return question.type === item.type && question.number === item.number; });
+          var valid = found && found.status === "read" && item.choices.some(function (choice) { return choice.option === found.answer; });
+          return { type: item.type, number: item.number, answer: valid ? found.answer : "",
+            status: valid ? "清晰讀取" : "待老師設定" };
+        });
+        var ready = records.filter(function (record) { return Boolean(record.answer); }).length;
+        var pending = records.length - ready;
+        renderImportedAnswers(records, "本機讀圈完成：清晰讀取 " + ready + " 題；空白、淺圈或多選共 " + pending + " 題待老師設定。");
+      } catch (error) {
+        setStatus("choice-answer-import-status", error && error.message || "答案卷未能讀取；請檢查檔案及頁碼。", true);
+      } finally {
+        if (canvas) { canvas.width = 1; canvas.height = 1; }
+      }
+    }
+    async function loadReferencePdf(file) {
+      destroyDocument(referenceDocument); referenceDocument = null; referenceFile = null;
+      referenceMaskRects = []; referenceImage = null;
+      get("choice-reference-ai-confirmation").hidden = true;
+      get("choice-reference-extract").disabled = true; get("choice-reference-ai-preview").disabled = true;
+      if (!file) return;
+      try {
+        referenceFile = file; referenceDocument = await pageDocument(file);
+        get("choice-reference-page").max = String(referenceDocument.numPages);
+        get("choice-reference-page").value = "1";
+        get("choice-reference-extract").disabled = false;
+        get("choice-reference-ai-preview").disabled = false;
+        setStatus("choice-answer-import-status", "參考 PDF 已在本機開啟，共 " + referenceDocument.numPages + " 頁。", false);
+      } catch (error) {
+        referenceFile = null; referenceDocument = null;
+        setStatus("choice-answer-import-status", "參考 PDF 無法開啟；請確認檔案完整且未加密。", true);
+      }
+    }
+    async function extractReferenceAnswers() {
+      if (!referenceDocument || !selectedDefinition()) return;
+      try {
+        setStatus("choice-answer-import-status", "正在本機讀取參考答案文字…", false);
+        var pageNumber = Math.floor(Number(get("choice-reference-page").value) || 1);
+        var page = await referenceDocument.getPage(pageNumber);
+        var content = await page.getTextContent();
+        var text = api.pdfTextLines(content.items).join("\n");
+        var context = currentAnswerBlocks();
+        var parsed = api.parseAnswerKeyText(text, 250, ["A", "B", "C", "D", "E", "F", "T"]);
+        var records = parsed.matchedCount ? Object.keys(parsed.answers).map(function (key) {
+          var number = Number(key); var answer = parsed.answers[key];
+          var type = answerTypeFor(number, answer, context.expanded);
+          return type ? { type: type, number: number, answer: answer, status: "文字讀取" } : null;
+        }).filter(Boolean) : [];
+        parsed.conflictingQuestions.forEach(function (number) {
+          context.expanded.items.filter(function (item) { return item.number === number; }).forEach(function (item) {
+            records.push({ type: item.type, number: number, answer: "", status: "答案衝突，待老師設定" });
+          });
+        });
+        var warnings = [];
+        if (parsed.unmatchedCount) warnings.push(parsed.unmatchedCount + " 項題號／答案數量不符或未能配對，請核對。");
+        if (parsed.conflictingQuestions.length) warnings.push("第 " + parsed.conflictingQuestions.join("、") + " 題有不同答案，已留空待老師設定。");
+        if (parsed.rejectedCount > parsed.unmatchedCount + parsed.conflictingQuestions.length) {
+          warnings.push("另有 " + (parsed.rejectedCount - parsed.unmatchedCount - parsed.conflictingQuestions.length) + " 項無效或重複內容已忽略。");
+        }
+        if (!records.length) {
+          renderImportedAnswers([], "本機文字層未辨認有效答案；如屬掃描頁，可檢視後選用 AI 讀取。" + (warnings.length ? " " + warnings.join(" ") : ""));
+        } else {
+          renderImportedAnswers(records, "本機文字層辨認 " + parsed.matchedCount + " 項。" +
+            (warnings.length ? " " + warnings.join(" ") : "") + " 請核對及補齊表格。");
+        }
+      } catch (error) {
+        setStatus("choice-answer-import-status", error && error.message || "參考答案文字未能讀取。", true);
+      }
+    }
+    async function prepareReferenceAiPreview() {
+      if (!referenceDocument || !selectedDefinition()) return;
+      try {
+        var pageNumber = Math.floor(Number(get("choice-reference-page").value) || 1);
+        var rendered = await renderImportPage(referenceDocument, pageNumber, 1024);
+        referenceBaseCanvas = rendered.canvas;
+        var preview = get("choice-reference-preview");
+        preview.width = rendered.canvas.width; preview.height = rendered.canvas.height;
+        preview.getContext("2d").drawImage(rendered.canvas, 0, 0);
+        var overlay = get("choice-reference-mask-overlay");
+        overlay.width = rendered.canvas.width; overlay.height = rendered.canvas.height;
+        referenceMaskRects = []; maskDrawing = null; drawReferenceMasks();
+        get("choice-reference-ai-reviewed").checked = false;
+        get("choice-reference-ai-confirm").disabled = true;
+        get("choice-reference-ai-confirmation").hidden = false;
+        setStatus("choice-answer-import-status", "已在本機顯示第 " + pageNumber + " 頁；按住並拖曳可遮蓋不需送出的區域。", false);
+      } catch (error) {
+        setStatus("choice-answer-import-status", error && error.message || "參考答案頁無法預覽。", true);
+      }
+    }
+    function drawReferenceMasks() {
+      var canvas = get("choice-reference-mask-overlay");
+      if (!canvas.width || !canvas.height) return;
+      var context = canvas.getContext("2d"); context.clearRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "#000";
+      referenceMaskRects.forEach(function (rect) {
+        context.fillRect(rect.x * canvas.width, rect.y * canvas.height, rect.w * canvas.width, rect.h * canvas.height);
+      });
+      if (maskDrawing) {
+        var left = Math.min(maskDrawing.x, maskDrawing.endX); var top = Math.min(maskDrawing.y, maskDrawing.endY);
+        context.fillRect(left, top, Math.abs(maskDrawing.endX - maskDrawing.x), Math.abs(maskDrawing.endY - maskDrawing.y));
+      }
+    }
+    function previewPoint(event) {
+      var canvas = get("choice-reference-mask-overlay"); var rect = canvas.getBoundingClientRect();
+      return { x: clamp((event.clientX - rect.left) / rect.width, 0, 1) * canvas.width,
+        y: clamp((event.clientY - rect.top) / rect.height, 0, 1) * canvas.height };
+    }
+    async function sendReferenceAiRequest() {
+      if (!referenceBaseCanvas || !get("choice-reference-ai-reviewed").checked || typeof options.requestAiAnswerKey !== "function") return;
+      var context = currentAnswerBlocks();
+      var aiSettings = options.getAiSettings();
+      if (!aiSettings.ready) {
+        setStatus("choice-answer-import-status", "請先在第七步啟用 AI 並設定供應者、模型及本頁記憶體中的 key。沒有送出圖片。", true); return;
+      }
+      var output = document.createElement("canvas"); output.width = referenceBaseCanvas.width; output.height = referenceBaseCanvas.height;
+      var outputContext = output.getContext("2d"); outputContext.drawImage(referenceBaseCanvas, 0, 0);
+      outputContext.fillStyle = "#000";
+      referenceMaskRects.forEach(function (rect) {
+        outputContext.fillRect(rect.x * output.width, rect.y * output.height, rect.w * output.width, rect.h * output.height);
+      });
+      var image = { mimeType: "image/png", dataUrl: output.toDataURL("image/png"), width: output.width, height: output.height };
+      var allowed = Array.from(new Set(context.expanded.items.flatMap(function (item) {
+        return item.choices.map(function (choice) { return choice.option; });
+      })));
+      var questionCount = context.expanded.items.reduce(function (maximum, item) { return Math.max(maximum, item.number); }, 0);
+      get("choice-reference-ai-confirm").disabled = true;
+      setStatus("choice-answer-import-status", "已按預覽遮蓋內容；正在送出單頁圖片，沒有套用答案。", false);
+      try {
+        var result = await options.requestAiAnswerKey(image, questionCount, allowed);
+        if (!result || !result.ok) {
+          setStatus("choice-answer-import-status", result && result.message || "AI 讀取失敗，沒有套用答案。", true); return;
+        }
+        var records = result.answers.map(function (entry) {
+          var type = answerTypeFor(entry.q, entry.a, context.expanded);
+          return type ? { type: type, number: entry.q, answer: entry.a, status: "AI 待核對" } : null;
+        }).filter(Boolean);
+        renderImportedAnswers(records, "AI 提供 " + records.length + " 項答案供核對；" + result.rejectedCount + " 項無效或不適用內容已忽略。只按「套用答案」才會寫入答案欄。");
+      } catch (error) {
+        setStatus("choice-answer-import-status", error && error.message || "AI 讀取失敗，沒有套用答案。", true);
+      } finally {
+        image.dataUrl = ""; output.width = 1; output.height = 1;
+        get("choice-reference-ai-confirm").disabled = false;
+      }
+    }
+    function applyImportedAnswers() {
+      var context = currentAnswerBlocks();
+      ["mc", "tf"].forEach(function (type) {
+        var count = context.counts[type === "mc" ? "mcCount" : "tfCount"];
+        var answers = Array(count).fill("?");
+        importedAnswers.forEach(function (entry) {
+          var index = Number(entry.number) - 1;
+          if (entry.type === type && Number.isInteger(index) && index >= 0 && index < count) {
+            var choices = selectedOptions(type).choices;
+            answers[index] = choices.indexOf(entry.answer) >= 0 ? entry.answer : "?";
+          }
+        });
+        var input = get(type === "mc" ? "mc-key" : "tf-key");
+        input.value = answers.join("");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        syncAnswerInput(type);
+      });
+      setStatus("choice-answer-import-status", "答案已套用；待老師設定的題目仍保留空位，請在答案表或下方答案欄補齊。", false);
+      get("choice-reference-ai-confirmation").hidden = true;
+    }
     function renderAnswerPage() {
       var definition = selectedDefinition();
       if (!definition) return;
@@ -971,6 +1256,72 @@
       clearPreparedAiImage(); clearAiSuggestions(); renderSamplePage();
     });
     get("choice-wizard-answer-page").addEventListener("change", renderAnswerPage);
+    get("choice-answer-source").addEventListener("change", function () {
+      updateAnswerSourceAvailability();
+      if (this.value === "grading") get("choice-answer-page").value = "1";
+    });
+    get("choice-answer-file").addEventListener("change", async function () {
+      var file = this.files && this.files[0];
+      destroyDocument(localAnswerDocument); localAnswerDocument = null; answerSourceDocument = null; answerSourceFile = file || null;
+      if (!file) { updateAnswerSourceAvailability(); return; }
+      try {
+        localAnswerDocument = await pageDocument(file);
+        if (get("choice-answer-source").value === "local") answerSourceDocument = localAnswerDocument;
+        get("choice-answer-page").max = String(localAnswerDocument.numPages);
+        get("choice-answer-page").value = "1";
+        updateAnswerSourceAvailability();
+        setStatus("choice-answer-import-status", "答案卷已在本機開啟，共 " + localAnswerDocument.numPages + " 頁。", false);
+      } catch (error) {
+        answerSourceFile = null; localAnswerDocument = null;
+        updateAnswerSourceAvailability();
+        setStatus("choice-answer-import-status", error && error.message || "答案卷無法開啟。", true);
+      }
+    });
+    get("choice-answer-read-omr").addEventListener("click", readAnswerSheet);
+    get("choice-answer-page").addEventListener("change", function () {
+      var excludedPage = typeof options.getExcludedAnswerPage === "function" ? options.getExcludedAnswerPage() : 0;
+      get("choice-answer-exclude-page").checked = Boolean(excludedPage && excludedPage === Number(this.value));
+    });
+    get("choice-answer-import-apply").addEventListener("click", applyImportedAnswers);
+    get("choice-answer-exclude-page").addEventListener("change", function () {
+      var pageNumber = Number(get("choice-answer-page").value) || 1;
+      if (typeof options.setAnswerPageExcluded === "function") options.setAnswerPageExcluded(pageNumber, this.checked);
+    });
+    get("choice-reference-file").addEventListener("change", function () { loadReferencePdf(this.files && this.files[0]); });
+    get("choice-reference-extract").addEventListener("click", extractReferenceAnswers);
+    get("choice-reference-ai-preview").addEventListener("click", prepareReferenceAiPreview);
+    get("choice-reference-ai-reviewed").addEventListener("change", function () {
+      get("choice-reference-ai-confirm").disabled = !this.checked || !referenceBaseCanvas;
+    });
+    get("choice-reference-ai-confirm").addEventListener("click", sendReferenceAiRequest);
+    get("choice-reference-ai-cancel").addEventListener("click", function () {
+      get("choice-reference-ai-confirmation").hidden = true;
+      get("choice-reference-ai-reviewed").checked = false;
+      referenceBaseCanvas = null; referenceMaskRects = [];
+      get("choice-reference-preview").width = 1; get("choice-reference-preview").height = 1;
+      get("choice-reference-mask-overlay").width = 1; get("choice-reference-mask-overlay").height = 1;
+      setStatus("choice-answer-import-status", "已取消 AI 讀取；沒有送出圖片或套用答案。", false);
+    });
+    var referenceMaskOverlay = get("choice-reference-mask-overlay");
+    referenceMaskOverlay.addEventListener("pointerdown", function (event) {
+      if (!referenceBaseCanvas || event.button !== 0) return;
+      var point = previewPoint(event); maskDrawing = { x: point.x, y: point.y, endX: point.x, endY: point.y };
+      referenceMaskOverlay.setPointerCapture(event.pointerId); drawReferenceMasks(); event.preventDefault();
+    });
+    referenceMaskOverlay.addEventListener("pointermove", function (event) {
+      if (!maskDrawing) return;
+      var point = previewPoint(event); maskDrawing.endX = point.x; maskDrawing.endY = point.y; drawReferenceMasks();
+    });
+    referenceMaskOverlay.addEventListener("pointerup", function (event) {
+      if (!maskDrawing) return;
+      var point = previewPoint(event); maskDrawing.endX = point.x; maskDrawing.endY = point.y;
+      var left = Math.min(maskDrawing.x, maskDrawing.endX); var top = Math.min(maskDrawing.y, maskDrawing.endY);
+      var width = Math.abs(maskDrawing.endX - maskDrawing.x); var height = Math.abs(maskDrawing.endY - maskDrawing.y);
+      if (width >= 2 && height >= 2) referenceMaskRects.push({ x: left / referenceMaskOverlay.width, y: top / referenceMaskOverlay.height,
+        w: width / referenceMaskOverlay.width, h: height / referenceMaskOverlay.height });
+      maskDrawing = null; drawReferenceMasks();
+    });
+    referenceMaskOverlay.addEventListener("pointercancel", function () { maskDrawing = null; drawReferenceMasks(); });
     get("choice-wizard-next-from-source").addEventListener("click", enterStage3FromExisting);
     get("choice-wizard-build-template").addEventListener("click", handleBuildTemplate);
     get("choice-wizard-delete-zone").addEventListener("click", function () {
@@ -1073,6 +1424,7 @@
       },
       onEditorClosed: function () { if (editorPanel.parentNode !== editorHome) editorHome.insertBefore(editorPanel, editorNext); },
       refreshAiSettings: updateAiButton,
+      refreshAnswerSourceAvailability: updateAnswerSourceAvailability,
       isActive: function () { return !wizard.hidden; },
       showLegacy: showLegacy,
       refreshTemplates: populateTemplates

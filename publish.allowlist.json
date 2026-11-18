@@ -1547,7 +1547,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.18.17",
+      "version": "2026.11.18.20",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1780,7 +1780,7 @@
     {
       "id": "pdf-marking",
       "title": "PDF 閱卷及批改工具",
-      "version": "2026.11.18.16",
+      "version": "2026.11.18.19",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -1995,7 +1995,7 @@
     {
       "id": "pdf-marking-choice",
       "title": "批改 PDF（選擇題）",
-      "version": "2026.11.18.12",
+      "version": "2026.11.18.15",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"

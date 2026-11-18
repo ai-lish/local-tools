@@ -294,6 +294,9 @@
     var pdfLib = await root.PDFLib.PDFDocument.load(bytes.slice(0));
     var count = Math.min(pdfjs.numPages, pdfLib.getPageCount());
     for (var index = 0; index < count; index += 1) {
+      var pageRecord = state.pages[index + 1];
+      if (pageRecord && Array.isArray(pageRecord.pageFlags) &&
+          pageRecord.pageFlags.indexOf("答案卷頁：不計分、不匯出") >= 0) continue;
       var jsPage = await pdfjs.getPage(index + 1);
       var viewport = jsPage.getViewport({ scale: 2 });
       var canvas = root.document.createElement("canvas");
@@ -302,7 +305,7 @@
       await jsPage.render({ canvasContext: sourceContext, viewport: viewport }).promise;
       var sourceData = sourceContext.getImageData(0, 0, canvas.width, canvas.height);
       sourceContext.clearRect(0, 0, canvas.width, canvas.height);
-      drawChoiceAnnotations(canvas, viewport, state.pages[index + 1], state.settings, index + 1, sourceData);
+      drawChoiceAnnotations(canvas, viewport, pageRecord, state.settings, index + 1, sourceData);
       var libPage = pdfLib.getPage(index);
       var rotation = ((libPage.getRotation().angle % 360) + 360) % 360;
       await embedAnnotation(canvas, pdfLib, libPage, rotation, root.PDFLib);

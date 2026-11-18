@@ -1,6 +1,21 @@
 (function (root) {
   "use strict";
 
+  var ANSWER_KEY_EXCLUDED_FLAG = "答案卷頁：不計分、不匯出";
+
+  function isAnswerKeyExcluded(page) {
+    return Boolean(page && Array.isArray(page.pageFlags) && page.pageFlags.indexOf(ANSWER_KEY_EXCLUDED_FLAG) >= 0);
+  }
+
+  function setAnswerKeyExcludedFlag(page, excluded) {
+    var next = Object.assign({}, page || {});
+    next.pageFlags = (Array.isArray(next.pageFlags) ? next.pageFlags : []).filter(function (flag) {
+      return flag !== ANSWER_KEY_EXCLUDED_FLAG;
+    });
+    if (excluded) next.pageFlags.push(ANSWER_KEY_EXCLUDED_FLAG);
+    return next;
+  }
+
   var PUNCTUATION = "，、。？！；：「」『』（）《》〈〉…—·,.?!;:'\"()";
 
   function dictationSegmentAnswer(segment, segmentNumber, firstAnswer) {
@@ -586,6 +601,7 @@
     for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
       var page = (pages || {})[pageNumber] || (pages || {})[String(pageNumber)];
       if (!page) continue;
+      if (isAnswerKeyExcluded(page)) continue;
       var requirements = page.identityRequirements || { grade: true, form: true, studentDigits: 2 };
       var digitCount = Number.isInteger(requirements.studentDigits) ? requirements.studentDigits : 2;
       var needsClass = requirements.grade !== false || requirements.form !== false;
@@ -621,6 +637,7 @@
     var pageFailures = 0;
     for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
       var page = (pages || {})[pageNumber] || (pages || {})[String(pageNumber)];
+      if (isAnswerKeyExcluded(page)) continue;
       if (!page) {
         pagesPending += 1;
         questionsPending += mcCount + tfCount;
@@ -671,7 +688,9 @@
     for (var mc = 1; mc <= settings.mcCount; mc += 1) rows[0].push(String(mc).padStart(2, "0") + "作答", String(mc).padStart(2, "0") + "對錯");
     for (var tf = 1; tf <= settings.tfCount; tf += 1) rows[0].push("是非" + String(tf).padStart(2, "0") + "作答", "是非" + String(tf).padStart(2, "0") + "對錯");
     for (var pageNumber = 1; pageNumber <= config.pageCount; pageNumber += 1) {
+      if ((config.excludedPages || []).indexOf(pageNumber) >= 0) continue;
       var page = (config.pages || {})[pageNumber] || (config.pages || {})[String(pageNumber)] || null;
+      if (isAnswerKeyExcluded(page)) continue;
       var answers = choiceAnswersForSettings(page, "mc", settings.mcCount);
       var tfAnswers = choiceAnswersForSettings(page, "tf", settings.tfCount);
       var forcedReadPending = Boolean(page && Array.isArray(page.pageFlags) &&
@@ -733,7 +752,9 @@
     var overflowPages = [];
 
     for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      if ((config.excludedPages || []).indexOf(pageNumber) >= 0) continue;
       var page = pages[pageNumber] || pages[String(pageNumber)] || null;
+      if (isAnswerKeyExcluded(page)) continue;
       if (!page) {
         identityPages.push(pageNumber);
         pendingPages.push(pageNumber);
@@ -896,6 +917,9 @@
   }
 
   root.PdfMarkingModel = {
+    ANSWER_KEY_EXCLUDED_FLAG: ANSWER_KEY_EXCLUDED_FLAG,
+    isAnswerKeyExcluded: isAnswerKeyExcluded,
+    setAnswerKeyExcludedFlag: setAnswerKeyExcludedFlag,
     PUNCTUATION: PUNCTUATION,
     dictationSegmentAnswer: dictationSegmentAnswer,
     normalizeChoice: normalizeChoice,

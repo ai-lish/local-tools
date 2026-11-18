@@ -426,6 +426,22 @@ footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: cent
 .choice-wizard-answer-bubble.selected { border-color: #125c2c; color: #fff; background: #1f7a3d; box-shadow: 0 0 0 2px #fff; }
 .choice-wizard-answer-inputs { display: grid; gap: 8px; min-width: 0; margin-top: 12px; }
 .choice-wizard-answer-inputs .field { min-width: 0; margin: 0; }
+.choice-answer-import { min-width: 0; margin: 12px 0; padding: 12px; }
+.choice-answer-import h3, .choice-answer-import h4 { margin: 0 0 7px; }
+.choice-answer-import-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.choice-answer-import-grid > section { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: #f7fafc; }
+.choice-answer-import-grid .field { min-width: 0; margin: 8px 0; }
+.choice-answer-import-results { margin-top: 12px; }
+.choice-answer-import-results .table-scroll { max-height: 320px; overflow: auto; margin-bottom: 10px; }
+.choice-answer-import-results table { width: 100%; border-collapse: collapse; }
+.choice-answer-import-results th, .choice-answer-import-results td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.choice-answer-import-results td input, .choice-answer-import-results td select { width: 100%; min-width: 0; }
+.choice-reference-ai-confirmation { margin-top: 12px; padding: 12px; border: 2px solid #a45b16; border-radius: 10px; background: #fffaf2; }
+.choice-reference-preview-wrap { position: relative; width: fit-content; max-width: 100%; max-height: 65vh; overflow: auto; margin: 10px 0; background: #e9eef2; }
+.choice-reference-preview-wrap canvas { display: block; max-width: 100%; height: auto; }
+.choice-reference-preview-wrap #choice-reference-mask-overlay { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+.choice-reference-preview-wrap #choice-reference-preview { max-height: 65vh; object-fit: contain; }
+.choice-reference-preview-wrap #choice-reference-mask-overlay { max-height: 65vh; }
 .choice-wizard-grade-slot { min-width: 0; }
 .choice-wizard-grade-slot #step-2, .choice-wizard-grade-slot #step-3 { margin-top: 12px; }
 .choice-wizard-grade-navigation { justify-content: start; }
@@ -467,6 +483,7 @@ footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: cent
   .choice-wizard-zone-rows { flex: 1 1 auto; }
   .wizard-navigation > .button { flex: 1 1 130px; }
   .choice-wizard-answer-bubble { width: 24px; height: 24px; font-size: 10px; }
+  .choice-answer-import-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 480px) {
