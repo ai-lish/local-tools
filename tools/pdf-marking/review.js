@@ -9,7 +9,14 @@
     var queue = [];
     for (var pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
       var page = pages && pages[pageNumber];
-      if (!page || page.pageFailure) continue;
+      if (!page) continue;
+      if (page.pageFailure) {
+        queue.push({ kind: "page", pageNumber: pageNumber, type: "page", number: 0,
+          answer: "整頁", reason: Array.isArray(page.alignmentDiagnostics && page.alignmentDiagnostics.reasons)
+            ? page.alignmentDiagnostics.reasons.join(" ") : "整頁定位失敗，請檢查本頁",
+          diagnostic: page.alignmentDiagnostics || null, question: null, key: "page:" + String(pageNumber) });
+        continue;
+      }
       (Array.isArray(page.questions) ? page.questions : []).forEach(function (question) {
         if (question && question.status === "review" && !question.reviewed) {
           queue.push({ pageNumber: pageNumber, type: question.type, number: question.number,
@@ -19,6 +26,14 @@
       });
     }
     return queue;
+  }
+
+  function hasForcedReadPending(page, questions) {
+    var pending = Boolean(page && Array.isArray(page.pageFlags) && page.pageFlags.indexOf("整頁讀取中：所有題目須逐題確認後才計分") >= 0);
+    if (!pending) return false;
+    return (Array.isArray(questions) ? questions : page.questions || []).some(function (question) {
+      return question && question.status === "review" && !question.reviewed;
+    });
   }
 
   function nextIndex(queue, currentIndex, direction) {
@@ -64,7 +79,8 @@
   function hasManualEdits(pages) {
     return Object.keys(pages || {}).some(function (pageNumber) {
       var page = pages[pageNumber] || {};
-      return Boolean(page.classWasEdited || page.studentIdWasEdited || page.focusDraftEdited) ||
+      return Boolean(page.classWasEdited || page.studentIdWasEdited || page.focusDraftEdited ||
+        Array.isArray(page.pageFlags) && page.pageFlags.indexOf("整頁讀取中：所有題目須逐題確認後才計分") >= 0) ||
         (Array.isArray(page.questions) && page.questions.some(function (question) {
           return question && (question.status === "manual" || question.focusDraftEdited);
         }));
@@ -84,7 +100,8 @@
     findIndex: findIndex,
     focusCropBounds: focusCropBounds,
     hasManualEdits: hasManualEdits,
-    confirmQuestion: confirmQuestion
+    confirmQuestion: confirmQuestion,
+    hasForcedReadPending: hasForcedReadPending
   };
   root.PdfMarkingReview = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

@@ -90,6 +90,14 @@
     }
     return [];
   }
+  function rowValueGroups(rows) {
+    if (!rows || typeof rows !== "object") return [];
+    if (rows.mode === "list") return Array.isArray(rows.groups) ? rows.groups.map(function (group) {
+      return Array.isArray(group) ? group : [];
+    }) : [];
+    var values = rowValues(rows);
+    return values.length ? [values] : [];
+  }
   function boundedCount(value, maximum, fallback) {
     if (value == null) return fallback;
     var count = Number(value);
@@ -109,17 +117,20 @@
     if (!def || def.kind !== "choice" || !Array.isArray(def.blocks)) throw new Error("選擇題範本格式不正確。");
     var requested = counts || {};
     var bubbles = []; var items = []; var typeNumbers = { mc: 0, tf: 0 };
-    function appendQuestion(block, columnIndex, rowIndex, yValues, limit) {
+    function appendQuestion(block, columnIndex, y, rowGroupIndex, limit) {
       if (typeNumbers[block.type] >= limit) return false;
       typeNumbers[block.type] += 1;
-      var number = typeNumbers[block.type]; var y = yValues[rowIndex];
+      var number = typeNumbers[block.type];
       var column = block.columns[columnIndex];
       var optionLabels = column.options || block.options;
       var choices = column.xs.map(function (x, optionIndex) {
         return { x: x, y: y, type: block.type, number: number, option: optionLabels[optionIndex] };
       });
       choices.forEach(function (bubble) { bubbles.push(bubble); });
-      items.push({ type: block.type, number: number, choices: choices });
+      var item = { type: block.type, number: number, choices: choices };
+      Object.defineProperty(item, "columnIndex", { value: columnIndex });
+      Object.defineProperty(item, "rowGroupIndex", { value: rowGroupIndex });
+      items.push(item);
       return true;
     }
     function countFor(block) {
@@ -130,18 +141,19 @@
     def.blocks.forEach(function (block) {
       var limit = countFor(block); var locations = [];
       block.columns.forEach(function (column, columnIndex) {
-        var ys = rowValues(column.rows || block.rows);
-        ys.forEach(function (y, rowIndex) {
-          locations.push({ columnIndex: columnIndex, rowIndex: rowIndex, y: y,
-            x: column.xs.reduce(function (sum, value) { return sum + value; }, 0) / column.xs.length });
+        var rowOrderIndex = 0;
+        rowValueGroups(column.rows || block.rows).forEach(function (ys, rowGroupIndex) {
+          ys.forEach(function (y, rowIndex) {
+            locations.push({ columnIndex: columnIndex, rowIndex: rowOrderIndex++, rowGroupIndex: rowGroupIndex, y: y,
+              x: column.xs.reduce(function (sum, value) { return sum + value; }, 0) / column.xs.length });
+          });
         });
       });
       locations.sort(block.numbering === "row-major"
         ? function (left, right) { return left.y - right.y || left.x - right.x || left.columnIndex - right.columnIndex; }
         : function (left, right) { return left.columnIndex - right.columnIndex || left.rowIndex - right.rowIndex; });
       locations.slice(0, limit).forEach(function (location) {
-        appendQuestion(block, location.columnIndex, location.rowIndex,
-          rowValues(block.columns[location.columnIndex].rows || block.rows), limit);
+        appendQuestion(block, location.columnIndex, location.y, location.rowGroupIndex, limit);
       });
     });
 
@@ -192,19 +204,23 @@
       locations.sort(block.numbering === "row-major"
         ? function (left, right) { return left.y - right.y || left.x - right.x; }
         : function (left, right) { return left.columnIndex - right.columnIndex || left.rowIndex - right.rowIndex; });
-      locations.slice(0, block.maxCount).forEach(function (location) {
+      locations.slice(0, block.maxCount).forEach(function (location, locationIndex) {
         var column = block.columns[location.columnIndex];
         var y = rowValues(column.rows || block.rows)[location.rowIndex];
-        questionItems.push({ choices: column.xs.map(function (x) { return { x: x, y: y }; }) });
+        questionItems.push({ number: locationIndex + 1, columnIndex: location.columnIndex,
+          choices: column.xs.map(function (x) { return { x: x, y: y }; }) });
       });
     });
     var groupGapPoints = [];
+    var groupGaps = [];
     for (var itemIndex = 0; itemIndex < questionItems.length - 1; itemIndex += 1) {
       var before = questionItems[itemIndex]; var after = questionItems[itemIndex + 1];
       var left = before.choices[0]; var right = after.choices[0];
       if (Math.abs(left.x - right.x) > 0.03 || right.y - left.y < 0.03) continue;
       var gapY = (left.y + right.y) / 2;
-      before.choices.forEach(function (point) { groupGapPoints.push({ x: point.x, y: gapY, type: "group-gap" }); });
+      var points = before.choices.map(function (point) { return { x: point.x, y: gapY, type: "group-gap" }; });
+      points.forEach(function (point) { groupGapPoints.push(point); });
+      groupGaps.push({ beforeNumber: before.number, afterNumber: after.number, points: points });
     }
     return {
       radius: bubble.radius == null ? 0.0077 : bubble.radius,
@@ -214,6 +230,7 @@
       minGridScore: alignment.minGridScore == null ? 0.22 : alignment.minGridScore,
       maxGroupGapInk: alignment.rowShiftGuard && alignment.rowShiftGuard.maxInk != null ? alignment.rowShiftGuard.maxInk : 0.14,
       groupGapPoints: groupGapPoints,
+      groupGaps: groupGaps,
       search: clone(alignment.search || { dx: 0.012, dy: 0.008, angle: 0.8, scale: 0.015 }),
       limits: clone(alignment.limits || { dx: 0.012, dy: 0.012 }),
       metadataSearchPixels: Number.isFinite(alignment.metadataSearchPixels) ? alignment.metadataSearchPixels : 15,

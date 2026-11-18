@@ -38,6 +38,8 @@
     var aiSuggestions = [];
     var preparedAiImage = null;
     var aiRequestBusy = false;
+    var clickMode = null;
+    var baseClickCalibration = null;
 
     function svg(name, attributes) {
       var node = document.createElementNS(SVG_NS, name);
@@ -194,6 +196,7 @@
         item.className = "choice-wizard-zone-item" + (zone.id === selectedZoneId ? " selected" : "");
         var text = document.createElement("span");
         text.textContent = (index + 1) + ". " + zoneTypeLabel(zone.type) + " · " + zone.label +
+          (zone.clickCalibrated ? " · 點圈建立" : "") +
           (zone.optionsPendingConfirmation ? " · 選項待確認" : "");
         item.append(text);
         if (isTextZone(zone)) {
@@ -308,6 +311,26 @@
         label.textContent = suggestion.label;
         group.append(label); overlay.append(group);
       });
+      if (clickMode) {
+        (clickMode.points || []).forEach(function (point, index) {
+          var circle = svg("circle", { cx: point.x, cy: point.y, r: 0.006,
+            class: point.snapped ? "choice-wizard-click-point" : "choice-wizard-click-point is-unsnapped",
+            "data-click-point-index": index, "aria-label": point.label || clickPointLabel(point) });
+          var label = svg("text", { x: point.x + 0.006, y: point.y - 0.006, "font-size": "0.012", "pointer-events": "none" });
+          label.textContent = point.label || clickPointLabel(point);
+          overlay.append(circle, label);
+        });
+        var preview = clickMode.calibration;
+        if (preview) {
+          var rows = api.rowCoordinates(preview.rows);
+          preview.xs.forEach(function (x) {
+            rows.forEach(function (y) {
+              overlay.append(svg("circle", { cx: x, cy: y, r: 0.0045, class: "choice-wizard-click-prediction",
+                "data-click-predicted-circle": "true" }));
+            });
+          });
+        }
+      }
     }
     function renderAiSuggestions() {
       var list = get("choice-wizard-ai-suggestions");
@@ -336,6 +359,146 @@
       var rect = get("choice-wizard-overlay").getBoundingClientRect();
       return { x: clamp((event.clientX - rect.left) / rect.width, 0, 1), y: clamp((event.clientY - rect.top) / rect.height, 0, 1) };
     }
+
+    function clickOptionLabels() { return Array.from(get("choice-wizard-options").value); }
+    function clickPointLabel(point) {
+      if (point.role === "option") return point.label + " 圈";
+      if (point.role === "anchor") return "定位題 " + clickMode.anchorQuestionNumber + " A 圈";
+      if (point.role === "gap") return "下一組第一題 A 圈";
+      return "第 " + clickMode.startQuestionNumber + " 題 A 圈";
+    }
+    function snapClickPoint(point, label) {
+      var canvas = get("choice-wizard-canvas");
+      if (!options.omr || !canvas || !canvas.width || !canvas.height) return Object.assign({}, point, { snapped: false, label: label });
+      try {
+        var data = canvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, canvas.width, canvas.height);
+        var params = templates.choiceParameters(templates.BUILTIN_TEMPLATES[0]);
+        var result = options.omr.refineBubbleCenter(data.data, canvas.width, canvas.height,
+          { x: point.x, y: point.y, type: "mc" }, { dx: 0, dy: 0, angle: 0, scale: 1 }, params);
+        if (result.found) return { x: result.center.x / canvas.width, y: result.center.y / canvas.height,
+          snapped: true, label: label };
+      } catch (error) { /* Keep the teacher's click when a nearby bubble cannot be measured. */ }
+      return Object.assign({}, point, { snapped: false, label: label });
+    }
+    function renderClickControls(message) {
+      var panel = get("choice-wizard-click-panel");
+      var active = Boolean(createMode && samplePage && get("choice-wizard-zone-type").value === "answer-mc");
+      panel.hidden = !active;
+      get("choice-wizard-zone-type").disabled = Boolean(clickMode);
+      get("choice-wizard-options").disabled = Boolean(clickMode);
+      if (!active) return;
+      var inProgress = Boolean(clickMode);
+      get("choice-wizard-click-start").hidden = inProgress || Boolean(baseClickCalibration);
+      get("choice-wizard-click-add-column").hidden = inProgress || !baseClickCalibration;
+      get("choice-wizard-click-cancel").hidden = !inProgress;
+      get("choice-wizard-click-complete").hidden = !inProgress || clickMode.stage !== "settings";
+      get("choice-wizard-click-anchor-wrap").hidden = !inProgress || clickMode.kind !== "first" || clickMode.stage !== "anchor";
+      get("choice-wizard-click-start-wrap").hidden = !inProgress || clickMode.kind !== "additional";
+      get("choice-wizard-click-group-wrap").hidden = !inProgress || clickMode.kind !== "first" || clickMode.stage !== "settings";
+      get("choice-wizard-click-count").closest("label").hidden = !inProgress || clickMode.stage === "options" || clickMode.stage === "anchor" || clickMode.stage === "gap";
+      get("choice-wizard-click-measure-gap").hidden = !inProgress || clickMode.kind !== "first" || clickMode.stage !== "settings" ||
+        !Number(get("choice-wizard-click-group-size").value) || Number(get("choice-wizard-click-count").value) <= Number(get("choice-wizard-click-group-size").value) || Boolean(clickMode.gapChosen);
+      get("choice-wizard-click-skip-gap").hidden = !inProgress || clickMode.kind !== "first" || clickMode.stage !== "settings" ||
+        !Number(get("choice-wizard-click-group-size").value) || Number(get("choice-wizard-click-count").value) <= Number(get("choice-wizard-click-group-size").value) || Boolean(clickMode.gapChosen);
+      get("choice-wizard-click-status").textContent = message || (inProgress
+        ? "請按提示在樣本頁點圈。點不到清晰圈心時會保留點擊位置，可拖動微調。"
+        : baseClickCalibration ? "第一欄已完成；可繼續拉框混用，或按「再加一欄」沿用同一間距。"
+          : "選擇題答案欄可沿用拖拉畫框，亦可按「點圈建立」量度圈心及行距。");
+      renderOverlay();
+    }
+    function clickCalibrationInput() {
+      if (!clickMode) return null;
+      var count = Number(get("choice-wizard-click-count").value);
+      if (clickMode.kind === "additional") {
+        var point = clickMode.points[0];
+        if (!point) return null;
+        return api.extendClickCalibration(baseClickCalibration, point, Number(get("choice-wizard-click-start-number").value), count);
+      }
+      var optionsPoints = clickMode.points.filter(function (point) { return point.role === "option"; });
+      var anchor = clickMode.points.find(function (point) { return point.role === "anchor"; });
+      var gap = clickMode.points.find(function (point) { return point.role === "gap"; });
+      if (optionsPoints.length !== clickMode.optionLabels.length || !anchor) return null;
+      return api.createClickCalibration({ optionPoints: optionsPoints, firstQuestionNumber: clickMode.startQuestionNumber,
+        anchorQuestionNumber: Number(get("choice-wizard-click-anchor-number").value), anchorPoint: anchor,
+        questionCount: count, groupSize: Number(get("choice-wizard-click-group-size").value), nextGroupPoint: gap || null });
+    }
+    function refreshClickPreview() {
+      if (!clickMode || clickMode.stage !== "settings") return;
+      try {
+        clickMode.calibration = clickCalibrationInput();
+        get("choice-wizard-click-complete").disabled = !clickMode.calibration;
+        get("choice-wizard-click-status").textContent = clickMode.calibration
+          ? "已按定位點生成 " + clickMode.calibration.questionCount + " 題預覽；可拖動綠圈或定位點微調，再按「完成並加入答案欄」。"
+          : "請補齊點圈資料。";
+      } catch (error) {
+        clickMode.calibration = null;
+        get("choice-wizard-click-complete").disabled = true;
+        get("choice-wizard-click-status").textContent = error.message || "點圈資料無效。";
+      }
+      renderOverlay();
+    }
+    function startClickCalibration(additional) {
+      if (!samplePage || get("choice-wizard-zone-type").value !== "answer-mc") return;
+      var count = Math.max(1, Number(get("choice-wizard-rows").value) || 15);
+      get("choice-wizard-click-count").value = String(additional && baseClickCalibration ? baseClickCalibration.questionCount : count);
+      if (additional && baseClickCalibration) {
+        var existingEnd = Math.max.apply(null, zones.filter(function (zone) { return zone.clickCalibrated; })
+          .map(function (zone) { return Number(zone.questionStart) + Number(zone.rowsPerColumn) - 1; }).concat([0]));
+        get("choice-wizard-click-start-number").value = String(Math.max(existingEnd + 1, 1));
+        clickMode = { kind: "additional", stage: "additional", points: [],
+          startQuestionNumber: Number(get("choice-wizard-click-start-number").value),
+          optionLabels: (baseClickCalibration.optionLabels || clickOptionLabels()).slice() };
+        renderClickControls("點新欄第 " + clickMode.startQuestionNumber + " 題的 A 圈；其他選項圈會按第一欄間距生成。");
+      } else {
+        get("choice-wizard-click-anchor-number").value = "2";
+        get("choice-wizard-click-group-size").value = "5";
+        clickMode = { kind: "first", stage: "options", points: [], startQuestionNumber: 1, optionLabels: clickOptionLabels() };
+        renderClickControls("第一步：依次點第一題的 " + clickMode.optionLabels.join("、") + " 圈。");
+      }
+    }
+    function acceptClickPoint(point) {
+      if (!clickMode) return;
+      var snapped = snapClickPoint(point, "");
+      if (clickMode.stage === "options") {
+        var optionLabel = clickMode.optionLabels[clickMode.points.filter(function (entry) { return entry.role === "option"; }).length];
+        snapped.role = "option"; snapped.label = optionLabel;
+        clickMode.points.push(snapped);
+        if (clickMode.points.filter(function (entry) { return entry.role === "option"; }).length >= clickMode.optionLabels.length) {
+          clickMode.stage = "anchor";
+          get("choice-wizard-click-anchor-number").value = "2";
+          renderClickControls("第二步：點同一欄另一題的 A 圈。題號預設 2；可改成所點題號，建議選較遠的一題。");
+        } else renderClickControls("請點第一題的 " + clickMode.optionLabels[clickMode.points.filter(function (entry) { return entry.role === "option"; }).length] + " 圈。");
+      } else if (clickMode.stage === "anchor") {
+        snapped.role = "anchor"; snapped.label = "定位題 A"; clickMode.points.push(snapped);
+        clickMode.anchorQuestionNumber = Number(get("choice-wizard-click-anchor-number").value) || 2;
+        clickMode.stage = "settings"; renderClickControls(); refreshClickPreview();
+      } else if (clickMode.stage === "gap") {
+        snapped.role = "gap"; snapped.label = "下一組第一題 A"; clickMode.points.push(snapped); clickMode.gapChosen = true;
+        clickMode.stage = "settings"; renderClickControls(); refreshClickPreview();
+      } else if (clickMode.stage === "additional") {
+        snapped.role = "additional"; snapped.label = "新欄第一題 A"; clickMode.points.push(snapped);
+        clickMode.stage = "settings"; renderClickControls(); refreshClickPreview();
+      }
+    }
+    function completeClickCalibration() {
+      if (!clickMode) return;
+      try {
+        var calibration = clickMode.calibration || clickCalibrationInput();
+        if (!calibration) throw new Error("請先完成所有點圈步驟。");
+        calibration.optionLabels = clickMode.optionLabels.slice();
+        var zone = api.createClickCalibratedZone(calibration, { options: clickMode.optionLabels });
+        zone.clickCalibrated = true;
+        zone.clickCalibrationInfo = calibration;
+        zones.push(zone); selectedZoneId = zone.id;
+        if (!baseClickCalibration) baseClickCalibration = calibration;
+        clickMode = null;
+        renderZoneList(); renderClickControls("點圈答案欄已加入；範本尚未建立，可繼續新增其他區域或點「建立範本並調整位置」。");
+      } catch (error) { get("choice-wizard-click-status").textContent = error.message || "點圈校準無法完成。"; }
+    }
+    function cancelClickCalibration() {
+      clickMode = null;
+      renderClickControls("已取消目前點圈步驟；已加入的範圍保留。");
+    }
     function zoneConfig(point) {
       var type = get("choice-wizard-zone-type").value;
       var names = { "text-name": "姓名", "text-subject": "科目", "text-other": "其他文字區", "class-grade-grid": "班別年級圈格",
@@ -351,6 +514,17 @@
     }
     function pointerDown(event) {
       if (!createMode || !samplePage || event.button !== 0) return;
+      var clickPointTarget = event.target.closest("[data-click-point-index]");
+      if (clickMode && clickPointTarget) {
+        var clickIndex = Number(clickPointTarget.getAttribute("data-click-point-index"));
+        drawing = { kind: "click-point", index: clickIndex };
+        get("choice-wizard-overlay").setPointerCapture(event.pointerId);
+        event.preventDefault(); return;
+      }
+      if (clickMode) {
+        acceptClickPoint(pointFromEvent(event));
+        event.preventDefault(); return;
+      }
       var target = event.target.closest("[data-zone-id]");
       var handle = event.target.closest("[data-zone-handle]");
       var point = pointFromEvent(event);
@@ -370,7 +544,11 @@
     function pointerMove(event) {
       if (!drawing) return;
       var point = pointFromEvent(event);
-      if (drawing.kind === "new") {
+      if (drawing.kind === "click-point") {
+        var selectedPoint = clickMode && clickMode.points[drawing.index];
+        if (selectedPoint) { selectedPoint.x = point.x; selectedPoint.y = point.y; }
+        refreshClickPreview();
+      } else if (drawing.kind === "new") {
         drawing.zone.x = Math.min(drawing.origin.x, point.x); drawing.zone.y = Math.min(drawing.origin.y, point.y);
         drawing.zone.w = Math.abs(point.x - drawing.origin.x); drawing.zone.h = Math.abs(point.y - drawing.origin.y);
       } else if (drawing.kind === "move") {
@@ -385,6 +563,11 @@
     }
     function pointerUp(event) {
       if (!drawing) return;
+      if (drawing.kind === "click-point") {
+        drawing = null; renderOverlay();
+        if (get("choice-wizard-overlay").hasPointerCapture(event.pointerId)) get("choice-wizard-overlay").releasePointerCapture(event.pointerId);
+        event.preventDefault(); return;
+      }
       var identityDecisionChanged = false;
       if (drawing.kind === "new") {
         var zone = drawing.zone;
@@ -429,12 +612,13 @@
       get("choice-wizard-page").max = String(sampleDocument.numPages);
       get("choice-wizard-answer-page").max = String(sampleDocument.numPages);
       setStatus("choice-wizard-source-status", "樣本 PDF 已在本機開啟；第 " + pageNo + " / " + sampleDocument.numPages + " 頁。", false);
-      updateSourceButtons(); renderOverlay();
+      updateSourceButtons(); renderClickControls(); renderOverlay();
       if (currentStage === 4) renderAnswerPage();
     }
     async function loadSample(file) {
       if (!file) return;
       sampleFile = file; samplePage = null; createMode = false; zones = []; selectedZoneId = "";
+      clickMode = null; baseClickCalibration = null;
       clearPreparedAiImage(); clearAiSuggestions(); get("choice-wizard-no-identity").checked = false;
       get("choice-wizard-identities-complete").checked = false;
       if (sampleDocument && typeof sampleDocument.destroy === "function") sampleDocument.destroy();
@@ -461,12 +645,13 @@
       createMode = true; selectedTemplate = null;
       if (!continuing) {
         zones = []; selectedZoneId = "";
+        clickMode = null; baseClickCalibration = null;
         get("choice-wizard-no-identity").checked = false; get("choice-wizard-identities-complete").checked = false;
         clearPreparedAiImage(); clearAiSuggestions();
       }
       get("choice-wizard-builder").hidden = false;
       setStatus("choice-wizard-source-status", "請拖拉標示姓名、科目、其他文字及手寫身份區；班別／班號圈格可先畫概略框，亦可留待 AI 建議。", false);
-      renderOverlay(); renderZoneList(); updateSourceButtons(); updateIdentityConfirmation(false);
+      renderOverlay(); renderZoneList(); renderClickControls(); updateSourceButtons(); updateIdentityConfirmation(false);
     }
     function openEditorForSelected(forceReset) {
       var definition = selectedDefinition();
@@ -793,6 +978,30 @@
       zones = zones.filter(function (zone) { return zone.id !== selectedZoneId; }); selectedZoneId = ""; renderOverlay(); renderZoneList();
       if (removedIdentity) updateIdentityConfirmation(true);
     });
+    get("choice-wizard-zone-type").addEventListener("change", function () { renderClickControls(); });
+    get("choice-wizard-options").addEventListener("change", function () { renderClickControls(); });
+    get("choice-wizard-click-start").addEventListener("click", function () { startClickCalibration(false); });
+    get("choice-wizard-click-add-column").addEventListener("click", function () { startClickCalibration(true); });
+    get("choice-wizard-click-complete").addEventListener("click", completeClickCalibration);
+    get("choice-wizard-click-cancel").addEventListener("click", cancelClickCalibration);
+    get("choice-wizard-click-measure-gap").addEventListener("click", function () {
+      if (!clickMode || clickMode.kind !== "first" || clickMode.stage !== "settings") return;
+      clickMode.stage = "gap";
+      renderClickControls("請點下一組第一題的 A 圈，以量度組間空位。");
+    });
+    get("choice-wizard-click-skip-gap").addEventListener("click", function () {
+      if (!clickMode || clickMode.kind !== "first" || clickMode.stage !== "settings") return;
+      clickMode.gapChosen = true;
+      renderClickControls("未量度組間空位；已按預設空一行計算。可檢視預覽後完成。");
+      refreshClickPreview();
+    });
+    ["choice-wizard-click-anchor-number", "choice-wizard-click-start-number", "choice-wizard-click-count", "choice-wizard-click-group-size"]
+      .forEach(function (id) { get(id).addEventListener("input", function () {
+        if (id === "choice-wizard-click-anchor-number" && clickMode) clickMode.anchorQuestionNumber = Number(this.value);
+        if (id === "choice-wizard-click-start-number" && clickMode) clickMode.startQuestionNumber = Number(this.value);
+        renderClickControls();
+        refreshClickPreview();
+      }); });
     var zoneOverlay = get("choice-wizard-overlay");
     zoneOverlay.addEventListener("pointerdown", pointerDown);
     zoneOverlay.addEventListener("pointermove", pointerMove);

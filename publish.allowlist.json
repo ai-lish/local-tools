@@ -151,6 +151,12 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/pdf-marking/alignment-overlay.js",
+      "destination": "tools/pdf-marking/alignment-overlay.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/pdf-marking/pdf-export.js",
       "destination": "tools/pdf-marking/pdf-export.js",
       "publicMode": "cli-source",
@@ -1541,7 +1547,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.18.10",
+      "version": "2026.11.18.17",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1569,6 +1575,7 @@
         "tools/pdf-marking/model.js",
         "tools/pdf-marking/geometry.js",
         "tools/pdf-marking/omr.js",
+        "tools/pdf-marking/alignment-overlay.js",
         "tools/pdf-marking/pdf-export.js",
         "tools/pdf-marking/ai-review.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
@@ -1773,7 +1780,7 @@
     {
       "id": "pdf-marking",
       "title": "PDF 閱卷及批改工具",
-      "version": "2026.11.18.10",
+      "version": "2026.11.18.16",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -1793,6 +1800,7 @@
         "tools/pdf-marking/model.js",
         "tools/pdf-marking/geometry.js",
         "tools/pdf-marking/omr.js",
+        "tools/pdf-marking/alignment-overlay.js",
         "tools/pdf-marking/pdf-export.js",
         "tools/pdf-marking/ai-review.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
@@ -1987,7 +1995,7 @@
     {
       "id": "pdf-marking-choice",
       "title": "批改 PDF（選擇題）",
-      "version": "2026.11.18.5",
+      "version": "2026.11.18.12",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -2007,6 +2015,7 @@
         "tools/pdf-marking/model.js",
         "tools/pdf-marking/geometry.js",
         "tools/pdf-marking/omr.js",
+        "tools/pdf-marking/alignment-overlay.js",
         "tools/pdf-marking/pdf-export.js",
         "tools/pdf-marking/ai-review.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.min.js",

@@ -14,6 +14,7 @@
   <script defer src="templates.js"></script>
   <script defer src="geometry.js"></script>
   <script defer src="omr.js"></script>
+  <script defer src="alignment-overlay.js"></script>
   <script defer src="pdf-export.js"></script>
   <script defer src="review.js"></script>
   <script defer src="ai-review.js"></script>
@@ -122,6 +123,24 @@
             <label class="field"><span>題號排列</span><select id="choice-wizard-numbering"><option value="column-major">按欄</option><option value="row-major">按行</option></select></label>
             <button class="button" id="choice-wizard-delete-zone" type="button" disabled>刪除所選範圍</button>
           </div>
+          <section id="choice-wizard-click-panel" class="choice-wizard-click-panel" hidden aria-labelledby="choice-wizard-click-heading">
+            <h3 id="choice-wizard-click-heading">點圈建立答案欄</h3>
+            <p id="choice-wizard-click-status" class="status-message" role="status" aria-live="polite"></p>
+            <div class="choice-wizard-click-fields">
+              <label class="field" id="choice-wizard-click-anchor-wrap"><span>第二個定位點是第幾題</span><input id="choice-wizard-click-anchor-number" type="number" min="2" max="250" value="2"></label>
+              <label class="field" id="choice-wizard-click-start-wrap" hidden><span>新欄起始題號</span><input id="choice-wizard-click-start-number" type="number" min="1" max="250" value="16"></label>
+              <label class="field"><span>本欄題數</span><input id="choice-wizard-click-count" type="number" min="1" max="250" value="15"></label>
+              <label class="field" id="choice-wizard-click-group-wrap"><span>每組題數（0 不分組）</span><input id="choice-wizard-click-group-size" type="number" min="0" max="250" value="5"></label>
+            </div>
+            <div class="choice-wizard-click-actions">
+              <button class="button" id="choice-wizard-click-start" type="button">點圈建立</button>
+              <button class="button" id="choice-wizard-click-measure-gap" type="button" hidden>量度下一組第一題 A 圈</button>
+              <button class="button" id="choice-wizard-click-skip-gap" type="button" hidden>不用量度（預設空一行）</button>
+              <button class="button primary" id="choice-wizard-click-complete" type="button" hidden disabled>完成並加入答案欄</button>
+              <button class="button" id="choice-wizard-click-add-column" type="button" hidden>再加一欄（同樣間距）</button>
+              <button class="button" id="choice-wizard-click-cancel" type="button" hidden>取消</button>
+            </div>
+          </section>
           <div class="choice-wizard-frame" id="choice-wizard-frame">
             <canvas id="choice-wizard-canvas" hidden></canvas>
             <svg id="choice-wizard-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" role="img" aria-label="樣本頁範圍標示區" tabindex="0"></svg>
@@ -250,6 +269,20 @@
               <button class="button" id="template-editor-reset" type="button" disabled>重設為原範本</button>
               <button class="button primary" id="template-editor-test" type="button" disabled>以樣本測試讀圈</button>
             </div>
+            <section class="template-editor-auto-align" aria-labelledby="template-editor-auto-align-heading">
+              <div class="template-editor-auto-align-heading">
+                <h4 id="template-editor-auto-align-heading">本機自動對位</h4>
+                <label class="field"><span>對位範圍</span><select id="template-editor-auto-align-scope">
+                  <option value="selected">所選組</option><option value="all">全部組</option>
+                </select></label>
+              </div>
+              <div class="template-editor-auto-align-actions">
+                <button class="button" id="template-editor-auto-align" type="button" disabled>自動對位</button>
+                <button class="button primary" id="template-editor-auto-align-apply" type="button" disabled>套用</button>
+                <button class="button" id="template-editor-auto-align-cancel" type="button" hidden>取消預覽</button>
+              </div>
+              <p id="template-editor-auto-align-preview" class="template-editor-auto-align-preview" role="status" aria-live="polite">自動對位只會讀取本機樣本頁；預覽確認後才修改草稿。</p>
+            </section>
           </div>
           <p id="template-editor-instructions" class="muted small">載入一頁答題紙作底圖。選擇圈位組後，在底圖上按住拖拉可移動；聚焦底圖後可用方向鍵微調，Shift 加方向鍵每次移動 0.005。</p>
           <div class="template-editor-frame" id="template-editor-frame">
@@ -378,6 +411,7 @@
               </div>
               <div id="ai-review-choice-suggestion" class="ai-review-result" hidden></div>
               <div id="focus-answer-keys" class="focus-answer-keys" role="group" aria-label="選擇作答"></div>
+              <button class="button" id="focus-page-reread" type="button" hidden>仍然讀取此頁（需逐題確認）</button>
               <button class="button primary focus-confirm" id="focus-confirm" type="button" disabled>確認並下一題（Enter）</button>
             </section>
             <section class="document-card">

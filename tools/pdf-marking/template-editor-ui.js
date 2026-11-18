@@ -11,6 +11,7 @@
     var templates = options.templates;
     var geometry = options.geometry;
     var omr = options.omr;
+    var alignmentOverlay = root.PdfMarkingAlignmentOverlay;
     var editor = options.editor;
     var elements = {};
     [
@@ -18,6 +19,8 @@
       "template-editor-copy-note", "template-editor-pdf-file", "template-editor-page-number", "template-editor-group",
       "template-editor-option-spacing", "template-editor-row-spacing", "template-editor-all-columns-wrap",
       "template-editor-all-columns", "template-editor-undo", "template-editor-reset", "template-editor-test",
+      "template-editor-auto-align-scope", "template-editor-auto-align", "template-editor-auto-align-apply",
+      "template-editor-auto-align-cancel", "template-editor-auto-align-preview",
       "template-editor-canvas", "template-editor-overlay", "template-editor-empty", "template-editor-page-status",
       "template-editor-result", "template-editor-name", "template-editor-save", "template-editor-export", "template-editor-status"
     ].forEach(function (id) { elements[id] = document.getElementById(id); });
@@ -30,6 +33,7 @@
     var sampleRenderTask = null;
     var renderToken = 0;
     var detectedResult = null;
+    var autoAlignPreview = null;
     var undoStack = [];
     var drag = null;
     var controlEdit = null;
@@ -60,6 +64,7 @@
     }
     function resetTest() {
       detectedResult = null;
+      autoAlignPreview = null;
       elements["template-editor-result"].textContent = "調整範本後請重新測試讀圈。";
     }
     function updateValidation() {
@@ -96,6 +101,10 @@
       elements["template-editor-undo"].disabled = undoStack.length === 0;
       elements["template-editor-reset"].disabled = !session;
       elements["template-editor-test"].disabled = !samplePage;
+      elements["template-editor-auto-align"].disabled = !samplePage || !selectedGroup();
+      elements["template-editor-auto-align-apply"].disabled = !autoAlignPreview || !autoAlignPreview.canApply;
+      elements["template-editor-auto-align-cancel"].hidden = !autoAlignPreview;
+      renderAutoAlignPreview();
       renderOverlay();
       updateValidation();
     }
@@ -158,7 +167,37 @@
         svg.append(rect);
         drawLabel(svg, group.bounds.minX * width, group.bounds.minY * height - 3, group.label, group.color);
       });
-      if (detectedResult) drawDetectedPositions(svg, expanded, detectedResult, width, height, radius);
+      if (detectedResult) {
+        drawDetectedPositions(svg, expanded, detectedResult, width, height, radius);
+        alignmentOverlay.draw(svg, geometry, expanded, detectedResult, { width: width, height: height });
+      }
+      if (autoAlignPreview) drawAutoAlignPreview(svg, width, height, radius);
+    }
+    function drawAutoAlignPreview(svg, width, height, radius) {
+      autoAlignPreview.plans.filter(function (plan) { return plan.ok; }).forEach(function (plan) {
+        plan.previewPoints.forEach(function (point) {
+          drawCircle(svg, { x: point.old.x * width, y: point.old.y * height, type: point.type }, Math.max(4, radius * 0.9),
+            "#c05a00", "template-editor-auto-before", plan.target.label + " 調整前");
+          drawCircle(svg, { x: point.next.x * width, y: point.next.y * height, type: point.type }, Math.max(3, radius * 0.68),
+            "#00834a", "template-editor-auto-after", plan.target.label + " 調整後");
+        });
+      });
+    }
+    function renderAutoAlignPreview() {
+      if (!elements["template-editor-auto-align-preview"]) return;
+      if (!autoAlignPreview) {
+        elements["template-editor-auto-align-preview"].textContent = "自動對位只會讀取本機樣本頁；預覽確認後才修改草稿。";
+        return;
+      }
+      var lines = autoAlignPreview.plans.map(function (plan) {
+        if (!plan.ok) return plan.target.label + "：略過，" + plan.reason;
+        return plan.target.label + "：平均偏移 " + plan.meanOffsetMm.toFixed(2) + " mm（水平 " + plan.meanDxMm.toFixed(2) +
+          "、垂直 " + plan.meanDyMm.toFixed(2) + "），調整後殘差 " + plan.residualMm.toFixed(2) + " mm（圈心 " +
+          plan.foundCount + " / " + plan.expectedCount + "）。";
+      });
+      if (autoAlignPreview.validationError) lines.push("預計範本未能通過驗證：" + autoAlignPreview.validationError);
+      lines.push("橙色圈：調整前；綠色圈：調整後。按「套用」才會寫入草稿，可用一次「撤銷」還原。");
+      elements["template-editor-auto-align-preview"].textContent = lines.join("\n");
     }
     function drawDetectedPositions(svg, expanded, detected, width, height, radius) {
       expanded.items.forEach(function (item) {
@@ -189,6 +228,7 @@
       sampleRenderTask = null; samplePage = null; sampleViewport = null;
       if (sampleDocument && typeof sampleDocument.destroy === "function") sampleDocument.destroy();
       sampleDocument = null; sampleBytes = null; detectedResult = null;
+      autoAlignPreview = null;
       elements["template-editor-canvas"].width = 1; elements["template-editor-canvas"].height = 1;
       elements["template-editor-canvas"].hidden = true;
       elements["template-editor-empty"].hidden = false;
@@ -264,9 +304,23 @@
       var firstTen = detected.questions.slice(0, 10).map(function (question) {
         return question.number + "「" + (question.answer || "空白") + "」" + (question.status === "review" ? "（待覆核）" : "");
       }).join("、");
+      var diagnostics = detected.alignmentDiagnostics || { checks: [], groups: [], worstGroups: [], reasons: [] };
+      var checkLines = diagnostics.checks.map(function (check) {
+        var value = check.value == null ? "未提供" : (check.id === "multi-deep" ? (Number(check.value) * 100).toFixed(1) + "%" : Number(check.value).toFixed(3));
+        var limit = check.limit == null ? "—" : (check.id === "multi-deep" ? (Number(check.limit) * 100).toFixed(0) + "%" : Number(check.limit).toFixed(3));
+        return check.label + " " + value + " / 門檻 " + limit + "（" + (check.passed ? "通過" : "未通過") + "）";
+      });
+      var groupLines = diagnostics.groups.map(function (group) { return group.label + "平均偏移 " + Number(group.meanMm).toFixed(2) + " mm"; });
+      var worstLines = diagnostics.worstGroups.map(function (group) { return group.label + " " + Number(group.meanMm).toFixed(2) + " mm"; });
+      var shift = diagnostics.pageShift || {};
       elements["template-editor-result"].textContent = "班別：" + (detected.classValue || "未能讀取") +
         "；學號：" + (detected.studentId || "未能讀取") + "；首 " + detected.questions.slice(0, 10).length + " 題：" + (firstTen || "沒有選擇題") +
-        "；待覆核數：" + detected.reviewCount + (detected.pageFailure ? "（整頁定位失敗）" : "");
+        "；待覆核數：" + detected.reviewCount + (detected.pageFailure ? "（整頁定位失敗）" : "") +
+        "\n頁面移位：水平 " + Number(shift.xMm || 0).toFixed(1) + " mm、垂直 " + Number(shift.yMm || 0).toFixed(1) + " mm" +
+        "\n檢查：" + (checkLines.join("；") || "沒有檢查資料") +
+        "\n各組平均偏移：" + (groupLines.join("；") || "沒有題組") +
+        "\n偏移最大的三組：" + (worstLines.join("；") || "沒有題組") +
+        (diagnostics.reasons.length ? "\n定位原因：" + diagnostics.reasons.join(" ") : "");
     }
     async function testSample() {
       if (!session || !samplePage) return;
@@ -294,6 +348,76 @@
         button.textContent = "以樣本測試讀圈";
         button.disabled = !samplePage;
       }
+    }
+    function autoAlign() {
+      if (!session || !samplePage || !sampleViewport) return;
+      var scope = elements["template-editor-auto-align-scope"].value;
+      var targets = scope === "all" ? editor.listAutoAlignTargets(session.draft) :
+        [editor.autoAlignTargetForGroup(session.draft, selectedGroup())].filter(Boolean);
+      if (!targets.length) { setStatus("所選範圍沒有可自動對位的圈位。", true); return; }
+      var button = elements["template-editor-auto-align"];
+      button.disabled = true; button.textContent = "正在本機量度圈心…";
+      setStatus("正在本機樣本頁附近搜尋圈心；讀取完成前不會修改草稿。", false);
+      window.setTimeout(function () {
+        try {
+          var canvas = elements["template-editor-canvas"];
+          var imageData = canvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, canvas.width, canvas.height);
+          var parameters = templates.choiceParameters(session.draft);
+          // Calibration widens only the local search window so a deliberately misplaced template can find its printed rings.
+          // The ring-ink acceptance threshold and all normal OMR read parameters remain unchanged.
+          var calibrationParameters = Object.assign({}, parameters, { localSearch: Math.max(Number(parameters.localSearch) || 0, 0.016) });
+          var pageSizeMm = { widthMm: sampleViewport.width / sampleViewport.scale * 25.4 / 72,
+            heightMm: sampleViewport.height / sampleViewport.scale * 25.4 / 72 };
+          var plans = targets.map(function (target) {
+            var measurements = target.points.map(function (point) {
+              var found = omr.refineBubbleCenter(imageData.data, imageData.width, imageData.height,
+                { x: point.x, y: point.y, type: point.type }, { dx: 0, dy: 0, angle: 0, scale: 1 }, calibrationParameters);
+              return { found: Boolean(found && found.found), x: found ? found.center.x / imageData.width : NaN,
+                y: found ? found.center.y / imageData.height : NaN, ringInk: found && found.ringInk };
+            });
+            return editor.fitAutoAlignment(session.draft, target, measurements, pageSizeMm, 1);
+          });
+          var applicable = plans.filter(function (plan) { return plan.ok; });
+          var validationError = "";
+          if (applicable.length) {
+            var candidate = editor.applyAutoAlignPlans(session.draft, applicable);
+            var validation = templates.validateTemplate(candidate);
+            if (!validation.ok) validationError = validation.errors.join(" ");
+          }
+          autoAlignPreview = { plans: plans, canApply: applicable.length > 0 && !validationError, validationError: validationError };
+          renderAutoAlignPreview(); renderOverlay(); renderControls();
+          setStatus(applicable.length
+            ? "本機自動對位預覽完成；請檢查橙色及綠色圈位和殘差，再決定是否套用。"
+            : "沒有組別符合自動對位條件；範本草稿沒有修改。", !applicable.length);
+        } catch (error) {
+          autoAlignPreview = null;
+          renderOverlay(); renderAutoAlignPreview();
+          setStatus("自動對位未能完成；範本草稿沒有修改。", true);
+        } finally {
+          button.textContent = "自動對位";
+          button.disabled = !samplePage || !selectedGroup();
+        }
+      }, 30);
+    }
+    async function applyAutoAlign() {
+      if (!session || !autoAlignPreview || !autoAlignPreview.canApply) return;
+      var plans = autoAlignPreview.plans.filter(function (plan) { return plan.ok; });
+      var before = clone(session.draft);
+      var candidate = editor.applyAutoAlignPlans(session.draft, plans);
+      var validation = templates.validateTemplate(candidate);
+      if (!validation.ok) {
+        autoAlignPreview.validationError = validation.errors.join(" "); autoAlignPreview.canApply = false;
+        renderAutoAlignPreview(); renderControls();
+        setStatus("自動對位結果未通過範本驗證；未套用。", true);
+        return;
+      }
+      pushUndo(before);
+      session.draft = candidate;
+      elements["template-editor-name"].value = candidate.name;
+      autoAlignPreview = null;
+      resetTest(); renderControls();
+      setStatus("已把自動對位結果寫入草稿；正在重新執行樣本讀圈測試。", false);
+      await testSample();
     }
     function updateName() {
       if (!session) return;
@@ -344,7 +468,7 @@
         draft.name = (selected.name.slice(0, 88) + "（自訂副本）").slice(0, 100);
       }
       session = { draft: draft, resetDraft: clone(draft), original: clone(selected), copiedBuiltin: isBuiltin };
-      undoStack = []; detectedResult = null; controlEdit = null;
+      undoStack = []; detectedResult = null; autoAlignPreview = null; controlEdit = null;
       elements["template-selection-panel"].hidden = true;
       elements["template-editor-panel"].hidden = false;
       elements["template-editor-copy-note"].textContent = isBuiltin
@@ -386,6 +510,7 @@
     function undo() {
       if (!session || !undoStack.length) return;
       session.draft = undoStack.pop();
+      autoAlignPreview = null;
       elements["template-editor-name"].value = session.draft.name;
       resetTest(); setStatus("已撤銷上一步調整。", false);
       renderControls();
@@ -453,7 +578,7 @@
 
     elements["template-editor-pdf-file"].addEventListener("change", function () { loadSample(elements["template-editor-pdf-file"].files[0]); });
     elements["template-editor-page-number"].addEventListener("change", renderSamplePage);
-    elements["template-editor-group"].addEventListener("change", function () { renderControls(); });
+    elements["template-editor-group"].addEventListener("change", function () { autoAlignPreview = null; renderControls(); });
     elements["template-editor-option-spacing"].addEventListener("input", function () { applySpacing("option"); });
     elements["template-editor-option-spacing"].addEventListener("change", function () { finishSpacing("option"); });
     elements["template-editor-row-spacing"].addEventListener("input", function () { applySpacing("row"); });
@@ -469,6 +594,12 @@
     elements["template-editor-undo"].addEventListener("click", undo);
     elements["template-editor-reset"].addEventListener("click", reset);
     elements["template-editor-test"].addEventListener("click", testSample);
+    elements["template-editor-auto-align"].addEventListener("click", autoAlign);
+    elements["template-editor-auto-align-apply"].addEventListener("click", applyAutoAlign);
+    elements["template-editor-auto-align-cancel"].addEventListener("click", function () {
+      autoAlignPreview = null; renderAutoAlignPreview(); renderOverlay(); renderControls();
+      setStatus("已取消自動對位預覽；草稿沒有修改。", false);
+    });
     elements["template-editor-name"].addEventListener("input", updateName);
     elements["template-editor-save"].addEventListener("click", saveDraft);
     elements["template-editor-export"].addEventListener("click", exportDraft);

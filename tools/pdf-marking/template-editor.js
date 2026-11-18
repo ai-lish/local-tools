@@ -308,6 +308,320 @@
     }
     return { ok: false, message: "所選組沒有可調行距。" };
   }
+  function getAtPath(value, path) {
+    return path.reduce(function (current, key) { return current == null ? undefined : current[key]; }, value);
+  }
+  function setAtPath(value, path, next) {
+    var parent = getAtPath(value, path.slice(0, -1));
+    if (!parent) return false;
+    parent[path[path.length - 1]] = next;
+    return true;
+  }
+  function rowTrack(path, rows, xTrackIndexes, id, label) {
+    if (!rows) return null;
+    var groups;
+    var storage;
+    if (rows.mode === "linear") {
+      groups = [rowValues(rows)]; storage = "linear";
+    } else if (rows.mode === "list" && Array.isArray(rows.groups)) {
+      groups = rows.groups.map(function (group) { return group.slice(); }); storage = "list";
+    } else return null;
+    if (!groups.length || groups.some(function (group) { return !group.length || group.some(function (number) { return !Number.isFinite(number); }); })) return null;
+    var nextIndex = 0;
+    var rowIndexes = groups.map(function (group) {
+      var indexes = group.map(function (_, index) { return nextIndex + index; });
+      nextIndex += group.length;
+      return indexes;
+    });
+    return { id: id, label: label, path: path, groups: groups, rowIndexes: rowIndexes, storage: storage, xTrackIndexes: xTrackIndexes.slice() };
+  }
+  function scalarRowTrack(path, values, xTrackIndexes, id, label, firstRowIndex) {
+    if (!Array.isArray(values) || !values.length || values.some(function (number) { return !Number.isFinite(number); })) return null;
+    var start = Number(firstRowIndex) || 0;
+    return { id: id, label: label, path: path, groups: [values.slice()], rowIndexes: [values.map(function (_, index) { return start + index; })],
+      storage: "single", xTrackIndexes: xTrackIndexes.slice() };
+  }
+  function autoTarget(id, label, xTracks, rowTracks) {
+    var points = [];
+    rowTracks.forEach(function (rows, rowTrackIndex) {
+      rows.xTrackIndexes.forEach(function (xTrackIndex) {
+        var track = xTracks[xTrackIndex];
+        rows.groups.forEach(function (values, groupIndex) {
+          values.forEach(function (y, rowIndex) {
+            track.values.forEach(function (x, slotIndex) {
+              var globalRowIndex = rows.rowIndexes[groupIndex][rowIndex];
+              var allowedRows = rows.activeRowIndexes && rows.activeRowIndexes[xTrackIndex];
+              if (allowedRows && !allowedRows.has(globalRowIndex)) return;
+              points.push({ x: x, y: y, type: track.type, xTrackIndex: xTrackIndex, slotIndex: slotIndex,
+                rowTrackIndex: rowTrackIndex, groupIndex: groupIndex, rowIndex: rowIndex, globalRowIndex: globalRowIndex });
+            });
+          });
+        });
+      });
+    });
+    return { id: id, label: label, xTracks: xTracks, rowTracks: rowTracks, points: points };
+  }
+  function makeIdentityAutoTarget(definition, fieldIndex) {
+    var field = definition.identity.fields[fieldIndex];
+    var isArray = field.id === "student-number";
+    var xTrack = { id: "identity:" + field.id, type: field.id, path: ["identity", "fields", fieldIndex, isArray ? "xs" : "x"],
+      scalar: !isArray, values: isArray ? field.xs.slice() : [field.x] };
+    var rows = rowTrack(["identity", "fields", fieldIndex, "rows"], field.rows, [0], "identity-rows:" + field.id, field.label);
+    return autoTarget("identity:" + field.id, field.label, [xTrack], rows ? [rows] : []);
+  }
+  function makeBlockAutoTarget(definition, blockIndex, columnIndexes, label, rowPath, selectedGroupIndex) {
+    var block = definition.blocks[blockIndex];
+    var xTracks = columnIndexes.map(function (columnIndex) {
+      return { id: block.type + ":" + block.id + ":" + columnIndex, type: block.type,
+        columnIndex: columnIndex, path: ["blocks", blockIndex, "columns", columnIndex, "xs"], scalar: false,
+        values: block.columns[columnIndex].xs.slice() };
+    });
+    var rows = getAtPath(definition, rowPath);
+    var row;
+    if (selectedGroupIndex != null) {
+      var firstRowIndex = rows && rows.groups ? rows.groups.slice(0, selectedGroupIndex).reduce(function (sum, values) { return sum + values.length; }, 0) : 0;
+      row = scalarRowTrack(rowPath.concat(["groups", selectedGroupIndex]), rows && rows.groups && rows.groups[selectedGroupIndex],
+        xTracks.map(function (_, index) { return index; }), block.type + ":rows:" + selectedGroupIndex,
+        "第 " + (selectedGroupIndex + 1) + " 題組", firstRowIndex);
+    } else {
+      row = rowTrack(rowPath, rows, xTracks.map(function (_, index) { return index; }), block.type + ":rows", label);
+    }
+    if (row) {
+      var activeRows = activeQuestionRows(block);
+      row.activeRowIndexes = xTracks.map(function (track) { return activeRows[track.columnIndex] || null; });
+    }
+    return autoTarget(block.type + ":" + block.id + ":" + rowPath.join(".") + (selectedGroupIndex == null ? "" : ":" + selectedGroupIndex),
+      label, xTracks, row ? [row] : []);
+  }
+  function autoAlignTargetForGroup(definition, group) {
+    if (!group) return null;
+    if (group.kind === "identity") {
+      var fieldIndex = (definition.identity.fields || []).findIndex(function (field) { return field.id === group.fieldId; });
+      return fieldIndex < 0 ? null : makeIdentityAutoTarget(definition, fieldIndex);
+    }
+    var blockIndex = (definition.blocks || []).findIndex(function (block) { return block.id === group.blockId; });
+    if (blockIndex < 0) return null;
+    var block = definition.blocks[blockIndex];
+    if (group.kind === "mc-rows") {
+      var sharedIndexes = block.columns.map(function (column, index) { return column.rows ? -1 : index; }).filter(function (index) { return index >= 0; });
+      return makeBlockAutoTarget(definition, blockIndex, sharedIndexes, group.label,
+        ["blocks", blockIndex, "rows"], group.groupIndex);
+    }
+    if (group.kind === "mc-column" || group.kind === "mc-column-rows" || group.kind === "tf-column-rows") {
+      var column = block.columns[group.columnIndex];
+      var rowPath = column.rows ? ["blocks", blockIndex, "columns", group.columnIndex, "rows"] : ["blocks", blockIndex, "rows"];
+      return makeBlockAutoTarget(definition, blockIndex, [group.columnIndex], group.label, rowPath);
+    }
+    if (group.kind === "tf") {
+      return makeBlockAutoTarget(definition, blockIndex, block.columns.map(function (_, index) { return index; }), group.label,
+        ["blocks", blockIndex, "rows"]);
+    }
+    return null;
+  }
+  function listAutoAlignTargets(definition) {
+    var targets = [];
+    (definition.identity && definition.identity.fields || []).forEach(function (field, index) {
+      var target = makeIdentityAutoTarget(definition, index);
+      if (target.points.length) targets.push(target);
+    });
+    (definition.blocks || []).forEach(function (block, blockIndex) {
+      var groupedColumns = new Map();
+      block.columns.forEach(function (column, columnIndex) {
+        var path = column.rows ? ["blocks", blockIndex, "columns", columnIndex, "rows"] : ["blocks", blockIndex, "rows"];
+        var key = path.join(".");
+        if (!groupedColumns.has(key)) groupedColumns.set(key, { path: path, indexes: [] });
+        groupedColumns.get(key).indexes.push(columnIndex);
+      });
+      groupedColumns.forEach(function (entry) {
+        var suffix = entry.indexes.length > 1 ? "全欄" : "第 " + (entry.indexes[0] + 1) + " 欄";
+        var label = (block.type === "mc" ? "選擇題" : "是非題") + suffix + "及行位";
+        var target = makeBlockAutoTarget(definition, blockIndex, entry.indexes, label, entry.path);
+        if (target.points.length) targets.push(target);
+      });
+    });
+    return targets;
+  }
+  function activeQuestionRows(block) {
+    var locations = [];
+    block.columns.forEach(function (column, columnIndex) {
+      rowValues(column.rows || block.rows).forEach(function (y, rowIndex) {
+        locations.push({ columnIndex: columnIndex, rowIndex: rowIndex, y: y,
+          x: column.xs.reduce(function (sum, value) { return sum + value; }, 0) / column.xs.length });
+      });
+    });
+    locations.sort(block.numbering === "row-major"
+      ? function (left, right) { return left.y - right.y || left.x - right.x || left.columnIndex - right.columnIndex; }
+      : function (left, right) { return left.columnIndex - right.columnIndex || left.rowIndex - right.rowIndex; });
+    var active = block.columns.map(function () { return new Set(); });
+    locations.slice(0, block.maxCount).forEach(function (location) { active[location.columnIndex].add(location.rowIndex); });
+    return active;
+  }
+  function solveLeastSquares(rows, values) {
+    if (!rows.length || !rows[0].length || rows.length !== values.length) return null;
+    var size = rows[0].length;
+    var matrix = Array.from({ length: size }, function () { return Array(size + 1).fill(0); });
+    rows.forEach(function (row, rowIndex) {
+      for (var i = 0; i < size; i += 1) {
+        for (var j = 0; j < size; j += 1) matrix[i][j] += row[i] * row[j];
+        matrix[i][size] += row[i] * values[rowIndex];
+      }
+    });
+    for (var column = 0; column < size; column += 1) {
+      var pivot = column;
+      for (var candidate = column + 1; candidate < size; candidate += 1) {
+        if (Math.abs(matrix[candidate][column]) > Math.abs(matrix[pivot][column])) pivot = candidate;
+      }
+      if (Math.abs(matrix[pivot][column]) < 1e-12) return null;
+      var swap = matrix[column]; matrix[column] = matrix[pivot]; matrix[pivot] = swap;
+      var divisor = matrix[column][column];
+      for (var k = column; k <= size; k += 1) matrix[column][k] /= divisor;
+      for (var rowNumber = 0; rowNumber < size; rowNumber += 1) {
+        if (rowNumber === column) continue;
+        var factor = matrix[rowNumber][column];
+        for (var cell = column; cell <= size; cell += 1) matrix[rowNumber][cell] -= factor * matrix[column][cell];
+      }
+    }
+    return matrix.map(function (row) { return row[size]; });
+  }
+  function fitAutoAlignment(definition, target, measurements, pageSizeMm, maximumResidualMm) {
+    var page = pageSizeMm || {};
+    var widthMm = Number(page.widthMm); var heightMm = Number(page.heightMm);
+    var maxResidual = Number.isFinite(Number(maximumResidualMm)) ? Number(maximumResidualMm) : 1;
+    if (!target || !target.points.length || measurements.length !== target.points.length || widthMm <= 0 || heightMm <= 0) {
+      return { ok: false, reason: "沒有足夠的圈位或頁面尺寸資料。", target: target };
+    }
+    var found = measurements.filter(function (entry) { return entry && entry.found && Number.isFinite(entry.x) && Number.isFinite(entry.y); });
+    if (found.length * 2 < target.points.length) {
+      return { ok: false, reason: "找到的圈心少於該組圈數一半（" + found.length + " / " + target.points.length + "）。", target: target,
+        foundCount: found.length, expectedCount: target.points.length };
+    }
+    var usable = [];
+    measurements.forEach(function (measurement, index) {
+      if (measurement && measurement.found && Number.isFinite(measurement.x) && Number.isFinite(measurement.y)) {
+        usable.push(Object.assign({ point: target.points[index], index: index }, measurement));
+      }
+    });
+    var xFits = [];
+    for (var xIndex = 0; xIndex < target.xTracks.length; xIndex += 1) {
+      var xTrack = target.xTracks[xIndex];
+      var xSamples = usable.filter(function (entry) { return entry.point.xTrackIndex === xIndex; });
+      var expectedForTrack = target.points.filter(function (point) { return point.xTrackIndex === xIndex; }).length;
+      if (!expectedForTrack) {
+        xFits.push({ path: xTrack.path, scalar: xTrack.scalar, values: xTrack.values.slice(), id: xTrack.id });
+        continue;
+      }
+      if (xSamples.length * 2 < expectedForTrack) return { ok: false, reason: xTrack.id + " 找到的圈心不足一半。", target: target,
+        foundCount: found.length, expectedCount: target.points.length };
+      var xRows = xSamples.map(function (entry) {
+        var features = [1];
+        if (xTrack.values.length > 1) features.push(entry.point.slotIndex - (xTrack.values.length - 1) / 2);
+        return features;
+      });
+      var xValues = xSamples.map(function (entry) { return entry.x - entry.point.x; });
+      var xCoefficients = solveLeastSquares(xRows, xValues);
+      if (!xCoefficients) return { ok: false, reason: xTrack.id + " 的選項間距無法穩定估算。", target: target };
+      var newValues = xTrack.values.map(function (value, slot) {
+        return value + xCoefficients[0] + (xCoefficients.length > 1 ? xCoefficients[1] * (slot - (xTrack.values.length - 1) / 2) : 0);
+      });
+      xFits.push({ path: xTrack.path, scalar: xTrack.scalar, values: newValues, id: xTrack.id });
+    }
+    var rowFits = [];
+    target.rowTracks.forEach(function (rows, rowTrackIndex) {
+      var rowSamples = usable.filter(function (entry) { return entry.point.rowTrackIndex === rowTrackIndex; });
+      var expectedForRows = target.points.filter(function (point) { return point.rowTrackIndex === rowTrackIndex; }).length;
+      if (rowSamples.length * 2 < expectedForRows) return;
+      var hasPitch = rows.groups.some(function (group) { return group.length > 1; });
+      var groupCount = rows.groups.length;
+      var equations = rowSamples.map(function (entry) {
+        var groupIndex = entry.point.groupIndex; var group = rows.groups[groupIndex];
+        var features = Array(groupCount + (hasPitch ? 1 : 0)).fill(0);
+        features[groupIndex] = 1;
+        if (hasPitch) features[groupCount] = entry.point.rowIndex - (group.length - 1) / 2;
+        return features;
+      });
+      var values = rowSamples.map(function (entry) { return entry.y - entry.point.y; });
+      var coefficients = solveLeastSquares(equations, values);
+      if (!coefficients) return;
+      var updatedGroups = rows.groups.map(function (group, groupIndex) {
+        return group.map(function (value, rowIndex) {
+          return value + coefficients[groupIndex] + (hasPitch ? coefficients[groupCount] * (rowIndex - (group.length - 1) / 2) : 0);
+        });
+      });
+      rowFits.push({ path: rows.path, storage: rows.storage, groups: updatedGroups, id: rows.id });
+    });
+    if (rowFits.length !== target.rowTracks.length) return { ok: false, reason: "其中一段行位找不到足夠圈心，不能安全調整。", target: target,
+      foundCount: found.length, expectedCount: target.points.length };
+    if (xFits.some(function (fit) { return fit.values.some(function (value) { return value < 0 || value > 1; }); }) ||
+        rowFits.some(function (fit) { return fit.groups.some(function (group) { return group.some(function (value) { return value < 0 || value > 1; }); }); })) {
+      return { ok: false, reason: "預計圈位會超出頁面範圍，未作修改。", target: target,
+        foundCount: found.length, expectedCount: target.points.length };
+    }
+    var updatedX = new Map(); xFits.forEach(function (fit, index) { target.xTracks[index].values.forEach(function (value, slot) {
+      updatedX.set(index + ":" + slot, fit.values[slot]);
+    }); });
+    var updatedRows = new Map(); rowFits.forEach(function (fit, index) { fit.groups.forEach(function (group, groupIndex) {
+      group.forEach(function (value, rowIndex) { updatedRows.set(index + ":" + groupIndex + ":" + rowIndex, value); });
+    }); });
+    var residualSquared = 0; var offsetX = 0; var offsetY = 0; var offsetLength = 0;
+    usable.forEach(function (entry) {
+      var point = entry.point;
+      var predictedX = updatedX.get(point.xTrackIndex + ":" + point.slotIndex);
+      var predictedY = updatedRows.get(point.rowTrackIndex + ":" + point.groupIndex + ":" + point.rowIndex);
+      var residualX = (entry.x - predictedX) * widthMm;
+      var residualY = (entry.y - predictedY) * heightMm;
+      residualSquared += residualX * residualX + residualY * residualY;
+      var dx = (entry.x - point.x) * widthMm; var dy = (entry.y - point.y) * heightMm;
+      offsetX += dx; offsetY += dy; offsetLength += Math.hypot(dx, dy);
+    });
+    var residualMm = Math.sqrt(residualSquared / usable.length);
+    var meanOffsetMm = offsetLength / usable.length;
+    if (!Number.isFinite(residualMm) || residualMm > maxResidual) return { ok: false, reason: "擬合殘差 " + residualMm.toFixed(2) + " mm 過大（上限 " + maxResidual.toFixed(2) + " mm），未作修改。",
+      target: target, residualMm: residualMm, foundCount: found.length, expectedCount: target.points.length };
+    var candidate = clone(definition);
+    xFits.forEach(function (fit) {
+      if (fit.scalar) setAtPath(candidate, fit.path, fit.values[0]);
+      else setAtPath(candidate, fit.path, fit.values);
+    });
+    rowFits.forEach(function (fit) {
+      if (fit.storage === "single") setAtPath(candidate, fit.path, fit.groups[0]);
+      else if (fit.storage === "list") {
+        var rowsValue = getAtPath(candidate, fit.path); rowsValue.groups = fit.groups;
+      } else if (fit.storage === "linear") {
+        var linear = getAtPath(candidate, fit.path); var values = fit.groups[0];
+        linear.start = values[0];
+        if (values.length > 1) linear.pitch = (values[values.length - 1] - values[0]) / (values.length - 1);
+      }
+    });
+    var previewPoints = target.points.map(function (point) {
+      return { old: { x: point.x, y: point.y }, next: {
+        x: updatedX.get(point.xTrackIndex + ":" + point.slotIndex),
+        y: updatedRows.get(point.rowTrackIndex + ":" + point.groupIndex + ":" + point.rowIndex)
+      }, type: point.type };
+    });
+    return { ok: true, target: target, candidate: candidate, xFits: xFits, rowFits: rowFits,
+      foundCount: found.length, expectedCount: target.points.length, residualMm: residualMm,
+      meanOffsetMm: meanOffsetMm, meanDxMm: offsetX / usable.length, meanDyMm: offsetY / usable.length,
+      previewPoints: previewPoints };
+  }
+  function applyAutoAlignPlans(definition, plans) {
+    var result = clone(definition);
+    (plans || []).filter(function (plan) { return plan && plan.ok; }).forEach(function (plan) {
+      plan.xFits.forEach(function (fit) {
+        if (fit.scalar) setAtPath(result, fit.path, fit.values[0]);
+        else setAtPath(result, fit.path, fit.values);
+      });
+      plan.rowFits.forEach(function (fit) {
+        if (fit.storage === "single") setAtPath(result, fit.path, fit.groups[0]);
+        else if (fit.storage === "list") getAtPath(result, fit.path).groups = fit.groups;
+        else if (fit.storage === "linear") {
+          var linear = getAtPath(result, fit.path); var values = fit.groups[0];
+          linear.start = values[0];
+          if (values.length > 1) linear.pitch = (values[values.length - 1] - values[0]) / (values.length - 1);
+        }
+      });
+    });
+    return result;
+  }
   function saveValidated(definition, templateApi, saveFn) {
     var clean = templateApi.sanitizeTemplate(definition);
     var validation = templateApi.validateTemplate(clean);
@@ -324,6 +638,10 @@
     moveGroup: moveGroup,
     setOptionSpacing: setOptionSpacing,
     setRowSpacing: setRowSpacing,
+    autoAlignTargetForGroup: autoAlignTargetForGroup,
+    listAutoAlignTargets: listAutoAlignTargets,
+    fitAutoAlignment: fitAutoAlignment,
+    applyAutoAlignPlans: applyAutoAlignPlans,
     saveValidated: saveValidated
   };
   root.PdfMarkingTemplateEditor = api;

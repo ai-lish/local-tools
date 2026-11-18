@@ -5,6 +5,7 @@
   var templates = window.PdfMarkingTemplates;
   var geometry = window.PdfMarkingGeometry;
   var omr = window.PdfMarkingOmr;
+  var alignmentOverlay = window.PdfMarkingAlignmentOverlay;
   var pdfExport = window.PdfMarkingExport;
   var review = window.PdfMarkingReview;
   var aiReview = window.PdfMarkingAiReview;
@@ -58,6 +59,7 @@
     demoBanner: byId("demo-banner"), endDemo: byId("end-demo"), reviewStepStatus: byId("review-step-status"),
     focusTitle: byId("focus-title"), focusReason: byId("focus-reason"), focusPreview: byId("focus-preview"),
     focusAnswerKeys: byId("focus-answer-keys"), focusConfirm: byId("focus-confirm"), focusProgress: byId("focus-progress"),
+    focusPageReread: byId("focus-page-reread"),
     mcCount: byId("mc-count"), tfCount: byId("tf-count"),
     mcKey: byId("mc-key"), tfKey: byId("tf-key"), mcPoints: byId("mc-points"), tfPoints: byId("tf-points"),
     readOmr: byId("read-omr"), omrStatus: byId("omr-status"), choicePage: byId("choice-page"),
@@ -788,7 +790,7 @@
 
   function currentChoiceScore(page) {
     var settings = choiceSettings();
-    if (!page || page.pageFailure || !settings.valid) return null;
+    if (!page || page.pageFailure || review.hasForcedReadPending(page) || !settings.valid) return null;
     return model.scoreQuestions({
       answers: model.choiceAnswersForSettings(page, "mc", settings.mcCount),
       tfAnswers: model.choiceAnswersForSettings(page, "tf", settings.tfCount)
@@ -895,6 +897,15 @@
         overlay.append(button);
       });
     });
+    if (pageRecord.pageFailure || state.focusKey === "page:" + String(state.currentPage) ||
+        Array.isArray(pageRecord.pageFlags) && pageRecord.pageFlags.indexOf(omr.FORCED_READ_REVIEW_FLAG) >= 0) {
+      var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "alignment-diagnostic-overlay");
+      svg.setAttribute("viewBox", "0 0 " + viewport.width + " " + viewport.height);
+      svg.setAttribute("aria-label", "預期圈心、讀取圈心及題組間隙診斷");
+      alignmentOverlay.draw(svg, geometry, template, pageRecord, viewport);
+      overlay.append(svg);
+    }
     stage.replaceChildren(canvas, overlay);
   }
 
@@ -923,13 +934,35 @@
     var current = queue.find(function (entry) { return entry.key === state.focusKey; });
     els.focusAnswerKeys.replaceChildren();
     els.focusProgress.textContent = queue.length ? (Math.max(1, queue.findIndex(function (entry) { return entry.key === state.focusKey; }) + 1) + " / " + queue.length + " 題") : "0 題";
-    els.focusConfirm.disabled = !current;
+    var pageFailureItem = Boolean(current && current.kind === "page");
+    els.focusPageReread.hidden = !pageFailureItem;
+    els.focusConfirm.hidden = pageFailureItem;
+    els.focusConfirm.disabled = !current || pageFailureItem;
     els.focusConfirm.classList.toggle("primary", Boolean(current));
     els.exportPdf.classList.toggle("primary", !current);
     if (!current) {
       els.focusTitle.textContent = "沒有待覆核題目";
       els.focusReason.textContent = state.pdfDoc ? "所有已讀題目都已確認；整頁警告仍請檢查。" : "載入 PDF 後，待覆核題目會在這裏放大顯示。";
       els.focusPreview.replaceChildren(Object.assign(document.createElement("p"), { className: "empty-state", textContent: "目前沒有需要覆核的題目。" }));
+      renderChoiceAiSuggestion(null);
+      return;
+    }
+    if (pageFailureItem) {
+      els.focusTitle.textContent = "第 " + current.pageNumber + " 頁 · 整頁定位失敗";
+      var diagnostics = current.diagnostic || {};
+      var diagnosticReasons = diagnostics.reasons || [];
+      var groupLines = (diagnostics.groups || []).map(function (group) {
+        return group.label + "平均偏移 " + Number(group.meanMm).toFixed(1) + " mm";
+      });
+      var worstLines = (diagnostics.worstGroups || []).map(function (group) {
+        return group.label + " " + Number(group.meanMm).toFixed(1) + " mm";
+      });
+      var readout = diagnosticReasons.length ? diagnosticReasons.slice() : [current.reason];
+      readout.push("各組平均偏移：" + (groupLines.join("；") || "沒有題組"));
+      readout.push("偏移最大的三組：" + (worstLines.join("；") || "沒有題組"));
+      els.focusReason.textContent = readout.join("\n");
+      els.focusPreview.replaceChildren(Object.assign(document.createElement("p"), { className: "empty-state",
+        textContent: "整頁圈心診斷已疊加在右側答題紙；藍圈為預期位置，紅圈為讀取位置，連線顯示位移。" }));
       renderChoiceAiSuggestion(null);
       return;
     }
@@ -972,9 +1005,10 @@
       var button = document.createElement("button"); button.type = "button"; button.className = "review-item";
       button.setAttribute("aria-current", entry.key === state.focusKey ? "true" : "false");
       var label = document.createElement("span");
-      label.textContent = "第 " + entry.pageNumber + " 頁 · " + (entry.type === "mc" ? "選擇題" : "是非題") + "第 " + String(entry.number).padStart(2, "0") + " 題";
+      label.textContent = entry.kind === "page" ? "第 " + entry.pageNumber + " 頁 · 整頁" :
+        "第 " + entry.pageNumber + " 頁 · " + (entry.type === "mc" ? "選擇題" : "是非題") + "第 " + String(entry.number).padStart(2, "0") + " 題";
       var detail = document.createElement("span"); detail.className = "item-value";
-      detail.textContent = (entry.answer || "空白") + " · " + entry.reason;
+      detail.textContent = entry.kind === "page" ? "定位檢查失敗 · 按此查看診斷" : (entry.answer || "空白") + " · " + entry.reason;
       button.append(label, detail);
       button.addEventListener("click", function () {
         state.focusKey = entry.key; state.currentPage = entry.pageNumber;
@@ -990,6 +1024,13 @@
         flag.textContent = "第 " + pageNumber + " 頁 · " + flagText;
         els.pageFlags.append(flag);
       });
+      if (entry.pageFailure && entry.alignmentDiagnostics && Array.isArray(entry.alignmentDiagnostics.reasons)) {
+        entry.alignmentDiagnostics.reasons.forEach(function (reason) {
+          var diagnostic = document.createElement("div"); diagnostic.className = "page-flag alignment-warning";
+          diagnostic.textContent = "第 " + pageNumber + " 頁 · " + reason;
+          els.pageFlags.append(diagnostic);
+        });
+      }
     }
     renderFocusControls(queue);
   }
@@ -1784,6 +1825,7 @@
           calibration: detected.calibration,
           metadataCalibration: detected.metadataCalibration,
           thresholds: detected.thresholds,
+          alignmentDiagnostics: detected.alignmentDiagnostics,
           pageFlags: detected.pageFlags,
           pageFailure: detected.pageFailure,
           classWasEdited: false,
@@ -1819,11 +1861,43 @@
     if (index < 0) return;
     var current = queue[index];
     review.confirmQuestion(current.question);
+    var page = state.choicePages[current.pageNumber];
+    if (page && Array.isArray(page.pageFlags) && page.pageFlags.indexOf(omr.FORCED_READ_REVIEW_FLAG) >= 0 &&
+        !page.questions.some(function (question) { return question.status === "review" && !question.reviewed; })) {
+      page.pageFlags = page.pageFlags.filter(function (flag) { return flag !== omr.FORCED_READ_REVIEW_FLAG; });
+    }
     var updated = review.buildReviewQueue(state.choicePages, state.pageCount);
     var next = updated[index] || updated[index - 1] || null;
     state.focusKey = next ? next.key : "";
     if (next) state.currentPage = next.pageNumber;
     renderCurrentMode(); updateControls(); updateStepper();
+  }
+
+  async function rereadFailedPageForReview() {
+    var page = currentChoicePage();
+    if (!page || !page.pageFailure || !state.pdfDoc) return;
+    els.focusPageReread.disabled = true;
+    try {
+      var settings = choiceSettings();
+      var rendered = await renderPdfToCanvas(state.currentPage, 2.2);
+      var expanded = geometry.expandChoiceTemplate(state.template, settings);
+      var detected = omr.detectPage(rendered.data.data, rendered.canvas.width, rendered.canvas.height,
+        settings.mcCount, settings.tfCount, page.calibration, page.metadataCalibration, expanded, { forceRead: true });
+      state.choicePages[state.currentPage] = Object.assign({}, page, {
+        questions: detected.questions,
+        pageFailure: false,
+        alignmentDiagnostics: page.alignmentDiagnostics || detected.alignmentDiagnostics,
+        pageFlags: (page.pageFlags || []).filter(function (flag) { return flag !== omr.FORCED_READ_REVIEW_FLAG; })
+          .concat([omr.FORCED_READ_REVIEW_FLAG])
+      });
+      var queue = review.buildReviewQueue(state.choicePages, state.pageCount);
+      state.focusKey = queue.length ? queue[0].key : "";
+      renderCurrentMode(); updateControls(); updateStepper();
+    } catch (error) {
+      els.focusReason.textContent = "仍然讀取失敗；原有整頁警告及零分保護已保留。請重新選擇此項再試。";
+    } finally {
+      els.focusPageReread.disabled = false;
+    }
   }
 
   function toggleChoiceAnswer(type, number, option) {
@@ -2167,7 +2241,8 @@
       pageFlags: Array.isArray(source.pageFlags) ? source.pageFlags.filter(function (flag) {
         return ["定位校正幅度較大，請檢查整頁對齊", "定位校正後仍有較大殘差，請檢查整頁對齊",
           "班別讀取未確認", "學號讀取未確認",
-          "整頁定位失敗：可能是空白頁、方向錯誤或分組位置不符，請核對本頁"].indexOf(flag) >= 0;
+          "整頁定位失敗：可能是空白頁、方向錯誤或分組位置不符，請核對本頁",
+          omr.FORCED_READ_REVIEW_FLAG].indexOf(flag) >= 0;
       }) : [],
       classWasEdited: Boolean(source.classWasEdited), studentIdWasEdited: Boolean(source.studentIdWasEdited)
     };
@@ -2443,6 +2518,7 @@
   choiceWizardUI = window.PdfMarkingChoiceWizardUI.create({
     templates: templates,
     geometry: geometry,
+    omr: omr,
     getTemplates: function () { return templates.BUILTIN_TEMPLATES.concat(customTemplates); },
     getSelectedTemplate: function () { return state.template || templateById(state.templateId); },
     getEditorDraft: function () { return templateEditorUI.getDraft(); },
@@ -2728,6 +2804,7 @@
   els.aiDictationAll.addEventListener("click", function () { runDictationAi(true); });
   els.stepPills.forEach(function (pill) { pill.addEventListener("click", function () { setStep(Number(pill.dataset.step)); renderCurrentMode(); }); });
   els.focusConfirm.addEventListener("click", confirmFocusedQuestion);
+  els.focusPageReread.addEventListener("click", rereadFailedPageForReview);
   window.addEventListener("keydown", function (event) {
     if (event.key !== "Enter" || state.step !== 3 || state.mode !== "choice") return;
     var target = event.target;

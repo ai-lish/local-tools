@@ -674,7 +674,10 @@
       var page = (config.pages || {})[pageNumber] || (config.pages || {})[String(pageNumber)] || null;
       var answers = choiceAnswersForSettings(page, "mc", settings.mcCount);
       var tfAnswers = choiceAnswersForSettings(page, "tf", settings.tfCount);
-      var score = page && !page.pageFailure ? scoreQuestions({ answers: answers, tfAnswers: tfAnswers },
+      var forcedReadPending = Boolean(page && Array.isArray(page.pageFlags) &&
+        page.pageFlags.indexOf("整頁讀取中：所有題目須逐題確認後才計分") >= 0 &&
+        (page.questions || []).some(function (question) { return question && question.status === "review" && !question.reviewed; }));
+      var score = page && !page.pageFailure && !forcedReadPending ? scoreQuestions({ answers: answers, tfAnswers: tfAnswers },
         settings.mcKey, settings.tfKey, settings.mcPoints, settings.tfPoints) : null;
       var questionsPending = choiceReviewSummary({ 1: page }, 1, settings.mcCount, settings.tfCount).questionsPending;
       var blankCount = 0;

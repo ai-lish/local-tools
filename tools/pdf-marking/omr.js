@@ -7,6 +7,7 @@
   var MAX_GROUP_GAP_INK = BUILTIN_PARAMS.maxGroupGapInk;
   var MIN_LOCAL_CIRCLE_INK = BUILTIN_PARAMS.minLocalCircleInk;
   var MAX_LOCAL_CORRECTION_RATIO = BUILTIN_PARAMS.maxLocalCorrection;
+  var FORCED_READ_REVIEW_FLAG = "整頁讀取中：所有題目須逐題確認後才計分";
 
   function clamp(value, low, high) { return Math.max(low, Math.min(high, value)); }
 
@@ -89,6 +90,76 @@
     return gaps.reduce(function (total, point) {
       return total + ringInk(data, width, height, point, calibration, params);
     }, 0) / gaps.length;
+  }
+
+  function groupGapMeasurements(data, width, height, calibration, template, params) {
+    var configured = (template && template.params || BUILTIN_PARAMS).groupGaps || [];
+    return configured.map(function (gap) {
+      var values = gap.points.map(function (point) { return ringInk(data, width, height, point, calibration, params); });
+      return { beforeNumber: gap.beforeNumber, afterNumber: gap.afterNumber,
+        ink: values.reduce(function (sum, value) { return sum + value; }, 0) / Math.max(1, values.length) };
+    });
+  }
+
+  function answerGroupLabel(type, questionNumbers) {
+    var numbers = (Array.isArray(questionNumbers) ? questionNumbers : []).map(Number).filter(Number.isFinite);
+    if (!numbers.length) return type === "tf" ? "是非題" : "選擇題";
+    var first = Math.min.apply(Math, numbers);
+    var last = Math.max.apply(Math, numbers);
+    var range = first === last ? String(first) : first + "–" + last;
+    return (type === "tf" ? "是非題" : "選擇題") + "第 " + range + " 題";
+  }
+
+  function buildAlignmentDiagnostics(input) {
+    var value = input || {};
+    var calibration = value.calibration || {};
+    var params = value.params || BUILTIN_PARAMS;
+    var gridScore = Number(value.gridScore);
+    var groupGapValue = Number(value.groupGapInk);
+    var count = Number(value.questionCount) || 0;
+    var multiple = Number(value.multipleCount) || 0;
+    var xLimit = Number(params.limits && params.limits.dx) || 0;
+    var yLimit = Number(params.limits && params.limits.dy) || 0;
+    var checks = [
+      { id: "shift-x", label: "水平移位", value: Math.abs(Number(calibration.dx) || 0), limit: xLimit,
+        passed: Math.abs(Number(calibration.dx) || 0) <= xLimit },
+      { id: "shift-y", label: "垂直移位", value: Math.abs(Number(calibration.dy) || 0), limit: yLimit,
+        passed: Math.abs(Number(calibration.dy) || 0) < yLimit },
+      { id: "grid-score", label: "圈格定位分數", value: Number.isFinite(gridScore) ? gridScore : null,
+        limit: params.minGridScore, passed: !Number.isFinite(gridScore) || gridScore >= params.minGridScore },
+      { id: "group-gap-ink", label: "題組間隙黑墨平均", value: Number.isFinite(groupGapValue) ? groupGapValue : null,
+        limit: params.maxGroupGapInk, passed: !Number.isFinite(groupGapValue) || groupGapValue < params.maxGroupGapInk },
+      { id: "multi-deep", label: "多個深圈題目比例", value: count ? multiple / count : 0,
+        limit: 0.6, passed: !count || multiple / count < 0.6 }
+    ];
+    var reasons = [];
+    if (!checks[0].passed || !checks[1].passed) {
+      reasons.push("整頁移位超出 1.2%：水平 " + (Math.abs(Number(calibration.dx) || 0) * 100).toFixed(2) + "%（" +
+        (Math.abs(Number(calibration.dx) || 0) * 210).toFixed(1) + " mm），垂直 " +
+        (Math.abs(Number(calibration.dy) || 0) * 100).toFixed(2) + "%（" +
+        (Math.abs(Number(calibration.dy) || 0) * 297).toFixed(1) + " mm）。");
+    }
+    if (!checks[2].passed) reasons.push("圈格定位分數 " + gridScore.toFixed(3) + " 低於最低值 " + Number(params.minGridScore).toFixed(3) + "。");
+    var gapMeasurements = Array.isArray(value.groupGapMeasurements) ? value.groupGapMeasurements : [];
+    if (!checks[3].passed) {
+      reasons.push("題組間隙黑墨平均 " + groupGapValue.toFixed(3) + " 達到上限 " + Number(params.maxGroupGapInk).toFixed(3) + "。");
+      gapMeasurements.filter(function (gap) {
+        return Number(gap.ink) >= Number(params.maxGroupGapInk);
+      }).forEach(function (gap) {
+        reasons.push("第 " + gap.beforeNumber + " 題與第 " + gap.afterNumber + " 題之間應為空白，但偵測到圈或墨水（" +
+          Number(gap.ink).toFixed(2) + "，上限 " + Number(params.maxGroupGapInk).toFixed(2) +
+          "）：請檢查答案欄次序或分組設定。");
+      });
+    }
+    if (!checks[4].passed) reasons.push("多於一個深圈的題目 " + multiple + " / " + count + "（" + (multiple / count * 100).toFixed(1) + "%），達到 60% 門檻。");
+    var groups = (Array.isArray(value.columnDisplacements) ? value.columnDisplacements : []).map(function (group, index) {
+      var mean = group.values.length ? group.values.reduce(function (sum, entry) { return sum + entry; }, 0) / group.values.length : 0;
+      return { label: group.label || "題組 " + (index + 1), meanMm: mean, sampleCount: group.values.length };
+    });
+    var worstGroups = groups.slice().sort(function (left, right) { return right.meanMm - left.meanMm; }).slice(0, 3);
+    return { failed: checks.some(function (check) { return !check.passed; }), checks: checks, reasons: reasons, groupGaps: gapMeasurements, groups: groups, worstGroups: worstGroups,
+      pageShift: { xPercent: (Number(calibration.dx) || 0) * 100, yPercent: (Number(calibration.dy) || 0) * 100,
+        xMm: (Number(calibration.dx) || 0) * 210, yMm: (Number(calibration.dy) || 0) * 297 } };
   }
 
   function gridFit(data, width, height, template) {
@@ -431,7 +502,7 @@
     return isAffineResultWorse(gridResult, affineResult) ? gridResult : affineResult;
   }
 
-  function analysePage(data, width, height, template, applied, metadataApplied, params, baseCalibration) {
+  function analysePage(data, width, height, template, applied, metadataApplied, params, baseCalibration, options) {
     var constrained = applied.affine ? { baseCalibration: baseCalibration, maxOffset: 0.01 } : null;
     var itemLocations = template.items.map(function (item) {
       return item.choices.map(function (bubble) {
@@ -473,6 +544,32 @@
     var unexpectedGroupGapInk = Number.isFinite(Number(applied.groupGapInk)) && applied.groupGapInk >= params.maxGroupGapInk;
     var pageFailure = Boolean(applied.alignmentBoundary) || lowGridScore || unexpectedGroupGapInk ||
       (questions.length > 0 && pageMultipleCount / questions.length >= 0.6);
+    var alignmentFailed = pageFailure;
+    var gapMeasurements = groupGapMeasurements(data, width, height, applied, template, params);
+    var displacementGroupsById = Object.create(null);
+    template.items.forEach(function (item, itemIndex) {
+      var columnIndex = Number.isInteger(item.columnIndex) ? item.columnIndex : 0;
+      var rowGroupIndex = Number.isInteger(item.rowGroupIndex) ? item.rowGroupIndex : 0;
+      var groupId = item.type + ":" + columnIndex + ":" + rowGroupIndex;
+      var displacementGroup = displacementGroupsById[groupId];
+      if (!displacementGroup) {
+        displacementGroup = displacementGroupsById[groupId] = { type: item.type, columnIndex: columnIndex,
+          rowGroupIndex: rowGroupIndex, numbers: [], values: [] };
+      }
+      displacementGroup.numbers.push(item.number);
+      itemLocations[itemIndex].forEach(function (location, bubbleIndex) {
+        var expected = geometry.mapBubble(item.choices[bubbleIndex], width, height, { dx: 0, dy: 0, angle: 0, scale: 1 });
+        displacementGroup.values.push(Math.hypot((location.center.x - expected.x) / width * 210,
+          (location.center.y - expected.y) / height * 297));
+      });
+    });
+    var displacementGroups = Object.keys(displacementGroupsById).map(function (groupId) {
+      var group = displacementGroupsById[groupId];
+      return { label: answerGroupLabel(group.type, group.numbers), values: group.values };
+    });
+    var diagnostics = buildAlignmentDiagnostics({ calibration: applied, gridScore: applied.gridScore,
+      groupGapInk: applied.groupGapInk, groupGapMeasurements: gapMeasurements, multipleCount: pageMultipleCount,
+      questionCount: questions.length, params: params, columnDisplacements: displacementGroups });
     var highConfidenceResiduals = itemLocations.reduce(function (all, locations) {
       return all.concat(locations.filter(function (location) { return location.ringInk >= 0.5; })
         .map(function (location) { return Math.hypot(location.offsetX, location.offsetY); }));
@@ -496,14 +593,26 @@
         return measureBubble(data, width, height, bubble, metadataApplied, params);
       }), thresholdInfo, "學號第 " + (index + 1) + " 位");
     });
-    if (pageFailure) {
-      questions.forEach(function (question) {
-        question.answer = "";
-        question.status = "review";
-        question.reason = "整頁定位失敗";
-        question.reviewed = true;
-      });
+    if (pageFailure || options && options.forceRead) {
+      if (pageFailure) {
       pageFlags.push("整頁定位失敗：可能是空白頁、方向錯誤或分組位置不符，請核對本頁");
+      }
+      if (options && options.forceRead) {
+        questions.forEach(function (question) {
+          question.status = "review";
+          question.reason = "整頁定位失敗後，需逐題確認";
+          question.reviewed = false;
+        });
+        pageFlags.push(FORCED_READ_REVIEW_FLAG);
+        pageFailure = false;
+      } else if (pageFailure) {
+        questions.forEach(function (question) {
+          question.answer = "";
+          question.status = "review";
+          question.reason = "整頁定位失敗";
+          question.reviewed = true;
+        });
+      }
     }
     if ((requiresGrade && grade.status !== "read") || (requiresForm && form.status !== "read")) pageFlags.push("班別讀取未確認");
     if (idDigits.some(function (digit) { return digit.status !== "read"; })) pageFlags.push("學號讀取未確認");
@@ -518,6 +627,9 @@
       calibration: applied,
       metadataCalibration: metadataApplied,
       pageFailure: pageFailure,
+      alignmentFailed: alignmentFailed,
+      forcedReadPending: Boolean(options && options.forceRead && alignmentFailed),
+      alignmentDiagnostics: diagnostics,
       multipleCount: multipleCount,
       affineDiagnostics: { applied: Boolean(applied.affine), residualMedian: residualMedian,
         residualCount: highConfidenceResiduals.length },
@@ -527,7 +639,7 @@
     };
   }
 
-  function detectPage(data, width, height, mcCount, tfCount, calibration, metadataCalibration, expandedTemplate) {
+  function detectPage(data, width, height, mcCount, tfCount, calibration, metadataCalibration, expandedTemplate, options) {
     var template = expandedTemplate || geometry.omrTemplate(mcCount, tfCount);
     var params = template.params || BUILTIN_PARAMS;
     var baseCalibration = Object.assign({ dx: 0, dy: 0, angle: 0, scale: 1 }, calibration || {});
@@ -535,12 +647,13 @@
     if (existingAffine) baseCalibration.affine = existingAffine;
     else delete baseCalibration.affine;
     var metadataApplied = metadataCalibration || baseCalibration;
-    var gridResult = analysePage(data, width, height, template, baseCalibration, metadataApplied, params, baseCalibration);
+    var gridResult = analysePage(data, width, height, template, baseCalibration, metadataApplied, params, baseCalibration, options);
+    if (options && options.forceRead) return gridResult;
     if (baseCalibration.affine || gridResult.pageFailure) return gridResult;
     var fit = fitAffineCorrection(data, width, height, template, baseCalibration, params);
     if (!fit) return gridResult;
     var affineCalibration = Object.assign({}, baseCalibration, { affine: fit.affine });
-    var affineResult = analysePage(data, width, height, template, affineCalibration, metadataApplied, params, baseCalibration);
+    var affineResult = analysePage(data, width, height, template, affineCalibration, metadataApplied, params, baseCalibration, options);
     affineResult.affineDiagnostics = Object.assign({}, affineResult.affineDiagnostics, {
       anchorCount: fit.anchorCount, inlierCount: fit.inlierCount, fitResidualMedian: fit.fitResidualMedian,
       maximumShift: fit.maximumShift, fallback: false
@@ -570,7 +683,11 @@
     MAX_GROUP_GAP_INK: MAX_GROUP_GAP_INK,
     MIN_LOCAL_CIRCLE_INK: MIN_LOCAL_CIRCLE_INK,
     MAX_LOCAL_CORRECTION_RATIO: MAX_LOCAL_CORRECTION_RATIO,
-    refineBubbleCenter: refineBubbleCenter
+    refineBubbleCenter: refineBubbleCenter,
+    groupGapMeasurements: groupGapMeasurements,
+    buildAlignmentDiagnostics: buildAlignmentDiagnostics,
+    answerGroupLabel: answerGroupLabel,
+    FORCED_READ_REVIEW_FLAG: FORCED_READ_REVIEW_FLAG
   };
   if (typeof module !== "undefined" && module.exports) module.exports = root.PdfMarkingOmr;
 })(typeof window !== "undefined" ? window : globalThis);
