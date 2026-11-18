@@ -396,6 +396,18 @@ footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: cent
 .choice-wizard-ai-suggestion-zone { fill: rgba(231, 144, 24, .10); stroke: #bd6500; stroke-width: .003; stroke-dasharray: .012 .008; pointer-events: none; }
 .choice-wizard-template-handoff { padding: 12px; border-left: 4px solid var(--blue); }
 .choice-wizard-template-handoff h3 { margin: 0 0 6px; }
+.drive-sync-panel { min-width: 0; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #f7fafc; }
+.drive-sync-panel h3 { margin: 0 0 5px; font-size: 15px; }
+.drive-sync-panel > p { margin: 5px 0; }
+.drive-sync-row { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; min-width: 0; margin: 9px 0; }
+.drive-sync-row .field { flex: 1 1 270px; min-width: 0; margin: 0; }
+.drive-sync-row input { width: 100%; min-width: 0; }
+.drive-sync-conflicts { display: grid; gap: 8px; min-width: 0; margin-top: 8px; }
+.drive-sync-conflict { min-width: 0; padding: 10px; border: 1px solid #d9a84f; border-radius: 8px; background: #fffaf0; }
+.drive-sync-conflict h4 { margin: 0 0 5px; font-size: 13px; overflow-wrap: anywhere; }
+.drive-sync-conflict p { margin: 0 0 8px; font-size: 12px; overflow-wrap: anywhere; }
+.drive-sync-actions { display: flex; flex-wrap: wrap; gap: 7px; min-width: 0; }
+.drive-sync-actions .button { max-width: 100%; overflow-wrap: anywhere; }
 
 @media (max-width: 620px) {
   .choice-wizard-heading { align-items: start; flex-direction: column; }
@@ -411,6 +423,11 @@ footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: cent
 }
 
 @media (max-width: 480px) {
+  .drive-sync-row { align-items: stretch; }
+  .drive-sync-row .field { flex-basis: 100%; }
+  .drive-sync-row > .button { flex: 1 1 145px; min-width: 0; white-space: normal; }
+  .drive-sync-actions { flex-direction: column; }
+  .drive-sync-actions .button { width: 100%; }
   .choice-wizard-ai-suggestion { align-items: stretch; flex-direction: column; }
   .choice-wizard-ai-suggestion-actions .button { flex: 1 1 auto; }
   .choice-wizard-ai-preview { max-height: 55vh; }

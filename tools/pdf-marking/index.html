@@ -24,6 +24,8 @@
   <script defer src="choice-wizard.js"></script>
   <script defer src="choice-wizard-ui.js"></script>
   <script defer src="app.js"></script>
+  <script defer src="drive-config.js"></script>
+  <script defer src="drive-sync.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -80,6 +82,22 @@
           <button class="button" id="choice-wizard-direct-use" type="button">直接使用現有範本批改</button>
           <label class="button file-button" for="choice-wizard-template-file">匯入範本 JSON<input id="choice-wizard-template-file" type="file" accept="application/json,.json"></label>
         </div>
+        <section id="pdf-marking-drive-sync" class="drive-sync-panel" aria-labelledby="drive-sync-heading" hidden>
+          <h3 id="drive-sync-heading">Google Drive 範本同步</h3>
+          <p class="muted">只會同步自訂選擇題範本 JSON；PDF、答案、成績及批改進度不會上載。同步須由你按下按鈕開始。</p>
+          <div class="drive-sync-row">
+            <label class="field"><span>Google OAuth 網頁用戶端 ID</span><input id="drive-sync-client-id" type="text" autocomplete="off" maxlength="300" placeholder="輸入以 .apps.googleusercontent.com 結尾的 ID"></label>
+            <button class="button" id="drive-sync-save-client-id" type="button">保存 ID</button>
+            <button class="button" id="drive-sync-login" type="button" disabled>登入 Google Drive</button>
+            <button class="button" id="drive-sync-upload" type="button" disabled>上載範本到 Drive</button>
+            <button class="button" id="drive-sync-download" type="button" disabled>由 Drive 下載範本</button>
+          </div>
+          <p id="drive-sync-status" class="status-message" role="status" aria-live="polite">尚未登入；請先設定用戶端 ID。</p>
+          <p id="drive-sync-last-sync" class="muted small">尚未同步。</p>
+          <div id="drive-sync-conflicts" class="drive-sync-conflicts" aria-live="polite"></div>
+        </section>
+        <p id="pdf-marking-drive-offline-note" class="privacy-note" hidden>離線版不支援雲端同步。</p>
+        <script>(function(){if(window.LT_OFFLINE){var panel=document.getElementById("pdf-marking-drive-sync");var note=document.getElementById("pdf-marking-drive-offline-note");if(panel)panel.hidden=true;if(note)note.hidden=false;}}());</script>
         <div class="choice-wizard-controls">
           <label class="button file-button" for="choice-wizard-pdf-file">載入本機答題紙 PDF<input id="choice-wizard-pdf-file" type="file" accept="application/pdf,.pdf"></label>
           <label class="field"><span>樣本頁碼</span><input id="choice-wizard-page" type="number" min="1" step="1" value="1" disabled></label>

@@ -2516,6 +2516,11 @@
   });
   els.progressFile.addEventListener("change", function () { loadProgress(els.progressFile.files[0]); els.progressFile.value = ""; });
   window.addEventListener("resize", function () { if (state.pdfDoc) renderCurrentMode(); });
+  window.addEventListener("pdf-marking:templates-updated", function () {
+    customTemplates = templateStore.load(window, templates).templates;
+    renderTemplateList();
+    if (choiceWizardUI) choiceWizardUI.refreshTemplates();
+  });
 
   aiMemory.provider = els.aiProvider.value === "minimax" ? "minimax" : "gemini";
   aiMemory.model = els.aiModel.value.trim();

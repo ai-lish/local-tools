@@ -14,16 +14,16 @@
       "byteLength": 24162
     },
     "core-all": {
-      "version": "2026.11.17.7",
-      "contentHash": "608c64eb542a",
+      "version": "2026.11.18.1",
+      "contentHash": "26487449cfff",
       "fileCount": 32,
-      "byteLength": 4311110
+      "byteLength": 4317673
     },
     "pdf-marking": {
-      "version": "2026.11.17.7",
-      "contentHash": "f26df96290e8",
+      "version": "2026.11.18.1",
+      "contentHash": "1fa5ad21467c",
       "fileCount": 24,
-      "byteLength": 4041520
+      "byteLength": 4048083
     },
     "pdf-splitter": {
       "version": "2026.11.13.2",

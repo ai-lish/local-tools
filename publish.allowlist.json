@@ -85,6 +85,18 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/pdf-marking/drive-config.js",
+      "destination": "tools/pdf-marking/drive-config.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/drive-sync.js",
+      "destination": "tools/pdf-marking/drive-sync.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/pdf-marking/template-editor.js",
       "destination": "tools/pdf-marking/template-editor.js",
       "publicMode": "cli-source",
@@ -1529,7 +1541,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.17.7",
+      "version": "2026.11.18.1",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1745,13 +1757,23 @@
           "file": "tools/pdf-marking/index.html",
           "from": "href=\"../../public-index.html\"",
           "to": "href=\"../../START-HERE.html\""
+        },
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "<script defer src=\"drive-config.js\"></script>",
+          "to": "<!-- 離線包略去同步設定檔 -->"
+        },
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "<script defer src=\"drive-sync.js\"></script>",
+          "to": "<!-- 離線包略去同步程式 -->"
         }
       ]
     },
     {
       "id": "pdf-marking",
       "title": "PDF 閱卷及批改工具",
-      "version": "2026.11.17.7",
+      "version": "2026.11.18.1",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -1949,6 +1971,16 @@
           "file": "tools/pdf-marking/index.html",
           "from": "href=\"../../public-index.html\"",
           "to": "href=\"../../START-HERE.html\""
+        },
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "<script defer src=\"drive-config.js\"></script>",
+          "to": "<!-- 離線包略去同步設定檔 -->"
+        },
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "<script defer src=\"drive-sync.js\"></script>",
+          "to": "<!-- 離線包略去同步程式 -->"
         }
       ]
     },

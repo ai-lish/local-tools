@@ -41,7 +41,11 @@ const allowedCdnUrls = new Set([
   'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js',
   'https://ai-lish.github.io/ai-learning/js/firebase-config.js',
   'https://ai-lish.github.io/ai-learning/js/auth-state.js',
-  'https://ai-lish.github.io/ai-learning/css/auth-widget.css'
+  'https://ai-lish.github.io/ai-learning/css/auth-widget.css',
+  'https://accounts.google.com/gsi/client',
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/drive/v3/files',
+  'https://www.googleapis.com/upload/drive/v3/files'
 ]);
 const calculatorPdf = 'tools/fx-50fh-ii/output/pdf/fx-50fh-ii-s5-program-library.pdf';
 const storageAccess = /\b(?:localStorage|sessionStorage|indexedDB)\b/i;
@@ -216,18 +220,19 @@ function assertStorageAllowed(relative, content) {
       /\b[A-Za-z_$][\w$]*\s*\[\s*['"](?:getItem|setItem)['"]\s*\]\s*\(/g
     )];
     const approvedPdfMarkingStorageCalls = [...content.matchAll(
-      /\bstorage\.(getItem|setItem)\s*\(\s*(TEMPLATE_STORAGE_KEY|PREFERENCE_STORAGE_KEY)\s*(?=[,)])/g
+      /\bstorage\.(getItem|setItem)\s*\(\s*(TEMPLATE_STORAGE_KEY|PREFERENCE_STORAGE_KEY|DRIVE_SYNC_STORAGE_KEY)\s*(?=[,)])/g
     )];
     const namespacedPdfMarkingStorage = relative === 'tools/pdf-marking/template-store.js' &&
       content.includes('var TEMPLATE_STORAGE_KEY = "pdf-marking.templates.v1";') &&
       content.includes('var PREFERENCE_STORAGE_KEY = "pdf-marking.preferences.v1";') &&
+      content.includes('var DRIVE_SYNC_STORAGE_KEY = "pdf-marking.drive-sync.v1";') &&
       content.includes('var storage = host && host.localStorage;') &&
       (content.match(/\blocalStorage\b/gi) || []).length === 1 &&
-      pdfMarkingStorageCalls.length === 4 &&
+      pdfMarkingStorageCalls.length === 6 &&
       bracketPdfMarkingStorageCalls.length === 0 &&
       approvedPdfMarkingStorageCalls.length === pdfMarkingStorageCalls.length &&
-      approvedPdfMarkingStorageCalls.filter((match) => match[1] === 'getItem').length === 2 &&
-      approvedPdfMarkingStorageCalls.filter((match) => match[1] === 'setItem').length === 2 &&
+      approvedPdfMarkingStorageCalls.filter((match) => match[1] === 'getItem').length === 3 &&
+      approvedPdfMarkingStorageCalls.filter((match) => match[1] === 'setItem').length === 3 &&
       !/\b(?:sessionStorage|indexedDB)\b/i.test(content);
     if (!namespacedCalculatorStorage && !namespacedThankTeacherStorage && !namespacedPdfMarkingStorage) {
       throw new Error('unapproved browser storage in public file: ' + relative);
