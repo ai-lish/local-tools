@@ -1541,7 +1541,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.18.5",
+      "version": "2026.11.18.10",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1773,6 +1773,220 @@
     {
       "id": "pdf-marking",
       "title": "PDF 閱卷及批改工具",
+      "version": "2026.11.18.10",
+      "entry": "tools/pdf-marking/index.html",
+      "entries": [
+        "tools/pdf-marking/index.html"
+      ],
+      "files": [
+        "tools/pdf-marking/index.html",
+        "tools/pdf-marking/styles.css",
+        "tools/pdf-marking/app.js",
+        "tools/pdf-marking/templates.js",
+        "tools/pdf-marking/template-store.js",
+        "tools/pdf-marking/template-editor.js",
+        "tools/pdf-marking/template-editor-ui.js",
+        "tools/pdf-marking/choice-wizard.js",
+        "tools/pdf-marking/choice-wizard-ui.js",
+        "tools/pdf-marking/review.js",
+        "tools/pdf-marking/demo.js",
+        "tools/pdf-marking/model.js",
+        "tools/pdf-marking/geometry.js",
+        "tools/pdf-marking/omr.js",
+        "tools/pdf-marking/pdf-export.js",
+        "tools/pdf-marking/ai-review.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.worker.min.js",
+        "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",
+        "tools/_vendor/pdfjs-3.11.174/LICENSE",
+        "tools/_vendor/pdf-lib-1.17.1/pdf-lib.min.js",
+        "tools/_vendor/pdf-lib-1.17.1/LICENSE.md",
+        "tools/_vendor/jszip-3.10.1/jszip.min.js",
+        "tools/_vendor/jszip-3.10.1/LICENSE.markdown"
+      ],
+      "transforms": {
+        "injectOfflineHead": true
+      },
+      "allowedTextUrls": [
+        {
+          "value": "https://ai-lish.github.io/local-tools/downloads/index.html#",
+          "kind": "hyperlink"
+        },
+        {
+          "value": "https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-3.11.174.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://www.apache.org/licenses/LICENSE-2.0",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://${t}",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://${e}",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/2000/svg",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/XML/1998/namespace",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/xlink",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xci/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-connection-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-data/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-form/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-locale-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-source-set/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-template/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xdc/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xdp/pdf/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xdp/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xfdf/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://ns.adobe.com/xmpmeta/",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/2000/09/xmldsig#",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/XSL/Transform",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.w3.org/1999/xhtml",
+          "kind": "namespace"
+        },
+        {
+          "value": "https://registry.npmjs.org/pdf-lib/-/pdf-lib-1.17.1.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/Hopding/pdf-lib",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://registry.npmjs.org/jszip/-/jszip-3.10.1.tgz",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://stuartk.com/jszip",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://raw.github.com/Stuk/jszip/main/LICENSE.markdown",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://github.com/nodeca/pako/blob/main/LICENSE",
+          "kind": "license-text"
+        },
+        {
+          "value": "https://stuk.github.io/jszip/documentation/howto/read_zip.html",
+          "kind": "license-text"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/package/2006/content-types",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/package/2006/relationships",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+          "kind": "namespace"
+        },
+        {
+          "value": "http://www.xfa.org/schema/xfa-data/1.0/",
+          "kind": "namespace"
+        }
+      ],
+      "allowedFetchUrls": [
+        "https://generativelanguage.googleapis.com/v1beta/models/",
+        "https://api.minimax.io/v1/chat/completions"
+      ],
+      "libraries": [
+        "pdfjs-dist",
+        "pdf-lib",
+        "jszip"
+      ],
+      "offlineRewrites": [
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "href=\"../../public-index.html\"",
+          "to": "href=\"../../START-HERE.html\""
+        },
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "<script defer src=\"drive-config.js\"></script>",
+          "to": "<!-- 離線包略去同步設定檔 -->"
+        },
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "<script defer src=\"drive-sync.js\"></script>",
+          "to": "<!-- 離線包略去同步程式 -->"
+        }
+      ]
+    },
+    {
+      "id": "pdf-marking-choice",
+      "title": "批改 PDF（選擇題）",
       "version": "2026.11.18.5",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
@@ -1967,6 +2181,21 @@
         "jszip"
       ],
       "offlineRewrites": [
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "</body>",
+          "to": "<script>(function(){document.addEventListener(\"DOMContentLoaded\",function(){var button=document.getElementById(\"choice-wizard-select-choice\");if(button)button.click();});}());</script></body>"
+        },
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "<p class=\"muted\">默書會沿用原有批改流程；選擇題可建立新範本或直接使用現有範本。</p>",
+          "to": "<p class=\"muted\">此離線套件只提供選擇題範本建立、讀圈及匯出。</p>"
+        },
+        {
+          "file": "tools/pdf-marking/index.html",
+          "from": "<button class=\"choice-wizard-category\" id=\"choice-wizard-select-dictation\" type=\"button\"><strong>默書</strong><span>進入現有默書標記及批改流程</span></button>",
+          "to": "<button class=\"choice-wizard-category\" id=\"choice-wizard-select-dictation\" type=\"button\" style=\"display:none\" aria-hidden=\"true\" tabindex=\"-1\" disabled><strong>默書</strong><span>此套件只提供選擇題批改</span></button>"
+        },
         {
           "file": "tools/pdf-marking/index.html",
           "from": "href=\"../../public-index.html\"",

@@ -22,6 +22,7 @@
     var tfKeyLabel = get("tf-key").closest("label");
     var currentStage = 1;
     var selectedTemplate = null;
+    var pendingOrderTemplate = null;
     var sampleFile = null;
     var sampleDocument = null;
     var samplePage = null;
@@ -53,6 +54,15 @@
       var target = get(id);
       target.textContent = message || "";
       target.classList.toggle("is-error", Boolean(error));
+    }
+    function updateTemplateOrderWarning(definition) {
+      pendingOrderTemplate = definition && definition.source === "custom" && definition.kind === "choice" &&
+        api.misorderedColumnGroups(definition).length ? definition : null;
+      var warning = get("choice-wizard-order-warning");
+      warning.hidden = !pendingOrderTemplate;
+      get("choice-wizard-order-warning-text").textContent = pendingOrderTemplate
+        ? "此自訂範本有同一直行的答案欄未按由上而下排列，題號可能錯配。可建立修正版副本；原範本會保留。"
+        : "";
     }
     function setLegacyVisibility(visible) {
       legacyStepper.hidden = !visible;
@@ -112,6 +122,7 @@
       if (Array.from(select.options).some(function (entry) { return entry.value === previous; })) select.value = previous;
       else if (options.getSelectedTemplate() && options.getSelectedTemplate().kind === "choice") select.value = options.getSelectedTemplate().id;
       else if (select.options.length) select.selectedIndex = 0;
+      updateTemplateOrderWarning(templateFromSelect());
     }
     function templateFromSelect() {
       return allChoiceTemplates().find(function (definition) { return definition.id === get("choice-wizard-template").value; }) || null;
@@ -378,13 +389,15 @@
       if (drawing.kind === "new") {
         var zone = drawing.zone;
         if (zone.w >= 0.015 && zone.h >= 0.015) {
-          var optionsCount = get("choice-wizard-options").value.length;
-          zone.options = zone.type === "answer-tf" ? ["T", "F"] : Array.from(get("choice-wizard-options").value);
-          zone.rowsPerColumn = Number(get("choice-wizard-rows").value) || 10;
-          if (zone.groupSize == null) zone.groupSize = 0;
-          if (zone.groupGap == null) zone.groupGap = 1;
-          zone.numbering = get("choice-wizard-numbering").value;
-          if (zone.type === "answer-mc") zone.optionsCount = optionsCount;
+          if (zone.type === "answer-mc" || zone.type === "answer-tf") {
+            var optionsCount = get("choice-wizard-options").value.length;
+            zone.options = zone.type === "answer-tf" ? ["T", "F"] : Array.from(get("choice-wizard-options").value);
+            zone.rowsPerColumn = Number(get("choice-wizard-rows").value) || 10;
+            if (zone.groupSize == null) zone.groupSize = 0;
+            if (zone.groupGap == null) zone.groupGap = 1;
+            zone.numbering = get("choice-wizard-numbering").value;
+            if (zone.type === "answer-mc") zone.optionsCount = optionsCount;
+          }
           zones.push(zone); selectedZoneId = zone.id; identityDecisionChanged = isPrivacyIdentityZone(zone);
         }
       } else if (isPrivacyIdentityZone(drawing.zone) && (drawing.zone.x !== drawing.initial.x || drawing.zone.y !== drawing.initial.y ||
@@ -453,7 +466,7 @@
       }
       get("choice-wizard-builder").hidden = false;
       setStatus("choice-wizard-source-status", "請拖拉標示姓名、科目、其他文字及手寫身份區；班別／班號圈格可先畫概略框，亦可留待 AI 建議。", false);
-      renderOverlay(); renderZoneList(); updateSourceButtons();
+      renderOverlay(); renderZoneList(); updateSourceButtons(); updateIdentityConfirmation(false);
     }
     function openEditorForSelected(forceReset) {
       var definition = selectedDefinition();
@@ -715,6 +728,7 @@
     get("choice-wizard-use-existing").addEventListener("click", function () {
       selectedTemplate = templateFromSelect();
       if (!selectedTemplate) { setStatus("choice-wizard-source-status", "請選擇一個範本。", true); return; }
+      updateTemplateOrderWarning(selectedTemplate);
       createMode = false; get("choice-wizard-builder").hidden = true;
       if (!options.onSelectTemplate(selectedTemplate)) return;
       updateSourceButtons();
@@ -724,8 +738,29 @@
     get("choice-wizard-direct-use").addEventListener("click", function () {
       var definition = templateFromSelect();
       if (!definition) { setStatus("choice-wizard-source-status", "請選擇一個範本。", true); return; }
+      updateTemplateOrderWarning(definition);
       if (!options.onSelectTemplate(definition)) return;
       showLegacy("choice", definition);
+    });
+    get("choice-wizard-template").addEventListener("change", function () {
+      updateTemplateOrderWarning(templateFromSelect());
+    });
+    get("choice-wizard-order-repair").addEventListener("click", function () {
+      var result = options.createReorderedTemplateCopy(pendingOrderTemplate);
+      if (!result.ok) { setStatus("choice-wizard-source-status", result.message, true); return; }
+      var hadReadResults = typeof options.hasChoiceReadings === "function" && options.hasChoiceReadings();
+      if (!options.onSelectTemplate(result.template, { preserveAnswers: true })) {
+        setStatus("choice-wizard-source-status", "已建立修正版副本，但本次沒有更換目前範本；仍使用原範本。", false);
+        return;
+      }
+      selectedTemplate = result.template;
+      get("choice-wizard-template").value = result.template.id;
+      updateTemplateOrderWarning(result.template);
+      updateSourceButtons();
+      if (currentStage === 4) { renderAnswerPage(); updateAnswerStatus(); }
+      var message = "已改用『" + result.template.name + "』；原範本保留在範本清單。";
+      if (hadReadResults) message += " 範本已更換，請重新讀圈。";
+      setStatus("choice-wizard-source-status", message, false);
     });
     get("choice-wizard-pdf-file").addEventListener("change", function () { loadSample(this.files[0]); });
     get("choice-wizard-template-file").addEventListener("change", function () {
@@ -815,13 +850,15 @@
       });
     });
     return {
-      start: function () { populateTemplates(); renderStage(1); },
-      onTemplateSaved: function (definition) { selectedTemplate = definition; populateTemplates(); },
+      start: function () { populateTemplates(); updateTemplateOrderWarning(options.getSelectedTemplate()); renderStage(1); },
+      onTemplateSaved: function (definition) { selectedTemplate = definition; populateTemplates(); updateTemplateOrderWarning(definition); },
       onTemplateImported: function (definition) {
         if (!definition || definition.kind !== "choice") return;
+        updateTemplateOrderWarning(definition);
         selectedTemplate = definition; createMode = false; populateTemplates();
         if (!options.onSelectTemplate(definition)) return;
         get("choice-wizard-template").value = definition.id;
+        updateTemplateOrderWarning(definition);
         setStatus("choice-wizard-source-status", "範本已匯入。已直接前往第四步；載入樣本頁後可點選圈格，也可用整批輸入。", false);
         renderStage(4);
       },

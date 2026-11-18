@@ -9,10 +9,12 @@
   var review = window.PdfMarkingReview;
   var aiReview = window.PdfMarkingAiReview;
   var templateStore = window.PdfMarkingTemplateStore;
+  var choiceWizard = window.PdfMarkingChoiceWizard;
   var DEFAULT_DICTATION_ANSWER = "應當一無掛慮，只要凡事藉著禱告、祈求，和感謝，將你們所要的告訴神。";
   var DEFAULT_TEMPLATE = templates.BUILTIN_TEMPLATES[0];
   var storedTemplateState = templateStore.load(window, templates);
   var customTemplates = storedTemplateState.templates;
+  var pendingColumnOrderTemplate = null;
   function findTemplateById(id) {
     return templates.BUILTIN_TEMPLATES.concat(customTemplates).find(function (definition) { return definition.id === id; }) || null;
   }
@@ -50,6 +52,8 @@
     templateList: byId("template-list"), useTemplate: byId("use-template"), demoStart: byId("demo-start"),
     editTemplateLayout: byId("edit-template-layout"),
     templateStatus: byId("template-status"), selectedTemplateLabel: byId("selected-template-label"),
+    templateOrderWarning: byId("template-order-warning"), templateOrderWarningText: byId("template-order-warning-text"),
+    templateOrderRepair: byId("template-order-repair"),
     templateFile: byId("template-file"), exportTemplate: byId("export-template"), deleteTemplate: byId("delete-template"),
     demoBanner: byId("demo-banner"), endDemo: byId("end-demo"), reviewStepStatus: byId("review-step-status"),
     focusTitle: byId("focus-title"), focusReason: byId("focus-reason"), focusPreview: byId("focus-preview"),
@@ -587,6 +591,36 @@
     return (definition || state.template).blocks && (definition || state.template).blocks.find(function (block) { return block.type === type; });
   }
 
+  function showTemplateOrderWarning(definition) {
+    pendingColumnOrderTemplate = definition && definition.source === "custom" && definition.kind === "choice" &&
+      choiceWizard.misorderedColumnGroups(definition).length ? definition : null;
+    els.templateOrderWarning.hidden = !pendingColumnOrderTemplate;
+    els.templateOrderWarningText.textContent = pendingColumnOrderTemplate
+      ? "此自訂範本有同一直行的答案欄未按由上而下排列，題號可能錯配。可建立修正版副本；原範本會保留。"
+      : "";
+  }
+
+  function createReorderedTemplateCopy(definition) {
+    if (!definition || definition.source !== "custom" || definition.kind !== "choice" ||
+        !choiceWizard.misorderedColumnGroups(definition).length) {
+      return { ok: false, message: "此範本毋須重新排列。" };
+    }
+    var copy = choiceWizard.reorderColumnMajorTemplate(definition);
+    copy.source = "custom";
+    copy.id = "custom:reordered-" + Date.now().toString(36) + "-" + (customTemplates.length + 1).toString(36);
+    copy.name = (String(definition.name || "自訂範本") + "（欄序修正版）").slice(0, 100);
+    var validation = templates.validateTemplate(copy);
+    if (!validation.ok) return { ok: false, message: validation.errors.join(" ") };
+    var next = customTemplates.concat([copy]);
+    var saved = templateStore.saveTemplates(window, templates, next);
+    if (!saved.ok) return { ok: false, message: saved.message + " 修正版尚未加入範本清單。" };
+    customTemplates = next;
+    renderTemplateList();
+    if (choiceWizardUI) choiceWizardUI.refreshTemplates();
+    return { ok: true, template: copy,
+      message: "已建立「" + copy.name + "」（欄序修正版）；原範本保留在範本清單。" };
+  }
+
   function renderTemplateList() {
     els.templateList.replaceChildren();
     templates.BUILTIN_TEMPLATES.concat(customTemplates).forEach(function (definition) {
@@ -619,6 +653,7 @@
     els.exportTemplate.disabled = false;
     els.deleteTemplate.disabled = selected.source !== "custom";
     els.selectedTemplateLabel.textContent = selected.name;
+    showTemplateOrderWarning(selected);
   }
 
   function updateStepper() {
@@ -2453,23 +2488,29 @@
         if (choiceWizardUI) choiceWizardUI.onTemplateImported(definition);
       } });
     },
+    createReorderedTemplateCopy: createReorderedTemplateCopy,
     setNumbering: function (type, numbering) { return templateEditorUI.setNumbering(type, numbering); },
     hasLoadedPdf: function () { return Boolean(state.pdfDoc); },
+    hasChoiceReadings: function () { return Object.keys(state.choicePages).length > 0; },
     openEditor: function (definition, sampleFile) {
       templateEditorUI.open(definition);
       templateEditorUI.loadSample(sampleFile);
     },
-    onSelectTemplate: function (definition) {
+    onSelectTemplate: function (definition, selectionOptions) {
       if (!definition || definition.kind !== "choice") return false;
+      var preserveAnswers = Boolean(selectionOptions && selectionOptions.preserveAnswers);
       var changed = state.templateId !== definition.id;
       var hasWork = Object.keys(state.choicePages).length > 0;
       if (changed && state.pdfDoc && hasWork && !window.confirm("更換範本會清除目前選擇題讀圈結果；PDF 仍會保留。要繼續嗎？")) return false;
-      if (changed && state.pdfDoc && hasWork) { state.choicePages = {}; state.focusKey = ""; }
+      if (changed && state.pdfDoc && hasWork) {
+        state.choicePages = {}; state.focusKey = "";
+        if (preserveAnswers) els.omrStatus.textContent = "範本已更換，請重新讀圈。";
+      }
       state.templateId = definition.id; state.template = definition; state.mode = "choice";
       configureTemplateMode(definition);
       var mc = definition.blocks.find(function (block) { return block.type === "mc"; });
       var tf = definition.blocks.find(function (block) { return block.type === "tf"; });
-      if (changed) {
+      if (changed && !preserveAnswers) {
         els.mcCount.value = String(mc ? mc.maxCount : 0);
         els.tfCount.value = String(tf ? tf.maxCount : 0);
         els.mcKey.value = ""; els.tfKey.value = "";
@@ -2537,6 +2578,7 @@
       customTemplates.push(incoming);
       var saved = templateStore.saveTemplates(window, templates, customTemplates);
       renderTemplateList();
+      showTemplateOrderWarning(incoming);
       status.textContent = "範本已加入。" + (saved.ok ? saved.message : saved.message + " 請匯出 JSON 保留副本。");
       if (typeof settings.onImported === "function") settings.onImported(incoming);
     } catch (error) {
@@ -2630,6 +2672,24 @@
   els.exportTemplate.addEventListener("click", exportSelectedTemplate);
   els.deleteTemplate.addEventListener("click", deleteSelectedTemplate);
   els.templateFile.addEventListener("change", function () { importTemplateFile(els.templateFile.files[0]); });
+  els.templateOrderRepair.addEventListener("click", function () {
+    var result = createReorderedTemplateCopy(pendingColumnOrderTemplate);
+    if (!result.ok) { els.templateStatus.textContent = result.message; return; }
+    var hadReadResults = Object.keys(state.choicePages).length > 0;
+    state.templateId = result.template.id;
+    useSelectedTemplate();
+    if (!state.template || state.template.id !== result.template.id) {
+      els.templateStatus.textContent = "已建立修正版副本；本次沒有更換目前範本。";
+      return;
+    }
+    var message = "已改用『" + result.template.name + "』；原範本保留在範本清單。";
+    if (hadReadResults) {
+      message += " 範本已更換，請重新讀圈。";
+      els.omrStatus.textContent = "範本已更換，請重新讀圈。";
+    }
+    els.templateStatus.textContent = message;
+    showTemplateOrderWarning(result.template);
+  });
   els.demoStart.addEventListener("click", startDemo);
   els.endDemo.addEventListener("click", endDemo);
   els.aiEnabled.addEventListener("change", function () {

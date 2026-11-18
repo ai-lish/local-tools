@@ -368,17 +368,20 @@
         : editor.setRowSpacing(session.draft, group.id, Number(elements["template-editor-row-spacing"].value));
       if (!result.ok) {
         session.draft = clone(controlEdit.base);
-        setStatus(result.message, true);
       } else {
-        resetTest(); setStatus("間距已調整；請重新測試讀圈。", false);
+        resetTest();
       }
       renderOverlay(); updateValidation();
+      setStatus(result.ok ? "間距已調整；請重新測試讀圈。" : result.message, !result.ok);
     }
     function finishSpacing(kind) {
       if (!controlEdit || controlEdit.kind !== kind) return;
+      var errorMessage = elements["template-editor-status"].classList.contains("is-error")
+        ? elements["template-editor-status"].textContent : "";
       if (JSON.stringify(controlEdit.base) !== JSON.stringify(session.draft)) pushUndo(controlEdit.base);
       controlEdit = null;
       renderControls();
+      if (errorMessage) setStatus(errorMessage, true);
     }
     function undo() {
       if (!session || !undoStack.length) return;

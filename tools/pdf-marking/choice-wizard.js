@@ -67,6 +67,132 @@
     return Number(rows.count) || 0;
   }
 
+  function rowCoordinates(rows) {
+    if (!rows || typeof rows !== "object") return [];
+    if (rows.mode === "list") return (rows.groups || []).reduce(function (all, group) {
+      return all.concat(Array.isArray(group) ? group.map(Number).filter(Number.isFinite) : []);
+    }, []);
+    if (rows.mode === "linear") {
+      var count = Math.max(0, Math.min(250, Math.floor(Number(rows.count) || 0)));
+      var start = Number(rows.start); var pitch = Number(rows.pitch);
+      if (!Number.isFinite(start) || !Number.isFinite(pitch)) return [];
+      return Array.from({ length: count }, function (_, index) { return start + index * pitch; });
+    }
+    return [];
+  }
+
+  function spatialGroups(items, axis, describe) {
+    var descriptors = items.map(function (item, index) { return describe(item, index); });
+    var parents = descriptors.map(function (_, index) { return index; });
+    function find(index) {
+      while (parents[index] !== index) { parents[index] = parents[parents[index]]; index = parents[index]; }
+      return index;
+    }
+    function join(left, right) {
+      var leftRoot = find(left); var rightRoot = find(right);
+      if (leftRoot !== rightRoot) parents[rightRoot] = leftRoot;
+    }
+    descriptors.forEach(function (left, leftIndex) {
+      descriptors.slice(leftIndex + 1).forEach(function (right, offset) {
+        var rightIndex = leftIndex + offset + 1;
+        var leftStart = axis === "x" ? left.left : left.top;
+        var rightStart = axis === "x" ? right.left : right.top;
+        var leftEnd = axis === "x" ? left.right : left.bottom;
+        var rightEnd = axis === "x" ? right.right : right.bottom;
+        var leftSize = axis === "x" ? left.width : left.height;
+        var rightSize = axis === "x" ? right.width : right.height;
+        var overlap = Math.min(leftEnd, rightEnd) - Math.max(leftStart, rightStart);
+        var startDifference = Math.abs(leftStart - rightStart);
+        var halfSize = Math.min(leftSize, rightSize) / 2;
+        if (overlap > 0 || startDifference < halfSize || startDifference < 1e-9) join(leftIndex, rightIndex);
+      });
+    });
+    var byRoot = new Map();
+    descriptors.forEach(function (descriptor, index) {
+      var rootIndex = find(index);
+      if (!byRoot.has(rootIndex)) byRoot.set(rootIndex, []);
+      byRoot.get(rootIndex).push(descriptor);
+    });
+    var groups = Array.from(byRoot.values());
+    groups.forEach(function (group) {
+      group.sort(axis === "x"
+        ? function (left, right) { return left.centerY - right.centerY || left.centerX - right.centerX || left.index - right.index; }
+        : function (left, right) { return left.centerX - right.centerX || left.centerY - right.centerY || left.index - right.index; });
+    });
+    groups.sort(function (left, right) {
+      var leftStart = Math.min.apply(null, left.map(function (entry) { return entry.left; }));
+      var rightStart = Math.min.apply(null, right.map(function (entry) { return entry.left; }));
+      if (axis === "y") {
+        leftStart = Math.min.apply(null, left.map(function (entry) { return entry.top; }));
+        rightStart = Math.min.apply(null, right.map(function (entry) { return entry.top; }));
+      }
+      return leftStart - rightStart || left[0].index - right[0].index;
+    });
+    return groups;
+  }
+
+  function zoneDescriptor(zone, index) {
+    var left = Number(zone.x); var top = Number(zone.y);
+    var width = Number(zone.w); var height = Number(zone.h);
+    return { item: zone, index: index, left: left, right: left + width, width: width,
+      top: top, bottom: top + height, height: height, centerX: left + width / 2, centerY: top + height / 2 };
+  }
+
+  function templateColumnDescriptor(column, index, block) {
+    var xs = Array.isArray(column && column.xs) ? column.xs.map(Number).filter(Number.isFinite) : [];
+    var left = xs.length ? Math.min.apply(null, xs) : 0;
+    var right = xs.length ? Math.max.apply(null, xs) : left;
+    var ys = rowCoordinates(column && (column.rows || block.rows));
+    var top = ys.length ? Math.min.apply(null, ys) : 0;
+    var bottom = ys.length ? Math.max.apply(null, ys) : top;
+    return { item: column, index: index, left: left, right: right, width: right - left,
+      top: top, bottom: bottom, height: bottom - top,
+      centerX: xs.length ? xs.reduce(function (sum, value) { return sum + value; }, 0) / xs.length : left,
+      centerY: top };
+  }
+
+  function sortAnswerZones(answerZones, numbering) {
+    var axis = numbering === "row-major" ? "y" : "x";
+    return spatialGroups(answerZones, axis, zoneDescriptor).reduce(function (ordered, group) {
+      return ordered.concat(group.map(function (entry) { return entry.item; }));
+    }, []);
+  }
+
+  function templateColumnGroups(block) {
+    var columns = Array.isArray(block && block.columns) ? block.columns : [];
+    return spatialGroups(columns, "x", function (column, index) { return templateColumnDescriptor(column, index, block); });
+  }
+
+  function misorderedColumnGroups(definition) {
+    var issues = [];
+    (definition && Array.isArray(definition.blocks) ? definition.blocks : []).forEach(function (block) {
+      if (block.numbering !== "column-major" || !Array.isArray(block.columns) || block.columns.length < 2) return;
+      templateColumnGroups(block).forEach(function (group) {
+        if (group.length < 2) return;
+        var indices = group.map(function (entry) { return entry.index; });
+        var originalOrder = indices.slice().sort(function (left, right) { return left - right; })
+          .map(function (index) { return group.find(function (entry) { return entry.index === index; }); });
+        var orderedByY = originalOrder.every(function (entry, index) {
+          return index === 0 || originalOrder[index - 1].centerY <= entry.centerY;
+        });
+        var contiguous = Math.max.apply(null, indices) - Math.min.apply(null, indices) + 1 === indices.length;
+        if (!orderedByY || !contiguous) issues.push({ blockId: block.id, indices: indices });
+      });
+    });
+    return issues;
+  }
+
+  function reorderColumnMajorTemplate(definition) {
+    var result = clone(definition);
+    (result.blocks || []).forEach(function (block) {
+      if (block.numbering !== "column-major" || !Array.isArray(block.columns)) return;
+      block.columns = templateColumnGroups(block).reduce(function (ordered, group) {
+        return ordered.concat(group.map(function (entry) { return entry.item; }));
+      }, []);
+    });
+    return result;
+  }
+
   function isLayoutPrivacyZone(zone) {
     return Boolean(zone && ["text-name", "text-subject", "text-other", "class-handwrite", "student-handwrite"].indexOf(zone.type) >= 0);
   }
@@ -154,7 +280,10 @@
 
     var answerZones = zones.filter(function (zone) { return zone.type === "answer-mc" || zone.type === "answer-tf"; });
     ["mc", "tf"].forEach(function (type) {
-      var columns = answerZones.filter(function (zone) { return (zone.type === "answer-tf" ? "tf" : "mc") === type; }).sort(function (a, b) { return a.x - b.x; });
+      var numbering = settings[type + "Numbering"] === "row-major" ? "row-major" : "column-major";
+      var columns = sortAnswerZones(answerZones.filter(function (zone) {
+        return (zone.type === "answer-tf" ? "tf" : "mc") === type;
+      }), numbering);
       if (!columns.length) return;
       if (columns.length > 20) throw new Error("每種題型最多可設 20 欄。");
       var optionsForType = type === "mc" ? (settings.mcOptions || ["A", "B", "C", "D"]) : ["T", "F"];
@@ -169,7 +298,7 @@
       var maxCount = Math.min(250, generatedColumns.reduce(function (sum, column) { return sum + answerRowCount(column.rows); }, 0));
       var baseOptions = generatedColumns[0].options;
       definition.blocks.push({ id: type, type: type, label: type === "mc" ? "選擇題" : "是非題",
-        maxCount: maxCount, numbering: settings[type + "Numbering"] === "row-major" ? "row-major" : "column-major",
+        maxCount: maxCount, numbering: numbering,
         options: baseOptions.slice(),
         columns: generatedColumns.map(function (column) {
           var result = { xs: column.xs, rows: column.rows };
@@ -216,7 +345,8 @@
   var api = { createTemplateFromZones: createTemplateFromZones, keyArray: keyArray, toggleAnswer: toggleAnswer,
     identityRequirements: identityRequirements, isLayoutPrivacyZone: isLayoutPrivacyZone, isIdentityGridZone: isIdentityGridZone,
     layoutPrivacyDecisionReady: layoutPrivacyDecisionReady, createLayoutPrivacyDefinition: createLayoutPrivacyDefinition,
-    normalizeGridOptions: normalizeGridOptions, answerOptions: answerOptions, answerRows: answerRows };
+    normalizeGridOptions: normalizeGridOptions, answerOptions: answerOptions, answerRows: answerRows,
+    misorderedColumnGroups: misorderedColumnGroups, reorderColumnMajorTemplate: reorderColumnMajorTemplate };
   root.PdfMarkingChoiceWizard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

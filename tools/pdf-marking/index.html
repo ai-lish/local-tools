@@ -55,6 +55,10 @@
         <div><p class="eyebrow">本機批改流程</p><h2>選擇題範本及批改</h2></div>
         <span class="privacy-badge">🔒 樣本 PDF 只在記憶體處理</span>
       </div>
+      <section id="choice-wizard-order-warning" class="template-order-warning" role="alert" hidden>
+        <p id="choice-wizard-order-warning-text"></p>
+        <button class="button compact" id="choice-wizard-order-repair" type="button">重新排列欄序</button>
+      </section>
       <nav class="stepper choice-wizard-stepper" id="choice-wizard-stepper" aria-label="選擇題五個步驟">
         <button class="step-pill current" type="button" data-wizard-step="1"><span class="step-number">1</span><span><strong>類別</strong><small>選擇批改方式</small></span></button>
         <button class="step-pill" type="button" data-wizard-step="2"><span class="step-number">2</span><span><strong>樣本及範本</strong><small>標示答案及身份區</small></span></button>
@@ -132,6 +136,7 @@
         <section class="choice-wizard-ai-layout panel" aria-labelledby="choice-wizard-ai-heading">
           <div class="section-title"><div><p class="eyebrow">選用</p><h3 id="choice-wizard-ai-heading">AI 建議版面</h3></div><span class="hint-pill">教師逐項確認</span></div>
           <p class="privacy-note">先在樣本頁標示所有文字及手寫身份區，或確認沒有姓名等文字身份區。班別／班號代號圈格可先畫概略框，亦可留待 AI 建議。送出前會顯示實際影像預覽；只有按「確認送出」才會使用現有 AI 設定傳送。AI 只回傳圈格版面及選項標籤，不轉錄手寫或其他文字。</p>
+          <p class="muted">版面分析較適合 Gemini；MiniMax 可能需時一分鐘以上，亦較常認錯選項數目。AI 只作建議，請逐項核對。</p>
           <div id="choice-wizard-ai-settings-slot"></div>
           <div class="toolbar-row"><button class="button" id="choice-wizard-ai-prepare" type="button" disabled>預覽去識別圖片及 AI 建議</button><span id="choice-wizard-ai-status" class="status-message" role="status">請先載入樣本及標示身份區。</span></div>
           <section id="choice-wizard-ai-confirmation" class="choice-wizard-ai-confirmation" aria-labelledby="choice-wizard-ai-confirm-heading" hidden>
@@ -220,6 +225,10 @@
             <button class="button danger-button" id="delete-template" type="button" disabled>刪除自訂範本</button>
           </div>
           <p id="template-status" class="status-message" role="status">請選擇一款範本；內置範本可直接使用。</p>
+          <section id="template-order-warning" class="template-order-warning" role="alert" hidden>
+            <p id="template-order-warning-text"></p>
+            <button class="button compact" id="template-order-repair" type="button">重新排列欄序</button>
+          </section>
           <p class="privacy-note">範本與介面偏好只存於瀏覽器；不會儲存學生資料、答案、批改進度或任何金鑰。</p>
         </div>
         <section id="template-editor-panel" class="panel template-editor-panel" aria-labelledby="template-editor-heading" hidden>

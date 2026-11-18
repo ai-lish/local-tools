@@ -11,7 +11,7 @@ const siteRoot = path.resolve(root, manifest.publicRoot);
 const OFFLINE_CSP_BASE = "default-src 'self' file: data: blob: 'unsafe-inline'; worker-src blob:; form-action 'none'";
 
 function offlineCsp(packageInfo) {
-  const apiHosts = ['pdf-marking', 'core-all'].includes(packageInfo.id)
+  const apiHosts = ['pdf-marking', 'pdf-marking-choice', 'core-all'].includes(packageInfo.id)
     ? 'https://generativelanguage.googleapis.com https://api.minimax.io' : "'none'";
   return OFFLINE_CSP_BASE.replace('worker-src', `connect-src ${apiHosts}; worker-src`);
 }
@@ -280,8 +280,15 @@ for (const packageInfo of manifest.offlinePackages) {
 
 const downloadsRoot = path.join(siteRoot, 'downloads');
 await writeFile(path.join(downloadsRoot, 'index.js'), `window.LT_DOWNLOADS=${JSON.stringify(downloads)};\n`, 'utf8');
-const sums = [...downloads].sort((a, b) => a.id.localeCompare(b.id, 'en'))
-  .map((item) => `${item.sha256}  ${item.id}.zip`).join('\n') + '\n';
+const sumsOrder = [...downloads].sort((a, b) => a.id.localeCompare(b.id, 'en'));
+const choicePackageIndex = sumsOrder.findIndex((item) => item.id === 'pdf-marking-choice');
+const markingPackageIndex = sumsOrder.findIndex((item) => item.id === 'pdf-marking');
+if (choicePackageIndex >= 0 && markingPackageIndex >= 0) {
+  const [choicePackage] = sumsOrder.splice(choicePackageIndex, 1);
+  const updatedMarkingIndex = sumsOrder.findIndex((item) => item.id === 'pdf-marking');
+  sumsOrder.splice(updatedMarkingIndex + 1, 0, choicePackage);
+}
+const sums = sumsOrder.map((item) => `${item.sha256}  ${item.id}.zip`).join('\n') + '\n';
 await writeFile(path.join(downloadsRoot, 'SHA256SUMS.txt'), sums, 'utf8');
 
 const generatedDownloadFiles = [

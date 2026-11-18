@@ -11,7 +11,7 @@ const siteRoot = path.resolve(root, manifest.publicRoot);
 const OFFLINE_CSP_BASE = "default-src 'self' file: data: blob: 'unsafe-inline'; worker-src blob:; form-action 'none'";
 
 function offlineCsp(packageInfo) {
-  const apiHosts = ['pdf-marking', 'core-all'].includes(packageInfo.id)
+  const apiHosts = ['pdf-marking', 'pdf-marking-choice', 'core-all'].includes(packageInfo.id)
     ? 'https://generativelanguage.googleapis.com https://api.minimax.io' : "'none'";
   return OFFLINE_CSP_BASE.replace('worker-src', `connect-src ${apiHosts}; worker-src`);
 }
@@ -352,7 +352,15 @@ if (Object.keys(offlineLock.packages).sort().join('\n') !== manifest.offlinePack
   throw new Error('offline.lock.json package set differs from offlinePackages');
 }
 const sums = await readFile(fileMap.get('downloads/SHA256SUMS.txt').fullPath, 'utf8');
-const expectedSums = [...zipDigests.entries()].sort(([a], [b]) => a.localeCompare(b, 'en')).map(([name, hash]) => `${hash}  ${name}`).join('\n') + '\n';
+const sumsOrder = [...zipDigests.entries()].sort(([a], [b]) => a.localeCompare(b, 'en'));
+const choiceSumsIndex = sumsOrder.findIndex(([name]) => name === 'pdf-marking-choice.zip');
+const markingSumsIndex = sumsOrder.findIndex(([name]) => name === 'pdf-marking.zip');
+if (choiceSumsIndex >= 0 && markingSumsIndex >= 0) {
+  const [choiceSumsEntry] = sumsOrder.splice(choiceSumsIndex, 1);
+  const updatedMarkingSumsIndex = sumsOrder.findIndex(([name]) => name === 'pdf-marking.zip');
+  sumsOrder.splice(updatedMarkingSumsIndex + 1, 0, choiceSumsEntry);
+}
+const expectedSums = sumsOrder.map(([name, hash]) => `${hash}  ${name}`).join('\n') + '\n';
 if (sums !== expectedSums) throw new Error('downloads/SHA256SUMS.txt does not match generated ZIP files');
 
 for (const file of files) {

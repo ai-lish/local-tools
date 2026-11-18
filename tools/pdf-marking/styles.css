@@ -214,6 +214,9 @@ footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: cent
 .template-card p { margin-top: 8px; color: var(--muted); font-size: 12px; }
 .template-glyph { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid #cfdeea; border-radius: 10px; color: var(--blue); background: #fff; font-size: 17px; font-weight: 900; }
 .template-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.template-order-warning { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 10px; padding: 11px 13px; border: 1px solid #bd6500; border-radius: 9px; color: #512b08; background: #fff7e8; }
+.template-order-warning p { flex: 1 1 250px; min-width: 0; margin: 0; }
+.template-order-warning .button { flex: 0 0 auto; }
 .template-editor-panel { min-width: 0; margin-top: 14px; }
 .template-editor-controls { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 9px; align-items: end; min-width: 0; margin: 12px 0; }
 .template-editor-controls > * { min-width: 0; }

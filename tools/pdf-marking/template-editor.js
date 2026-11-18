@@ -108,6 +108,46 @@
   function findGroup(definition, id) {
     return listGroups(definition).find(function (group) { return group.id === id; }) || null;
   }
+  function median(values) {
+    if (!values.length) return null;
+    var sorted = values.slice().sort(function (left, right) { return left - right; });
+    var middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+  function listRowSpacing(rows) {
+    if (!rows || rows.mode !== "list" || !Array.isArray(rows.groups)) return null;
+    var distances = [];
+    rows.groups.forEach(function (group) {
+      if (!Array.isArray(group)) return;
+      for (var index = 1; index < group.length; index += 1) distances.push(group[index] - group[index - 1]);
+    });
+    return median(distances);
+  }
+  function respaceListRows(rows, spacing) {
+    if (!rows || rows.mode !== "list" || !Array.isArray(rows.groups) ||
+        rows.groups.some(function (group) { return !Array.isArray(group) || !group.length || group.some(function (value) { return !Number.isFinite(value); }); })) return null;
+    var oldSpacing = listRowSpacing(rows);
+    var allValues = rows.groups.reduce(function (all, group) { return all.concat(group); }, []);
+    if (allValues.length < 2 || !Number.isFinite(oldSpacing) || oldSpacing <= 0) return null;
+    var ratio = spacing / oldSpacing;
+    var gaps = [];
+    for (var groupIndex = 1; groupIndex < rows.groups.length; groupIndex += 1) {
+      var previous = rows.groups[groupIndex - 1]; var current = rows.groups[groupIndex];
+      gaps.push((current[0] - previous[previous.length - 1]) * ratio);
+    }
+    var totalSpan = rows.groups.reduce(function (sum, group) { return sum + Math.max(0, group.length - 1) * spacing; }, 0) +
+      gaps.reduce(function (sum, gap) { return sum + gap; }, 0);
+    var center = (Math.min.apply(null, allValues) + Math.max.apply(null, allValues)) / 2;
+    var cursor = center - totalSpan / 2;
+    var groups = rows.groups.map(function (group, index) {
+      var values = group.map(function (_, rowIndex) { return cursor + rowIndex * spacing; });
+      cursor = values[values.length - 1] + (index < gaps.length ? gaps[index] : 0);
+      return values;
+    });
+    var updated = groups.reduce(function (all, group) { return all.concat(group); }, []);
+    if (updated.some(function (value) { return value < -1e-10 || value > 1 + 1e-10; })) return null;
+    return groups.map(function (group) { return group.map(function (value) { return Math.max(0, Math.min(1, value)); }); });
+  }
   function groupCoordinates(definition, group) {
     if (group.kind === "identity") {
       var field = (definition.identity.fields || []).find(function (entry) { return entry.id === group.fieldId; });
@@ -180,7 +220,10 @@
       row = field.rows;
     } else {
       var block = blockById(definition, group.blockId);
-      if (group.kind === "mc-column") optionValues = block.columns[group.columnIndex].xs;
+      if (group.kind === "mc-column") {
+        optionValues = block.columns[group.columnIndex].xs;
+        row = block.columns[group.columnIndex].rows || block.rows;
+      }
       if (group.kind === "tf") { optionValues = block.columns[0] ? block.columns[0].xs : []; row = block.rows; }
       if (group.kind === "mc-column-rows" || group.kind === "tf-column-rows") row = block.columns[group.columnIndex].rows || block.rows;
       if (group.kind === "mc-rows") row = { mode: "list", groups: [block.rows.groups[group.groupIndex] || []] };
@@ -188,10 +231,7 @@
     var optionSpacing = optionValues.length > 1 ? (optionValues[optionValues.length - 1] - optionValues[0]) / (optionValues.length - 1) : null;
     var rowSpacing = null;
     if (row && row.mode === "linear" && row.count > 1) rowSpacing = row.pitch;
-    else if (row && row.mode === "list") {
-      var values = row.mode === "list" ? row.groups.reduce(function (all, entry) { return all.concat(entry); }, []) : [];
-      if (values.length > 1) rowSpacing = (values[values.length - 1] - values[0]) / (values.length - 1);
-    }
+    else if (row && row.mode === "list") rowSpacing = listRowSpacing(row);
     return { optionSpacing: optionSpacing, rowSpacing: rowSpacing };
   }
   function reSpace(values, spacing) {
@@ -244,7 +284,7 @@
       row = field.rows;
     } else {
       var block = blockById(definition, group.blockId);
-      if (group.kind === "tf") row = block.rows;
+      if (group.kind === "mc-column" || group.kind === "tf") row = group.kind === "mc-column" ? block.columns[group.columnIndex].rows || block.rows : block.rows;
       if (group.kind === "mc-column-rows" || group.kind === "tf-column-rows") row = block.columns[group.columnIndex].rows || block.rows;
       if (group.kind === "mc-rows") rowValuesToSet = block.rows.groups[group.groupIndex];
     }
@@ -252,6 +292,12 @@
       var oldValues = rowValues(row); var spaced = centeredRows(oldValues, value);
       if (!spaced) return { ok: false, message: "這個行距會令圈位超出頁面範圍。" };
       row.start = spaced[0]; row.pitch = value;
+      return { ok: true };
+    }
+    if (row && row.mode === "list") {
+      var newGroups = respaceListRows(row, value);
+      if (!newGroups) return { ok: false, message: "這個行距會令圈位超出頁面範圍。" };
+      row.groups = newGroups;
       return { ok: true };
     }
     if (rowValuesToSet && rowValuesToSet.length > 1) {

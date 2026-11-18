@@ -468,7 +468,7 @@
             { text: promptFor(task, identityContext) },
             { inline_data: { mime_type: mimeType, data: base64 } }
           ] }],
-          generationConfig: { responseMimeType: "application/json", maxOutputTokens: task === "layout" ? 2048 : 512 }
+          generationConfig: { responseMimeType: "application/json", maxOutputTokens: task === "layout" ? 8192 : 512 }
         })
       };
     }
@@ -482,7 +482,7 @@
           { type: "image_url", image_url: { url: image.dataUrl, detail: "low" } }
         ] }],
         reasoning_effort: "low",
-        max_completion_tokens: 2048,
+        max_completion_tokens: task === "layout" ? 8192 : 2048,
         stream: false
       })
     };
@@ -498,6 +498,39 @@
     if (typeof content === "string") return content;
     if (Array.isArray(content)) return content.map(function (part) { return part && part.text || ""; }).join("\n");
     return "";
+  }
+
+  function hasUsableProviderText(provider, response) {
+    if (provider === "gemini") {
+      var parts = response && response.candidates && response.candidates[0] &&
+        response.candidates[0].content && response.candidates[0].content.parts;
+      return Array.isArray(parts) && parts.some(function (part) {
+        return part && part.thought !== true && typeof part.text === "string" && part.text.trim().length > 0;
+      });
+    }
+    var content = response && response.choices && response.choices[0] && response.choices[0].message && response.choices[0].message.content;
+    if (typeof content === "string") return content.trim().length > 0;
+    return Array.isArray(content) && content.some(function (part) {
+      return part && typeof part.text === "string" && part.text.trim().length > 0;
+    });
+  }
+
+  function hasBudgetExhaustionWithoutText(provider, response) {
+    if (hasUsableProviderText(provider, response)) return false;
+    if (provider === "gemini") {
+      return Boolean(response && response.candidates && response.candidates[0] &&
+        response.candidates[0].finishReason === "MAX_TOKENS");
+    }
+    return Boolean(response && response.choices && response.choices[0] &&
+      response.choices[0].finish_reason === "length");
+  }
+
+  function budgetExhaustionMessage(task) {
+    if (task === "layout") return "AI 用盡回覆額度仍未完成分析（只有思考內容），未套用建議。建議改用 Gemini，或直接手動拉框。";
+    if (task === "choice") return "AI 用盡回覆額度仍未完成選擇題分析（只有思考內容），未套用答案建議。";
+    if (task === "dictation") return "AI 用盡回覆額度仍未完成默書轉錄（只有思考內容），未套用轉錄建議。";
+    if (task === "identity") return "AI 用盡回覆額度仍未完成身份核對（只有思考內容），未套用識別建議。";
+    return "AI 用盡回覆額度仍未完成測試（只有思考內容）。";
   }
 
   function parseJsonObject(text) {
@@ -784,7 +817,7 @@
       return { ok: false, message: error && error.message || "AI 覆核設定不完整。" };
     }
     var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-    var timeoutMs = task === "layout" ? 60000 : 30000;
+    var timeoutMs = task === "layout" ? 120000 : 30000;
     var timeoutId = controller ? setTimeout(function () { controller.abort(); }, timeoutMs) : null;
     try {
       var sender = fetchImpl || root.fetch.bind(root);
@@ -796,6 +829,9 @@
       if (!response || !response.ok) return { ok: false, message: responseError(response && response.status || 0) };
       var value;
       try { value = await response.json(); } catch (error) { return { ok: false, message: "AI 回覆不是有效 JSON。" }; }
+      if (hasBudgetExhaustionWithoutText(provider, value)) {
+        return { ok: false, message: budgetExhaustionMessage(task) };
+      }
       try { return parseProviderResponse(provider, task, value, allowedOptions, identityContext); } catch (error) {
         return { ok: false, message: "AI 回覆格式無效，未套用任何建議。" };
       }

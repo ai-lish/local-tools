@@ -14,16 +14,22 @@
       "byteLength": 24162
     },
     "core-all": {
-      "version": "2026.11.18.5",
-      "contentHash": "d7758f5a3ccc",
+      "version": "2026.11.18.10",
+      "contentHash": "edbb43f3e33b",
       "fileCount": 32,
-      "byteLength": 4382579
+      "byteLength": 4401073
     },
     "pdf-marking": {
-      "version": "2026.11.18.5",
-      "contentHash": "376170b798c8",
+      "version": "2026.11.18.10",
+      "contentHash": "75b11e3eb73e",
       "fileCount": 24,
-      "byteLength": 4112989
+      "byteLength": 4131483
+    },
+    "pdf-marking-choice": {
+      "version": "2026.11.18.5",
+      "contentHash": "75b11e3eb73e",
+      "fileCount": 24,
+      "byteLength": 4131483
     },
     "pdf-splitter": {
       "version": "2026.11.13.2",
