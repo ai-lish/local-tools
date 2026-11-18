@@ -362,7 +362,8 @@
     var marginY = Math.min(1, 0.015 * width / height);
     var redactionRects = definition.identity.masks.filter(function (mask) {
       if (!mask || !mask.type) return true;
-      if (["text-name", "class-handwrite", "student-handwrite"].indexOf(mask.type) >= 0) return true;
+      if (mask.type === "text-name") return true;
+      if (["class-handwrite", "student-handwrite"].indexOf(mask.type) >= 0) return mask.redactForAi !== false;
       if (["text-subject", "text-other"].indexOf(mask.type) >= 0) return mask.redactForAi !== false;
       return false;
     }).map(normalizedRect).filter(Boolean);
@@ -408,7 +409,8 @@
     }
     var labels = definition.identity.masks.filter(function (mask) {
       if (!mask || !mask.type) return true;
-      if (["text-name", "class-handwrite", "student-handwrite"].indexOf(mask.type) >= 0) return true;
+      if (mask.type === "text-name") return true;
+      if (["class-handwrite", "student-handwrite"].indexOf(mask.type) >= 0) return mask.redactForAi !== false;
       return ["text-subject", "text-other"].indexOf(mask.type) >= 0 && mask.redactForAi !== false;
     }).map(function (mask) { return String(mask.label || "身份區"); });
     (definition.identity.fields || []).forEach(function (field) { labels.push(String(field.label || field.id || "身份圈格")); });

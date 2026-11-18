@@ -369,7 +369,8 @@
         throw new Error("第 " + (index + 1) + " 個範圍超出頁面。");
       }
       if (clean.type === "text-name" || clean.type === "text-subject" || clean.type === "text-other" || clean.type === "class-handwrite" || clean.type === "student-handwrite" || clean.type === "class-grade-grid" || clean.type === "class-form-grid" || clean.type === "student-number-grid") {
-        if (clean.type === "text-name" || clean.type === "class-handwrite" || clean.type === "student-handwrite") clean.redactForAi = true;
+        if (clean.type === "text-name") clean.redactForAi = true;
+        else if (clean.type === "class-handwrite" || clean.type === "student-handwrite") clean.redactForAi = clean.redactForAi === true;
         else if (clean.type === "text-subject" || clean.type === "text-other") clean.redactForAi = clean.redactForAi !== false;
         definition.identity.masks.push(zoneMask(clean));
       }

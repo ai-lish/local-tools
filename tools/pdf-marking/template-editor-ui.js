@@ -18,10 +18,12 @@
       "template-selection-panel", "template-editor-panel", "edit-template-layout", "template-editor-close",
       "template-editor-copy-note", "template-editor-pdf-file", "template-editor-page-number", "template-editor-group",
       "template-editor-option-spacing", "template-editor-row-spacing", "template-editor-all-columns-wrap",
-      "template-editor-all-columns", "template-editor-undo", "template-editor-reset", "template-editor-test",
+      "template-editor-all-columns", "template-editor-row-all-wrap", "template-editor-row-all",
+      "template-editor-row-all-apply", "template-editor-view-fit", "template-editor-view-width", "template-editor-view-selected",
+      "template-editor-undo", "template-editor-reset", "template-editor-test",
       "template-editor-auto-align-scope", "template-editor-auto-align", "template-editor-auto-align-apply",
       "template-editor-auto-align-cancel", "template-editor-auto-align-preview",
-      "template-editor-canvas", "template-editor-overlay", "template-editor-empty", "template-editor-page-status",
+      "template-editor-frame", "template-editor-canvas", "template-editor-overlay", "template-editor-empty", "template-editor-page-status",
       "template-editor-result", "template-editor-name", "template-editor-save", "template-editor-export", "template-editor-status"
     ].forEach(function (id) { elements[id] = document.getElementById(id); });
 
@@ -37,6 +39,7 @@
     var undoStack = [];
     var drag = null;
     var controlEdit = null;
+    var viewMode = "fit";
 
     function clone(value) { return editor.clone(value); }
     function svgElement(name, attributes) {
@@ -52,6 +55,48 @@
       return session ? editor.listGroups(session.draft).find(function (group) {
         return group.id === elements["template-editor-group"].value;
       }) || null : null;
+    }
+    function updateSampleDisplay(scrollToSelection) {
+      var canvas = elements["template-editor-canvas"];
+      var frame = elements["template-editor-frame"];
+      var svg = elements["template-editor-overlay"];
+      if (!canvas || canvas.hidden || !canvas.width || !canvas.height) return;
+      var frameWidth = Math.max(1, frame.clientWidth - 2);
+      var aspect = canvas.height / canvas.width;
+      var displayWidth = frameWidth;
+      var displayHeight;
+      frame.classList.toggle("is-zoomed", viewMode === "selected");
+      if (viewMode === "fit") {
+        var maxHeight = Math.max(220, Math.min(window.innerHeight * 0.68, window.innerHeight - 250));
+        displayWidth = Math.min(frameWidth, maxHeight / aspect);
+      } else if (viewMode === "selected") {
+        frame.style.height = Math.max(260, Math.floor(window.innerHeight * 0.62)) + "px";
+        var group = selectedGroup();
+        var groupWidth = group && group.bounds ? Math.max(1, (group.bounds.maxX - group.bounds.minX) * frameWidth) : frameWidth * 0.4;
+        var groupHeight = group && group.bounds ? Math.max(1, (group.bounds.maxY - group.bounds.minY) * frameWidth * aspect) : frame.clientHeight * 0.4;
+        var zoom = Math.min(4, Math.max(1.5, Math.min(frameWidth * 0.72 / groupWidth, frame.clientHeight * 0.72 / groupHeight)));
+        displayWidth = frameWidth * zoom;
+      } else {
+        frame.style.height = "";
+      }
+      if (viewMode !== "selected") frame.style.height = "";
+      displayHeight = displayWidth * aspect;
+      canvas.style.width = displayWidth + "px";
+      canvas.style.height = displayHeight + "px";
+      svg.style.left = viewMode === "selected" ? "0" : "50%";
+      svg.style.top = "0";
+      svg.style.right = "auto";
+      svg.style.bottom = "auto";
+      svg.style.transform = viewMode === "selected" ? "none" : "translateX(-50%)";
+      svg.style.width = displayWidth + "px";
+      svg.style.height = displayHeight + "px";
+      if (scrollToSelection && viewMode === "selected") {
+        var selected = selectedGroup();
+        if (selected && selected.bounds) {
+          frame.scrollLeft = ((selected.bounds.minX + selected.bounds.maxX) / 2) * displayWidth - frame.clientWidth / 2;
+          frame.scrollTop = ((selected.bounds.minY + selected.bounds.maxY) / 2) * displayHeight - frame.clientHeight / 2;
+        }
+      }
     }
     function isDirty() {
       return Boolean(session && (JSON.stringify(session.draft) !== JSON.stringify(session.resetDraft) ||
@@ -98,6 +143,10 @@
       optionInput.value = spacing.optionSpacing == null ? "" : spacing.optionSpacing.toFixed(4);
       rowInput.value = spacing.rowSpacing == null ? "" : spacing.rowSpacing.toFixed(4);
       elements["template-editor-all-columns-wrap"].hidden = !group || group.kind !== "mc-column";
+      var isMcRows = Boolean(group && ["mc-column", "mc-column-rows", "mc-rows"].indexOf(group.kind) >= 0);
+      elements["template-editor-row-all-wrap"].hidden = !isMcRows;
+      elements["template-editor-row-all-apply"].hidden = !isMcRows;
+      elements["template-editor-row-all-apply"].disabled = !spacing.rowSpacing || !isMcRows;
       elements["template-editor-undo"].disabled = undoStack.length === 0;
       elements["template-editor-reset"].disabled = !session;
       elements["template-editor-test"].disabled = !samplePage;
@@ -106,6 +155,7 @@
       elements["template-editor-auto-align-cancel"].hidden = !autoAlignPreview;
       renderAutoAlignPreview();
       renderOverlay();
+      updateSampleDisplay(false);
       updateValidation();
     }
     function drawLabel(svg, x, y, text, color) {
@@ -172,6 +222,28 @@
         alignmentOverlay.draw(svg, geometry, expanded, detectedResult, { width: width, height: height });
       }
       if (autoAlignPreview) drawAutoAlignPreview(svg, width, height, radius);
+      renderRowHandles(svg, width, height);
+    }
+    function renderRowHandles(svg, width, height) {
+      var group = selectedGroup();
+      if (!group || !group.bounds || group.points.length < 2 || !editor.groupSpacing(session.draft, group.id).rowSpacing) return;
+      var rows = Array.from(new Set(group.points.map(function (point) { return point.y; }))).sort(function (a, b) { return a - b; });
+      if (rows.length < 2) return;
+      var handleX = group.bounds.maxX * width + 14;
+      if (handleX > width - 13) handleX = Math.max(13, group.bounds.minX * width - 14);
+      var line = svgElement("line", { x1: handleX, y1: rows[0] * height, x2: handleX, y2: rows[rows.length - 1] * height,
+        class: "template-editor-row-handle-line" });
+      svg.append(line);
+      [["first", rows[0], "移動整組行位"], ["last", rows[rows.length - 1], "調整行距"]].forEach(function (item) {
+        var handle = svgElement("circle", { cx: handleX, cy: item[1] * height, r: 10,
+          class: "template-editor-row-handle", "data-row-handle": item[0], tabindex: 0, role: "button",
+          "aria-label": item[2] });
+        var title = svgElement("title"); title.textContent = item[2] + "；可拖拉調整。"; handle.append(title);
+        svg.append(handle);
+        var label = svgElement("text", { x: handleX, y: item[1] * height, class: "template-editor-row-handle-label" });
+        label.textContent = item[0] === "first" ? "↕" : "↕";
+        svg.append(label);
+      });
     }
     function drawAutoAlignPreview(svg, width, height, radius) {
       autoAlignPreview.plans.filter(function (plan) { return plan.ok; }).forEach(function (plan) {
@@ -226,6 +298,12 @@
         try { sampleRenderTask.cancel(); } catch (error) { /* ignore cancelled render */ }
       }
       sampleRenderTask = null; samplePage = null; sampleViewport = null;
+      viewMode = "fit";
+      elements["template-editor-view-fit"].setAttribute("aria-pressed", "true");
+      elements["template-editor-view-width"].setAttribute("aria-pressed", "false");
+      elements["template-editor-view-selected"].setAttribute("aria-pressed", "false");
+      elements["template-editor-frame"].classList.remove("is-zoomed");
+      elements["template-editor-frame"].style.height = "";
       if (sampleDocument && typeof sampleDocument.destroy === "function") sampleDocument.destroy();
       sampleDocument = null; sampleBytes = null; detectedResult = null;
       autoAlignPreview = null;
@@ -264,6 +342,7 @@
         if (token !== renderToken) return;
         sampleRenderTask = null;
         resetTest();
+        updateSampleDisplay(false);
         elements["template-editor-page-status"].textContent = "第 " + pageNumber + " / " + sampleDocument.numPages + " 頁；旋轉 " +
           (page.rotate || 0) + "°，已由 PDF.js 轉正。拖拉底圖可移動所選組。";
         elements["template-editor-test"].disabled = false;
@@ -469,6 +548,10 @@
       }
       session = { draft: draft, resetDraft: clone(draft), original: clone(selected), copiedBuiltin: isBuiltin };
       undoStack = []; detectedResult = null; autoAlignPreview = null; controlEdit = null;
+      viewMode = "fit";
+      elements["template-editor-view-fit"].setAttribute("aria-pressed", "true");
+      elements["template-editor-view-width"].setAttribute("aria-pressed", "false");
+      elements["template-editor-view-selected"].setAttribute("aria-pressed", "false");
       elements["template-selection-panel"].hidden = true;
       elements["template-editor-panel"].hidden = false;
       elements["template-editor-copy-note"].textContent = isBuiltin
@@ -486,9 +569,11 @@
       var group = selectedGroup(); if (!group) return;
       if (!controlEdit || controlEdit.kind !== kind) controlEdit = { kind: kind, base: clone(session.draft) };
       session.draft = clone(controlEdit.base);
-      var result = kind === "option"
-        ? editor.setOptionSpacing(session.draft, group.id, Number(elements["template-editor-option-spacing"].value),
-          Boolean(elements["template-editor-all-columns"].checked))
+      var result;
+      if (kind === "option") result = editor.setOptionSpacing(session.draft, group.id, Number(elements["template-editor-option-spacing"].value),
+        Boolean(elements["template-editor-all-columns"].checked));
+      else result = elements["template-editor-row-all"].checked
+        ? editor.setAllMcRowSpacing(session.draft, Number(elements["template-editor-row-spacing"].value))
         : editor.setRowSpacing(session.draft, group.id, Number(elements["template-editor-row-spacing"].value));
       if (!result.ok) {
         session.draft = clone(controlEdit.base);
@@ -535,27 +620,52 @@
       return true;
     }
     function pointerDown(event) {
-      if (!session || !samplePage || event.pointerType === "touch" || event.button !== 0) return;
+      if (!session || !samplePage || event.button !== 0) return;
       var group = selectedGroup(); var rect = elements["template-editor-overlay"].getBoundingClientRect();
       if (!group || !rect.width || !rect.height) return;
-      drag = { id: group.id, x: event.clientX, y: event.clientY, rect: rect, before: clone(session.draft), base: clone(session.draft) };
+      var handle = event.target.closest && event.target.closest("[data-row-handle]");
+      if (!handle && event.pointerType === "touch") return;
+      if (handle) {
+        var handleSpacing = editor.rowSpacingAfterHandle(session.draft, group.id, 0);
+        drag = { mode: handle.getAttribute("data-row-handle") === "last" ? "row-pitch" : "row-move",
+          id: group.id, x: event.clientX, y: event.clientY, rect: rect, spacing: handleSpacing.spacing,
+          intervals: handleSpacing.intervals, before: clone(session.draft), base: clone(session.draft) };
+      } else {
+        drag = { mode: "move", id: group.id, x: event.clientX, y: event.clientY, rect: rect,
+          before: clone(session.draft), base: clone(session.draft) };
+      }
       elements["template-editor-overlay"].setPointerCapture(event.pointerId);
       event.preventDefault();
     }
     function pointerMove(event) {
       if (!drag || !session) return;
       session.draft = clone(drag.base);
-      var result = editor.moveGroup(session.draft, drag.id,
-        (event.clientX - drag.x) / drag.rect.width, (event.clientY - drag.y) / drag.rect.height);
+      var deltaY = (event.clientY - drag.y) / drag.rect.height;
+      var result;
+      if (drag.mode === "row-move") result = editor.moveGroupRows(session.draft, drag.id, deltaY);
+      else if (drag.mode === "row-pitch") {
+        var nextSpacing = drag.spacing + deltaY / drag.intervals;
+        result = elements["template-editor-row-all"].checked
+          ? editor.setAllMcRowSpacing(session.draft, nextSpacing)
+          : editor.setRowSpacing(session.draft, drag.id, nextSpacing);
+      } else result = editor.moveGroup(session.draft, drag.id,
+        (event.clientX - drag.x) / drag.rect.width, deltaY);
       if (result.ok) {
         resetTest(); renderOverlay(); updateValidation();
+        if (drag.mode === "row-pitch") {
+          var liveSpacing = editor.groupSpacing(session.draft, drag.id).rowSpacing;
+          if (Number.isFinite(liveSpacing)) elements["template-editor-row-spacing"].value = liveSpacing.toFixed(4);
+        }
       }
       event.preventDefault();
     }
     function pointerUp(event) {
       if (!drag || !session) return;
       if (JSON.stringify(drag.before) !== JSON.stringify(session.draft)) {
-        pushUndo(drag.before); setStatus("已移動所選圈位組；請測試讀圈後再儲存。", false);
+        pushUndo(drag.before);
+        setStatus(drag.mode === "row-pitch" ? "已調整行距；請測試讀圈後再儲存。"
+          : drag.mode === "row-move" ? "已移動整組行位；請測試讀圈後再儲存。"
+            : "已移動所選圈位組；請測試讀圈後再儲存。", false);
       }
       drag = null; renderControls();
       if (elements["template-editor-overlay"].hasPointerCapture(event.pointerId)) {
@@ -567,6 +677,24 @@
       var group = selectedGroup(); if (!group) return;
       event.preventDefault();
       var amount = event.shiftKey ? 0.005 : 0.001;
+      if (event.altKey) {
+        var isRow = event.key === "ArrowUp" || event.key === "ArrowDown";
+        var sign = event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 1;
+        var beforeSpacing = clone(session.draft);
+        var nextValue = isRow ? editor.groupSpacing(session.draft, group.id).rowSpacing : editor.groupSpacing(session.draft, group.id).optionSpacing;
+        if (!Number.isFinite(nextValue)) { setStatus(isRow ? "所選組沒有可調行距。" : "所選組沒有可調選項間距。", true); return; }
+        var candidate = clone(session.draft);
+        var adjusted = isRow
+          ? (elements["template-editor-row-all"].checked
+            ? editor.setAllMcRowSpacing(candidate, nextValue + sign * amount)
+            : editor.setRowSpacing(candidate, group.id, nextValue + sign * amount))
+          : editor.setOptionSpacing(candidate, group.id, nextValue + sign * amount,
+            Boolean(elements["template-editor-all-columns"].checked));
+        if (!adjusted.ok) { setStatus(adjusted.message, true); return; }
+        session.draft = candidate; pushUndo(beforeSpacing); resetTest(); renderControls();
+        setStatus(isRow ? "已用鍵盤調整行距。" : "已用鍵盤調整選項間距。", false);
+        return;
+      }
       var dx = event.key === "ArrowLeft" ? -amount : event.key === "ArrowRight" ? amount : 0;
       var dy = event.key === "ArrowUp" ? -amount : event.key === "ArrowDown" ? amount : 0;
       var before = clone(session.draft);
@@ -578,11 +706,35 @@
 
     elements["template-editor-pdf-file"].addEventListener("change", function () { loadSample(elements["template-editor-pdf-file"].files[0]); });
     elements["template-editor-page-number"].addEventListener("change", renderSamplePage);
-    elements["template-editor-group"].addEventListener("change", function () { autoAlignPreview = null; renderControls(); });
+    elements["template-editor-group"].addEventListener("change", function () {
+      autoAlignPreview = null; renderControls(); updateSampleDisplay(true);
+    });
     elements["template-editor-option-spacing"].addEventListener("input", function () { applySpacing("option"); });
     elements["template-editor-option-spacing"].addEventListener("change", function () { finishSpacing("option"); });
     elements["template-editor-row-spacing"].addEventListener("input", function () { applySpacing("row"); });
     elements["template-editor-row-spacing"].addEventListener("change", function () { finishSpacing("row"); });
+    elements["template-editor-row-all-apply"].addEventListener("click", function () {
+      if (!session || !selectedGroup()) return;
+      var before = clone(session.draft); var candidate = clone(session.draft);
+      var result = editor.setAllMcRowSpacingFromGroup(candidate, selectedGroup().id);
+      if (!result.ok) { setStatus(result.message, true); return; }
+      pushUndo(before); session.draft = candidate; resetTest(); renderControls();
+      setStatus("已把所選組的行距套用到全部選擇題組。一次撤銷可還原全部。", false);
+    });
+    [
+      ["template-editor-view-fit", "fit"],
+      ["template-editor-view-width", "width"],
+      ["template-editor-view-selected", "selected"]
+    ].forEach(function (entry) {
+      elements[entry[0]].addEventListener("click", function () {
+        viewMode = entry[1];
+        ["fit", "width", "selected"].forEach(function (mode) {
+          var id = mode === "fit" ? "template-editor-view-fit" : mode === "width" ? "template-editor-view-width" : "template-editor-view-selected";
+          elements[id].setAttribute("aria-pressed", mode === viewMode ? "true" : "false");
+        });
+        updateSampleDisplay(true);
+      });
+    });
     elements["template-editor-all-columns"].addEventListener("change", function () {
       var group = selectedGroup();
       if (!session || !group || group.kind !== "mc-column" || !this.checked) return;
@@ -609,6 +761,7 @@
     elements["template-editor-overlay"].addEventListener("pointerup", pointerUp);
     elements["template-editor-overlay"].addEventListener("pointercancel", pointerUp);
     elements["template-editor-overlay"].addEventListener("keydown", nudge);
+    window.addEventListener("resize", function () { updateSampleDisplay(false); });
     elements["edit-template-layout"].addEventListener("click", function () {
       var selected = options.getSelectedTemplate();
       if (selected && selected.kind === "choice") open(selected);

@@ -435,8 +435,8 @@
           "class-grade-grid", "class-form-grid", "student-number-grid"];
         if (mask.type != null && maskTypes.indexOf(mask.type) < 0) errors.push("身份遮蔽區類型不正確。");
         if (mask.redactForAi != null && typeof mask.redactForAi !== "boolean") errors.push("身份遮蔽區 AI 遮擋設定必須為布林值。");
-        if ((mask.type === "text-name" || mask.type === "class-handwrite" || mask.type === "student-handwrite") && mask.redactForAi === false) {
-          errors.push("姓名及手寫身份區必須送 AI 前遮擋。");
+        if (mask.type === "text-name" && mask.redactForAi === false) {
+          errors.push("姓名必須送 AI 前遮擋。");
         }
       }
     });

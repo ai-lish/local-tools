@@ -114,8 +114,8 @@
             <label class="field"><span>新區域類型</span><select id="choice-wizard-zone-type">
               <option value="text-name">文字遮罩：姓名</option><option value="text-subject">文字遮罩：科目</option><option value="text-other">文字遮罩：其他</option>
               <option value="class-grade-grid">班別圈格：年級（1–6）</option><option value="class-form-grid">班別圈格：字母（A–F）</option>
-              <option value="student-number-grid">班號圈格：數字</option><option value="class-handwrite">手寫班別（遮罩）</option>
-              <option value="student-handwrite">手寫班號（遮罩）</option><option value="answer-mc">選擇題答案欄</option><option value="answer-tf">是非題答案欄</option>
+              <option value="student-number-grid">班號圈格：數字</option><option value="class-handwrite">手寫班別</option>
+              <option value="student-handwrite">手寫班號</option><option value="answer-mc">選擇題答案欄</option><option value="answer-tf">是非題答案欄</option>
             </select></label>
             <label class="field"><span>選擇題選項</span><select id="choice-wizard-options"><option value="ABCD">A–D</option><option value="ABCDE">A–E</option><option value="ABCDEF">A–F</option></select></label>
             <label class="field"><span>每欄預設題數</span><input id="choice-wizard-rows" type="number" min="1" max="250" value="20"></label>
@@ -298,6 +298,13 @@
             <label class="field template-editor-spacing-field"><span>選項間距</span><input id="template-editor-option-spacing" type="number" min="0.0001" max="1" step="0.001" disabled></label>
             <label class="field template-editor-spacing-field"><span>行距</span><input id="template-editor-row-spacing" type="number" min="0.0001" max="1" step="0.001" disabled></label>
             <label id="template-editor-all-columns-wrap" class="inline-check" hidden><input id="template-editor-all-columns" type="checkbox"><span>全部選擇題欄同時套用</span></label>
+            <label id="template-editor-row-all-wrap" class="inline-check" hidden><input id="template-editor-row-all" type="checkbox"><span>全部選擇題組同時套用行距</span></label>
+            <button class="button" id="template-editor-row-all-apply" type="button" disabled>把所選組的行距套用到全部組</button>
+            <div class="template-editor-view-toggle" role="group" aria-label="樣本頁檢視大小">
+              <button class="button compact" id="template-editor-view-fit" type="button" aria-pressed="true">整頁</button>
+              <button class="button compact" id="template-editor-view-width" type="button" aria-pressed="false">闊度</button>
+              <button class="button compact" id="template-editor-view-selected" type="button" aria-pressed="false">放大所選組</button>
+            </div>
             <div class="template-editor-actions">
               <button class="button" id="template-editor-undo" type="button" disabled>撤銷</button>
               <button class="button" id="template-editor-reset" type="button" disabled>重設為原範本</button>
@@ -423,17 +430,32 @@
           </div>
           <div class="focus-grid">
             <aside class="review-list">
-              <h3>跨頁待覆核</h3>
-              <p class="muted small">選取題目後可放大查看；按確認再移到下一題。</p>
-              <div id="review-items" class="review-items"><p class="muted">載入並讀圈後，清單會顯示待覆核題目。</p></div>
-              <section id="choice-identity-review" class="choice-identity-review" aria-label="本機身份資料核對" hidden>
-                <h4>班別／學號本機核對</h4>
-                <p class="muted small">本機讀圈未確認、或 AI 核對有差異的頁面會列在此處。姓名及已選文字區放大圖只在本機顯示，不會送往 AI 或寫入匯出檔。</p>
-                <div id="choice-identity-review-pages" class="choice-identity-review-pages"></div>
-                <div id="choice-identity-ai-results" class="choice-identity-ai-results" aria-live="polite"></div>
-                <div id="choice-identity-review-crops" class="choice-identity-review-crops"></div>
-              </section>
-              <div id="page-flags" class="page-flags"></div>
+              <details id="review-queue-details" class="review-fold" open>
+                <summary id="review-queue-summary">跨頁待覆核題目（0）</summary>
+                <p class="muted small">選取題目後可放大查看；按確認再移到下一題。</p>
+                <div class="review-fold-scroll" id="review-queue-scroll">
+                  <div id="review-items" class="review-items"><p class="muted">載入並讀圈後，清單會顯示待覆核題目。</p></div>
+                </div>
+              </details>
+              <details id="choice-identity-review-details" class="review-fold" hidden>
+                <summary id="choice-identity-review-summary">班別／學號核對（0）</summary>
+                <div class="review-fold-scroll">
+                  <section id="choice-identity-review" class="choice-identity-review" aria-label="本機身份資料核對" hidden>
+                    <p class="muted small">本機讀圈未確認、或 AI 核對有差異的頁面會列在此處。姓名及已選文字區放大圖只在本機顯示，不會送往 AI 或寫入匯出檔。</p>
+                    <div id="choice-handwrite-pending" class="choice-handwrite-pending" hidden>
+                      <p id="choice-handwrite-pending-text" class="muted small"></p>
+                      <button class="button compact" id="choice-handwrite-next" type="button">下一頁未輸入</button>
+                    </div>
+                    <div id="choice-identity-review-pages" class="choice-identity-review-pages"></div>
+                    <div id="choice-identity-ai-results" class="choice-identity-ai-results" aria-live="polite"></div>
+                    <div id="choice-identity-review-crops" class="choice-identity-review-crops"></div>
+                  </section>
+                </div>
+              </details>
+              <details id="page-flags-details" class="review-fold">
+                <summary id="page-flags-summary">頁面警告（0）</summary>
+                <div class="review-fold-scroll"><div id="page-flags" class="page-flags"></div></div>
+              </details>
             </aside>
             <section class="focus-card" aria-label="專注覆核">
               <div class="focus-heading"><div><p class="eyebrow">目前覆核</p><h3 id="focus-title">尚未選取題目</h3></div><span id="focus-progress" class="hint-pill">0 題</span></div>
@@ -459,6 +481,32 @@
             </section>
           </div>
         </section>
+        <details id="choice-appeal-details" class="panel choice-appeal-details">
+          <summary>成績查詢（同學查詢答案時用）</summary>
+          <p class="muted small">只在本機查閱已讀圈頁面。題目截圖從原 PDF 即時重繪，不含姓名區，不會寫入進度或匯出檔。</p>
+          <div class="appeal-lookup-fields">
+            <label class="field"><span>班別</span><select id="appeal-class" disabled><option value="">請先讀圈</option></select></label>
+            <label class="field"><span>學號</span><input id="appeal-student-id" type="text" maxlength="12" autocomplete="off" disabled></label>
+            <button class="button primary" id="appeal-search" type="button" disabled>查找學生頁</button>
+            <label class="field"><span>直接選頁碼</span><select id="appeal-page" disabled><option value="">請先讀圈</option></select></label>
+          </div>
+          <p id="appeal-status" class="status-message" role="status" aria-live="polite">完成讀圈或載入進度及同一 PDF 後即可查詢。</p>
+          <div id="appeal-page-results" class="appeal-page-results" aria-live="polite"></div>
+          <div class="appeal-question-layout">
+            <div id="appeal-question-list" class="appeal-question-list" aria-label="該頁題目"></div>
+            <section id="appeal-question-detail" class="appeal-question-detail" aria-label="題目原圖及讀圈資料" hidden>
+              <div class="appeal-detail-heading">
+                <h4 id="appeal-detail-title"></h4>
+                <label class="inline-check"><input id="appeal-show-read-zones" type="checkbox"><span>顯示讀圈位置</span></label>
+              </div>
+              <p id="appeal-detail-status" class="muted small"></p>
+              <div class="appeal-crop-frame"><canvas id="appeal-crop-canvas" aria-label="原 PDF 題目截圖"></canvas><svg id="appeal-crop-overlay" aria-label="讀圈位置疊圖" role="img" hidden></svg></div>
+              <ul id="appeal-readouts" class="appeal-readouts"></ul>
+              <p id="appeal-review-record" class="muted small"></p>
+              <div class="toolbar-row"><button class="button compact" id="appeal-prev-question" type="button">上一題</button><button class="button compact" id="appeal-next-question" type="button">下一題</button></div>
+            </section>
+          </div>
+        </details>
       </section>
 
       <section id="dictation-mode" class="mode-panel" hidden>

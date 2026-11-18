@@ -275,38 +275,140 @@
   function centeredRows(values, spacing) {
     return reSpace(values, spacing);
   }
+  function rowTarget(definition, groupId) {
+    var group = findGroup(definition, groupId);
+    if (!group) return null;
+    if (group.kind === "identity") {
+      var field = (definition.identity.fields || []).find(function (entry) { return entry.id === group.fieldId; });
+      return field ? { rows: field.rows, singleGroupIndex: null } : null;
+    }
+    var block = blockById(definition, group.blockId);
+    if (!block) return null;
+    if (group.kind === "mc-column" || group.kind === "tf") {
+      return { rows: group.kind === "mc-column" ? block.columns[group.columnIndex].rows || block.rows : block.rows, singleGroupIndex: null };
+    }
+    if (group.kind === "mc-column-rows" || group.kind === "tf-column-rows") {
+      return { rows: block.columns[group.columnIndex].rows || block.rows, singleGroupIndex: null };
+    }
+    if (group.kind === "mc-rows") return { rows: block.rows, singleGroupIndex: group.groupIndex };
+    return null;
+  }
+  function rowTargetGroups(target) {
+    if (!target || !target.rows) return [];
+    if (target.rows.mode === "linear") return [rowValues(target.rows)];
+    if (target.rows.mode !== "list" || !Array.isArray(target.rows.groups)) return [];
+    if (target.singleGroupIndex != null) {
+      var selected = target.rows.groups[target.singleGroupIndex];
+      return Array.isArray(selected) ? [selected.slice()] : [];
+    }
+    return target.rows.groups.map(function (group) { return Array.isArray(group) ? group.slice() : []; });
+  }
+  function writeRowTargetGroups(target, groups) {
+    if (!target || !target.rows || !groups.length) return false;
+    if (target.rows.mode === "linear") {
+      var values = groups[0];
+      if (!values.length) return false;
+      target.rows.start = values[0];
+      if (values.length > 1) target.rows.pitch = (values[values.length - 1] - values[0]) / (values.length - 1);
+      return true;
+    }
+    if (target.rows.mode !== "list" || !Array.isArray(target.rows.groups)) return false;
+    if (target.singleGroupIndex != null) target.rows.groups[target.singleGroupIndex] = groups[0].slice();
+    else target.rows.groups = groups.map(function (group) { return group.slice(); });
+    return true;
+  }
+  function spacedGroupsKeepingFirst(groups, spacing) {
+    var updated = groups.map(function (values) {
+      if (values.length < 2) return values.slice();
+      return values.map(function (_, index) { return values[0] + index * spacing; });
+    });
+    if (updated.some(function (values) { return values.some(function (value) { return !Number.isFinite(value) || value < -1e-10 || value > 1 + 1e-10; }); })) return null;
+    return updated.map(function (values) { return values.map(function (value) { return Math.max(0, Math.min(1, value)); }); });
+  }
+  function rowIntervalCount(groups) {
+    return groups.reduce(function (sum, group) { return sum + Math.max(0, group.length - 1); }, 0);
+  }
+  function rowSpacingAfterHandle(definition, groupId, deltaY) {
+    var target = rowTarget(definition, groupId);
+    var groups = rowTargetGroups(target);
+    var intervals = rowIntervalCount(groups);
+    var spacing = groupSpacing(definition, groupId).rowSpacing;
+    if (!intervals || !Number.isFinite(spacing) || !Number.isFinite(Number(deltaY))) {
+      return { ok: false, message: "所選組沒有可調行距。" };
+    }
+    var nextSpacing = spacing + Number(deltaY) / intervals;
+    if (nextSpacing <= 0) return { ok: false, message: "行距須為大於 0 的數值。" };
+    return { ok: true, spacing: nextSpacing, intervals: intervals };
+  }
+  function moveGroupRows(definition, groupId, deltaY) {
+    var target = rowTarget(definition, groupId);
+    var groups = rowTargetGroups(target);
+    var delta = Number(deltaY);
+    if (!groups.length || !Number.isFinite(delta)) return { ok: false, message: "所選組沒有有效行位。" };
+    var updated = groups.map(function (values) { return values.map(function (value) { return value + delta; }); });
+    if (updated.some(function (values) { return values.some(function (value) { return value < -1e-10 || value > 1 + 1e-10; }); })) {
+      return { ok: false, message: "所選組移動後會超出頁面範圍。" };
+    }
+    updated = updated.map(function (values) { return values.map(function (value) { return Math.max(0, Math.min(1, value)); }); });
+    writeRowTargetGroups(target, updated);
+    return { ok: true, deltaY: delta };
+  }
+  function spaceRowObject(rows, spacing) {
+    if (!rows || !Number.isFinite(spacing) || spacing <= 0) return null;
+    if (rows.mode === "linear" && Number.isInteger(rows.count) && rows.count >= 1) {
+      if (rows.count < 2) return clone(rows);
+      var linearGroups = spacedGroupsKeepingFirst([rowValues(rows)], spacing);
+      if (!linearGroups) return null;
+      var linear = clone(rows);
+      linear.start = linearGroups[0][0]; linear.pitch = spacing;
+      return linear;
+    }
+    if (rows.mode === "list" && Array.isArray(rows.groups)) {
+      var listGroups = spacedGroupsKeepingFirst(rows.groups, spacing);
+      if (!listGroups) return null;
+      var list = clone(rows); list.groups = listGroups;
+      return list;
+    }
+    return null;
+  }
+  function replaceObject(target, source) {
+    Object.keys(target).forEach(function (key) { delete target[key]; });
+    Object.keys(source).forEach(function (key) { target[key] = source[key]; });
+  }
+  function setAllMcRowSpacing(definition, spacing) {
+    var value = Number(spacing);
+    if (!Number.isFinite(value) || value <= 0) return { ok: false, message: "行距須為大於 0 的數值。" };
+    var seen = new Set(); var updates = [];
+    (definition.blocks || []).filter(function (block) { return block.type === "mc"; }).forEach(function (block) {
+      (block.columns || []).forEach(function (column) {
+        var rows = column.rows || block.rows;
+        if (!rows || seen.has(rows)) return;
+        seen.add(rows);
+        var next = spaceRowObject(rows, value);
+        if (!next) updates.push({ invalid: true });
+        else updates.push({ rows: rows, next: next });
+      });
+    });
+    if (!updates.length || updates.some(function (entry) { return entry.invalid; })) {
+      return { ok: false, message: "這個行距會令其中一組圈位超出頁面範圍，所有選擇題組均未修改。" };
+    }
+    updates.forEach(function (entry) { replaceObject(entry.rows, entry.next); });
+    return { ok: true, updatedGroups: updates.length };
+  }
+  function setAllMcRowSpacingFromGroup(definition, groupId) {
+    var spacing = groupSpacing(definition, groupId).rowSpacing;
+    if (!Number.isFinite(spacing)) return { ok: false, message: "所選組沒有可用行距。" };
+    return setAllMcRowSpacing(definition, spacing);
+  }
   function setRowSpacing(definition, groupId, spacing) {
     var group = findGroup(definition, groupId); var value = Number(spacing);
     if (!group || !Number.isFinite(value) || value <= 0) return { ok: false, message: "行距須為大於 0 的數值。" };
-    var row = null; var rowValuesToSet = null;
-    if (group.kind === "identity") {
-      var field = definition.identity.fields.find(function (entry) { return entry.id === group.fieldId; });
-      row = field.rows;
-    } else {
-      var block = blockById(definition, group.blockId);
-      if (group.kind === "mc-column" || group.kind === "tf") row = group.kind === "mc-column" ? block.columns[group.columnIndex].rows || block.rows : block.rows;
-      if (group.kind === "mc-column-rows" || group.kind === "tf-column-rows") row = block.columns[group.columnIndex].rows || block.rows;
-      if (group.kind === "mc-rows") rowValuesToSet = block.rows.groups[group.groupIndex];
-    }
-    if (row && row.mode === "linear" && row.count > 1) {
-      var oldValues = rowValues(row); var spaced = centeredRows(oldValues, value);
-      if (!spaced) return { ok: false, message: "這個行距會令圈位超出頁面範圍。" };
-      row.start = spaced[0]; row.pitch = value;
-      return { ok: true };
-    }
-    if (row && row.mode === "list") {
-      var newGroups = respaceListRows(row, value);
-      if (!newGroups) return { ok: false, message: "這個行距會令圈位超出頁面範圍。" };
-      row.groups = newGroups;
-      return { ok: true };
-    }
-    if (rowValuesToSet && rowValuesToSet.length > 1) {
-      var newValues = centeredRows(rowValuesToSet, value);
-      if (!newValues) return { ok: false, message: "這個行距會令圈位超出頁面範圍。" };
-      blockById(definition, group.blockId).rows.groups[group.groupIndex] = newValues;
-      return { ok: true };
-    }
-    return { ok: false, message: "所選組沒有可調行距。" };
+    var target = rowTarget(definition, groupId); var groups = rowTargetGroups(target);
+    if (!target || !rowIntervalCount(groups)) return { ok: false, message: "所選組沒有可調行距。" };
+    var updated = spacedGroupsKeepingFirst(groups, value);
+    if (!updated) return { ok: false, message: "這個行距會令圈位超出頁面範圍。" };
+    writeRowTargetGroups(target, updated);
+    return { ok: true };
   }
   function getAtPath(value, path) {
     return path.reduce(function (current, key) { return current == null ? undefined : current[key]; }, value);
@@ -638,6 +740,10 @@
     moveGroup: moveGroup,
     setOptionSpacing: setOptionSpacing,
     setRowSpacing: setRowSpacing,
+    rowSpacingAfterHandle: rowSpacingAfterHandle,
+    moveGroupRows: moveGroupRows,
+    setAllMcRowSpacing: setAllMcRowSpacing,
+    setAllMcRowSpacingFromGroup: setAllMcRowSpacingFromGroup,
     autoAlignTargetForGroup: autoAlignTargetForGroup,
     listAutoAlignTargets: listAutoAlignTargets,
     fitAutoAlignment: fitAutoAlignment,

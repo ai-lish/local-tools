@@ -150,7 +150,7 @@
     function isPrivacyIdentityZone(zone) { return api.isLayoutPrivacyZone(zone); }
     function isIdentityGridZone(zone) { return api.isIdentityGridZone(zone); }
     function isTextZone(zone) { return Boolean(zone && ["text-name", "text-subject", "text-other"].indexOf(zone.type) >= 0); }
-    function isForcedRedactionZone(zone) { return Boolean(zone && ["text-name", "class-handwrite", "student-handwrite"].indexOf(zone.type) >= 0); }
+    function isForcedRedactionZone(zone) { return Boolean(zone && zone.type === "text-name"); }
     function clearPreparedAiImage() {
       if (preparedAiImage) preparedAiImage.dataUrl = "";
       preparedAiImage = null;
@@ -197,7 +197,7 @@
     function zoneTypeLabel(type) {
       return ({ "text-name": "文字遮罩：姓名", "text-subject": "文字遮罩：科目", "text-other": "文字遮罩：其他",
         "class-grade-grid": "班別圈格：年級", "class-form-grid": "班別圈格：字母", "student-number-grid": "班號圈格：數字",
-        "class-handwrite": "手寫班別（遮罩）", "student-handwrite": "手寫班號（遮罩）",
+        "class-handwrite": "手寫班別", "student-handwrite": "手寫班號",
         "answer-mc": "選擇題答案欄", "answer-tf": "是非題答案欄" })[type] || "區域";
     }
     function renderZoneList() {
@@ -519,7 +519,9 @@
       var zone = { id: "zone-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6), type: type,
         label: names[type] || "新區域", x: point.x, y: point.y, w: 0, h: 0,
         digits: Number(get("choice-wizard-digits").value) || 4 };
-      if (isPrivacyIdentityZone(zone)) zone.redactForAi = true;
+      if (isPrivacyIdentityZone(zone)) {
+        zone.redactForAi = zone.type === "class-handwrite" || zone.type === "student-handwrite" ? false : true;
+      }
       if (type === "answer-mc" || type === "answer-tf") { zone.groupSize = 0; zone.groupGap = 1; }
       if (type === "class-grade-grid" || type === "class-form-grid") zone.options = api.normalizeGridOptions(type, null);
       return zone;
@@ -745,7 +747,9 @@
         get("choice-wizard-ai-preview-image").src = image.dataUrl;
         get("choice-wizard-ai-provider").textContent = "供應者：" + settings.providerLabel + "；模型：" + settings.model;
         var maskedAreas = image.redactedAreas.length ? image.redactedAreas.join("、") : "無（已確認沒有姓名等文字身份區）";
-        var unmaskedText = zones.filter(function (zone) { return isTextZone(zone) && zone.type !== "text-name" && zone.redactForAi === false; })
+        var unmaskedText = zones.filter(function (zone) {
+          return isPrivacyIdentityZone(zone) && zone.type !== "text-name" && zone.redactForAi === false;
+        })
           .map(function (zone) { return zone.label || zoneTypeLabel(zone.type); });
         var visibleGrids = zones.filter(isIdentityGridZone).map(function (zone) { return zone.label || zoneTypeLabel(zone.type); });
         get("choice-wizard-ai-masks").textContent = "已遮走：" + maskedAreas +
