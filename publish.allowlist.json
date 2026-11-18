@@ -1541,7 +1541,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.18.1",
+      "version": "2026.11.18.5",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1773,7 +1773,7 @@
     {
       "id": "pdf-marking",
       "title": "PDF 閱卷及批改工具",
-      "version": "2026.11.18.1",
+      "version": "2026.11.18.5",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"

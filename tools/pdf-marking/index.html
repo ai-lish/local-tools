@@ -124,21 +124,21 @@
             <p id="choice-wizard-empty" class="empty-state">請先載入本機答題紙 PDF。</p>
           </div>
           <div id="choice-wizard-zone-list" class="choice-wizard-zone-list"></div>
-          <label id="choice-wizard-no-identity-wrap" class="inline-check" hidden><input id="choice-wizard-no-identity" type="checkbox"><span>我確認此答題紙沒有姓名等身份區</span></label>
-          <label id="choice-wizard-identities-complete-wrap" class="inline-check" hidden><input id="choice-wizard-identities-complete" type="checkbox"><span>我已標示全部身份區（姓名、班別、班號及其他文字區）</span></label>
+          <label id="choice-wizard-no-identity-wrap" class="inline-check" hidden><input id="choice-wizard-no-identity" type="checkbox"><span>我確認此答題紙沒有姓名等文字身份區</span></label>
+          <label id="choice-wizard-identities-complete-wrap" class="inline-check" hidden><input id="choice-wizard-identities-complete" type="checkbox"><span>我已標示全部文字及手寫身份區（姓名、科目、其他文字、手寫班別／班號）</span></label>
           <p id="choice-wizard-builder-status" class="status-message" role="status"></p>
           <button class="button primary" id="choice-wizard-build-template" type="button" disabled>建立範本並調整位置</button>
         </section>
         <section class="choice-wizard-ai-layout panel" aria-labelledby="choice-wizard-ai-heading">
           <div class="section-title"><div><p class="eyebrow">選用</p><h3 id="choice-wizard-ai-heading">AI 建議版面</h3></div><span class="hint-pill">教師逐項確認</span></div>
-          <p class="privacy-note">先在樣本頁標示所有身份區，或確認沒有身份區。送出前會顯示實際遮罩預覽；只有按「確認送出」才會使用現有 AI 設定傳送。AI 只回傳圈格位置，不轉錄文字。</p>
+          <p class="privacy-note">先在樣本頁標示所有文字及手寫身份區，或確認沒有姓名等文字身份區。班別／班號代號圈格可先畫概略框，亦可留待 AI 建議。送出前會顯示實際影像預覽；只有按「確認送出」才會使用現有 AI 設定傳送。AI 只回傳圈格版面及選項標籤，不轉錄手寫或其他文字。</p>
           <div id="choice-wizard-ai-settings-slot"></div>
           <div class="toolbar-row"><button class="button" id="choice-wizard-ai-prepare" type="button" disabled>預覽去識別圖片及 AI 建議</button><span id="choice-wizard-ai-status" class="status-message" role="status">請先載入樣本及標示身份區。</span></div>
           <section id="choice-wizard-ai-confirmation" class="choice-wizard-ai-confirmation" aria-labelledby="choice-wizard-ai-confirm-heading" hidden>
             <h4 id="choice-wizard-ai-confirm-heading">確認送出實際影像</h4>
             <p id="choice-wizard-ai-provider" class="muted"></p>
             <p id="choice-wizard-ai-masks" class="muted"></p>
-            <div class="choice-wizard-ai-preview"><img id="choice-wizard-ai-preview-image" alt="已遮走身份區的實際送出影像預覽"></div>
+            <div class="choice-wizard-ai-preview"><img id="choice-wizard-ai-preview-image" alt="文字及手寫身份區已遮走、圈格保留的實際送出影像預覽"></div>
             <div class="toolbar-row"><button class="button primary" id="choice-wizard-ai-confirm" type="button">確認送出</button><button class="button" id="choice-wizard-ai-cancel" type="button">取消</button></div>
           </section>
           <div id="choice-wizard-ai-suggestions" class="choice-wizard-ai-suggestions" aria-live="polite"></div>
@@ -319,7 +319,18 @@
             <button class="button" id="ai-review-clear-key" type="button">清除 key</button>
           </div>
         </div>
-        <p class="muted small">只有開啟此功能、輸入 key 並確認送出後，才會把通過身份區檢查的裁切圖傳往所選 AI 服務。圖片不含姓名、班別或學號；AI 建議只供老師核對。重新整理即清除 key。</p>
+        <p class="muted small">只有開啟此功能、輸入 key 並確認送出後，才會傳送裁切圖。選擇題任務只含題目圈格；身份核對只含單組班別／學號圈格，或老師標示的手寫班別／班號區。姓名、科目、學校名稱及其他文字區不會送出。AI 建議只供老師核對；重新整理即清除 key。</p>
+        <div class="toolbar-row ai-review-actions" id="ai-review-identity-actions">
+          <button class="button" id="ai-review-identity-current" type="button" disabled>AI 核對本頁班別／學號</button>
+          <button class="button" id="ai-review-identity-all" type="button" disabled>AI 核對全部頁班別／學號</button>
+        </div>
+        <section id="ai-identity-confirmation" class="ai-identity-confirmation" aria-labelledby="ai-identity-confirm-heading" hidden>
+          <h4 id="ai-identity-confirm-heading">確認送出身份核對裁切</h4>
+          <p id="ai-identity-confirm-counts" class="muted small"></p>
+          <label class="field"><span>預覽其中一張</span><select id="ai-identity-confirm-preview-select"></select></label>
+          <div class="ai-identity-confirm-preview"><img id="ai-identity-confirm-preview-image" alt="身份核對裁切預覽"></div>
+          <div class="toolbar-row"><button class="button primary" id="ai-identity-confirm-send" type="button">確認送出</button><button class="button" id="ai-identity-confirm-cancel" type="button">取消</button></div>
+        </section>
         <p id="ai-review-status" class="ai-review-status" role="status" aria-live="polite">AI 覆核已關閉；PDF 仍只在本機處理。</p>
       </section>
 
@@ -339,6 +350,13 @@
               <h3>跨頁待覆核</h3>
               <p class="muted small">選取題目後可放大查看；按確認再移到下一題。</p>
               <div id="review-items" class="review-items"><p class="muted">載入並讀圈後，清單會顯示待覆核題目。</p></div>
+              <section id="choice-identity-review" class="choice-identity-review" aria-label="本機身份資料核對" hidden>
+                <h4>班別／學號本機核對</h4>
+                <p class="muted small">本機讀圈未確認、或 AI 核對有差異的頁面會列在此處。姓名及已選文字區放大圖只在本機顯示，不會送往 AI 或寫入匯出檔。</p>
+                <div id="choice-identity-review-pages" class="choice-identity-review-pages"></div>
+                <div id="choice-identity-ai-results" class="choice-identity-ai-results" aria-live="polite"></div>
+                <div id="choice-identity-review-crops" class="choice-identity-review-crops"></div>
+              </section>
               <div id="page-flags" class="page-flags"></div>
             </aside>
             <section class="focus-card" aria-label="專注覆核">

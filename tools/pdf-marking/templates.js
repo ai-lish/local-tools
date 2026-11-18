@@ -300,7 +300,11 @@
           return result;
         }) : raw.identity.fields,
         masks: Array.isArray(raw.identity.masks) ? raw.identity.masks.map(function (mask) {
-          return isObject(mask) ? { id: mask.id, label: mask.label, x: mask.x, y: mask.y, w: mask.w, h: mask.h } : mask;
+          if (!isObject(mask)) return mask;
+          var cleanMask = { id: mask.id, label: mask.label, x: mask.x, y: mask.y, w: mask.w, h: mask.h };
+          if (mask.type != null) cleanMask.type = mask.type;
+          if (mask.redactForAi != null) cleanMask.redactForAi = mask.redactForAi;
+          return cleanMask;
         }) : raw.identity.masks,
         noIdentityAreaDeclared: raw.identity.noIdentityAreaDeclared === true
         };
@@ -348,7 +352,11 @@
           return result;
         }) : raw.identity.fields,
         masks: Array.isArray(raw.identity.masks) ? raw.identity.masks.map(function (mask) {
-          return isObject(mask) ? { id: mask.id, label: mask.label, x: mask.x, y: mask.y, w: mask.w, h: mask.h } : mask;
+          if (!isObject(mask)) return mask;
+          var cleanMask = { id: mask.id, label: mask.label, x: mask.x, y: mask.y, w: mask.w, h: mask.h };
+          if (mask.type != null) cleanMask.type = mask.type;
+          if (mask.redactForAi != null) cleanMask.redactForAi = mask.redactForAi;
+          return cleanMask;
         }) : raw.identity.masks,
         noIdentityAreaDeclared: raw.identity.noIdentityAreaDeclared === true
       };
@@ -393,7 +401,8 @@
               field.xs.some(function (x) { return !isFiniteIn(x, 0, 1); }) || field.options.some(function (option) { return DIGITS.indexOf(option) < 0; })) {
             errors.push("學號圈格的位數、欄座標或數字選項不正確。");
           }
-        } else if (!isFiniteIn(field.x, 0, 1) || field.options.some(function (option) { return field.id === "class-grade" ? !/^[1-6]$/.test(option) : !/^[A-F]$/.test(option); })) {
+        } else if (!isFiniteIn(field.x, 0, 1) || field.options.length < 2 || field.options.length > 12 ||
+            field.options.some(function (option) { return field.id === "class-grade" ? !/^[1-9]$/.test(option) : !/^[A-Z]$/.test(option); })) {
           errors.push("班別圈格座標或選項不正確。");
         }
         var ys = validateRows(field.rows, "身份圈格", errors);
@@ -404,6 +413,15 @@
     else identity.masks.forEach(function (mask) {
       if (!isObject(mask) || !safeText(mask.id || "mask", 80) || !["x", "y", "w", "h"].every(function (key) { return isFiniteIn(mask[key], 0, 1); }) ||
           mask.w <= 0 || mask.h <= 0 || mask.x + mask.w > 1 || mask.y + mask.h > 1) errors.push("身份遮蔽區必須完全位於頁面內。");
+      if (isObject(mask)) {
+        var maskTypes = ["text-name", "text-subject", "text-other", "class-handwrite", "student-handwrite",
+          "class-grade-grid", "class-form-grid", "student-number-grid"];
+        if (mask.type != null && maskTypes.indexOf(mask.type) < 0) errors.push("身份遮蔽區類型不正確。");
+        if (mask.redactForAi != null && typeof mask.redactForAi !== "boolean") errors.push("身份遮蔽區 AI 遮擋設定必須為布林值。");
+        if ((mask.type === "text-name" || mask.type === "class-handwrite" || mask.type === "student-handwrite") && mask.redactForAi === false) {
+          errors.push("姓名及手寫身份區必須送 AI 前遮擋。");
+        }
+      }
     });
     if (identity.manualFields != null) {
       var manual = identity.manualFields;

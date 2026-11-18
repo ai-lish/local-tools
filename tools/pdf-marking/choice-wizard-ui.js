@@ -122,9 +122,10 @@
       get("choice-wizard-build-template").disabled = !loaded || !createMode;
       get("choice-wizard-page").disabled = !loaded;
     }
-    function isIdentityZone(zone) {
-      return Boolean(zone && ["text-name", "text-subject", "text-other", "class-grade-grid", "class-form-grid", "student-number-grid", "class-handwrite", "student-handwrite"].indexOf(zone.type) >= 0);
-    }
+    function isPrivacyIdentityZone(zone) { return api.isLayoutPrivacyZone(zone); }
+    function isIdentityGridZone(zone) { return api.isIdentityGridZone(zone); }
+    function isTextZone(zone) { return Boolean(zone && ["text-name", "text-subject", "text-other"].indexOf(zone.type) >= 0); }
+    function isForcedRedactionZone(zone) { return Boolean(zone && ["text-name", "class-handwrite", "student-handwrite"].indexOf(zone.type) >= 0); }
     function clearPreparedAiImage() {
       if (preparedAiImage) preparedAiImage.dataUrl = "";
       preparedAiImage = null;
@@ -136,8 +137,8 @@
       renderOverlay(); renderAiSuggestions();
     }
     function identityDecisionReady() {
-      var hasIdentity = zones.some(isIdentityZone);
-      return hasIdentity ? get("choice-wizard-identities-complete").checked : get("choice-wizard-no-identity").checked;
+      return api.layoutPrivacyDecisionReady(zones, get("choice-wizard-identities-complete").checked,
+        get("choice-wizard-no-identity").checked);
     }
     function updateAiButton() {
       var button = get("choice-wizard-ai-prepare");
@@ -149,19 +150,22 @@
       if (aiRequestBusy) status.textContent = "正在處理版面建議；沒有儲存樣本或回應。";
       else if (!sampleFile) status.textContent = "請先載入本機樣本 PDF。";
       else if (!createMode) status.textContent = "請先選「由樣本建立新範本」。";
-      else if (zones.some(isIdentityZone) && !get("choice-wizard-identities-complete").checked) status.textContent = "標示所有姓名、班別、班號及其他文字區後，勾選已完成才可準備 AI 預覽。";
-      else if (!zones.some(isIdentityZone) && !get("choice-wizard-no-identity").checked) status.textContent = "如答題紙沒有任何身份區，請明確勾選確認。";
+      else if (zones.some(isPrivacyIdentityZone) && !get("choice-wizard-identities-complete").checked) status.textContent = "標示所有文字及手寫身份區後，勾選已完成才可準備 AI 預覽。圈格可先畫概略框，亦可留待 AI 建議。";
+      else if (!zones.some(isPrivacyIdentityZone) && !get("choice-wizard-no-identity").checked) status.textContent = "如答題紙沒有姓名等文字身份區，請明確勾選確認；班別及班號代號圈格不計作文字身份區。";
       else if (!options.getAiSettings().ready) status.textContent = "請在此頁下方的 AI 覆核設定啟用功能並輸入 API key 及模型。";
-      else status.textContent = "身份區已確認；按下按鈕後先預覽實際遮罩影像，未確認不會送出。";
+      else status.textContent = "文字及手寫身份區已確認；圈格會保留供 AI 定位。按下按鈕後先預覽實際影像，未確認不會送出。";
     }
     function updateIdentityConfirmation(resetPrivacyDecision) {
-      var hasIdentity = zones.some(isIdentityZone);
-      get("choice-wizard-no-identity-wrap").hidden = hasIdentity;
-      get("choice-wizard-identities-complete-wrap").hidden = !hasIdentity;
-      if (hasIdentity) {
+      var hasPrivacyIdentity = zones.some(isPrivacyIdentityZone);
+      get("choice-wizard-no-identity-wrap").hidden = hasPrivacyIdentity;
+      get("choice-wizard-identities-complete-wrap").hidden = !hasPrivacyIdentity;
+      if (hasPrivacyIdentity) {
         get("choice-wizard-no-identity").checked = false;
         if (resetPrivacyDecision) get("choice-wizard-identities-complete").checked = false;
-      } else get("choice-wizard-identities-complete").checked = false;
+      } else {
+        get("choice-wizard-identities-complete").checked = false;
+        if (resetPrivacyDecision) get("choice-wizard-no-identity").checked = false;
+      }
       if (resetPrivacyDecision) { clearPreparedAiImage(); clearAiSuggestions(); }
       updateAiButton();
     }
@@ -178,8 +182,30 @@
         var item = document.createElement("div");
         item.className = "choice-wizard-zone-item" + (zone.id === selectedZoneId ? " selected" : "");
         var text = document.createElement("span");
-        text.textContent = (index + 1) + ". " + zoneTypeLabel(zone.type) + " · " + zone.label;
+        text.textContent = (index + 1) + ". " + zoneTypeLabel(zone.type) + " · " + zone.label +
+          (zone.optionsPendingConfirmation ? " · 選項待確認" : "");
         item.append(text);
+        if (isTextZone(zone)) {
+          var labelField = document.createElement("label"); labelField.className = "choice-wizard-zone-rows choice-wizard-zone-label";
+          var labelText = document.createElement("span"); labelText.textContent = "區域標籤";
+          var labelInput = document.createElement("input"); labelInput.type = "text"; labelInput.maxLength = 80;
+          labelInput.value = zone.label || ""; labelInput.setAttribute("aria-label", zoneTypeLabel(zone.type) + "自訂標籤");
+          labelInput.addEventListener("input", function () { zone.label = labelInput.value.slice(0, 80); renderOverlay(); });
+          labelField.append(labelText, labelInput); item.append(labelField);
+        }
+        if (isPrivacyIdentityZone(zone)) {
+          var redactLabel = document.createElement("label"); redactLabel.className = "inline-check choice-wizard-zone-redact";
+          var redactInput = document.createElement("input"); redactInput.type = "checkbox";
+          redactInput.checked = isForcedRedactionZone(zone) || zone.redactForAi !== false;
+          redactInput.disabled = isForcedRedactionZone(zone);
+          redactInput.setAttribute("aria-label", zoneTypeLabel(zone.type) + "送 AI 時遮擋");
+          var redactText = document.createElement("span"); redactText.textContent = "送 AI 時遮擋";
+          redactInput.addEventListener("change", function () {
+            zone.redactForAi = isForcedRedactionZone(zone) || redactInput.checked;
+            clearPreparedAiImage(); clearAiSuggestions(); updateAiButton();
+          });
+          redactLabel.append(redactInput, redactText); item.append(redactLabel);
+        }
         if (zone.type === "answer-mc" || zone.type === "answer-tf") {
           var rowLabel = document.createElement("label"); rowLabel.className = "choice-wizard-zone-rows";
           var rowText = document.createElement("span"); rowText.textContent = "本欄題數";
@@ -189,11 +215,59 @@
             zone.rowsPerColumn = Math.max(1, Math.min(250, Math.floor(Number(rowInput.value) || 1)));
           });
           rowLabel.append(rowText, rowInput); item.append(rowLabel);
+          var groupSizeLabel = document.createElement("label"); groupSizeLabel.className = "choice-wizard-zone-rows";
+          var groupSizeText = document.createElement("span"); groupSizeText.textContent = "每組題數（0 不分組）";
+          var groupSizeInput = document.createElement("input"); groupSizeInput.type = "number"; groupSizeInput.min = "0"; groupSizeInput.max = "250"; groupSizeInput.step = "1";
+          groupSizeInput.value = String(zone.groupSize || 0); groupSizeInput.setAttribute("aria-label", zoneTypeLabel(zone.type) + "每組題數");
+          groupSizeInput.addEventListener("input", function () { zone.groupSize = Math.max(0, Math.min(250, Math.floor(Number(groupSizeInput.value) || 0))); });
+          groupSizeLabel.append(groupSizeText, groupSizeInput); item.append(groupSizeLabel);
+          var groupGapLabel = document.createElement("label"); groupGapLabel.className = "choice-wizard-zone-rows";
+          var groupGapText = document.createElement("span"); groupGapText.textContent = "組間空位（行距倍數）";
+          var groupGapInput = document.createElement("input"); groupGapInput.type = "number"; groupGapInput.min = "0"; groupGapInput.max = "10"; groupGapInput.step = "0.5";
+          groupGapInput.value = String(zone.groupGap == null ? 1 : zone.groupGap); groupGapInput.setAttribute("aria-label", zoneTypeLabel(zone.type) + "組間空位");
+          groupGapInput.addEventListener("input", function () { zone.groupGap = Math.max(0, Math.min(10, Number(groupGapInput.value) || 0)); });
+          groupGapLabel.append(groupGapText, groupGapInput); item.append(groupGapLabel);
+          var answerOptionsLabel = document.createElement("label"); answerOptionsLabel.className = "choice-wizard-zone-rows";
+          var answerOptionsText = document.createElement("span"); answerOptionsText.textContent = "選項";
+          var answerOptionsInput = document.createElement("input"); answerOptionsInput.type = "text";
+          answerOptionsInput.value = (Array.isArray(zone.options) ? zone.options : (zone.type === "answer-tf" ? ["T", "F"] : ["A", "B", "C", "D"])).join(", ");
+          answerOptionsInput.setAttribute("aria-label", zoneTypeLabel(zone.type) + "答案選項，以逗號分隔");
+          answerOptionsInput.addEventListener("change", function () {
+            try {
+              zone.options = api.answerOptions(zone.type, answerOptionsInput.value);
+              zone.optionsPendingConfirmation = false;
+              answerOptionsInput.value = zone.options.join(", ");
+              setStatus("choice-wizard-builder-status", "答案欄選項已更新。", false);
+              renderZoneList();
+            } catch (error) { setStatus("choice-wizard-builder-status", error.message || "答案欄選項無效。", true); }
+          });
+          answerOptionsLabel.append(answerOptionsText, answerOptionsInput); item.append(answerOptionsLabel);
+        }
+        if (zone.type === "class-grade-grid" || zone.type === "class-form-grid") {
+          var optionLabel = document.createElement("label"); optionLabel.className = "choice-wizard-zone-rows";
+          var optionText = document.createElement("span"); optionText.textContent = zone.type === "class-grade-grid" ? "年級選項" : "班別字母選項";
+          var optionInput = document.createElement("input"); optionInput.type = "text";
+          optionInput.value = (Array.isArray(zone.options) ? zone.options : api.normalizeGridOptions(zone.type, null)).join(", ");
+          optionInput.setAttribute("aria-label", zoneTypeLabel(zone.type) + "選項，以逗號分隔");
+          optionInput.addEventListener("input", function () { zone.options = optionInput.value; });
+          optionInput.addEventListener("change", function () {
+            try {
+              zone.options = api.normalizeGridOptions(zone.type, optionInput.value);
+              zone.optionsPendingConfirmation = false;
+              optionInput.value = zone.options.join(", ");
+              setStatus("choice-wizard-builder-status", "圈格選項已更新；建立範本時會按選項數量生成行位。", false);
+              renderZoneList();
+            } catch (error) {
+              zone.options = optionInput.value;
+              setStatus("choice-wizard-builder-status", error.message || "圈格選項無效。", true);
+            }
+          });
+          optionLabel.append(optionText, optionInput); item.append(optionLabel);
         }
         var select = document.createElement("button"); select.type = "button"; select.className = "button compact"; select.textContent = "選取";
         select.addEventListener("click", function () { selectedZoneId = zone.id; renderOverlay(); renderZoneList(); });
         var remove = document.createElement("button"); remove.type = "button"; remove.className = "button compact danger-button"; remove.textContent = "刪除";
-        remove.addEventListener("click", function () { var removedIdentity = isIdentityZone(zone); zones = zones.filter(function (entry) { return entry.id !== zone.id; }); if (selectedZoneId === zone.id) selectedZoneId = ""; renderOverlay(); renderZoneList(); updateIdentityConfirmation(removedIdentity); });
+        remove.addEventListener("click", function () { var removedIdentity = isPrivacyIdentityZone(zone); zones = zones.filter(function (entry) { return entry.id !== zone.id; }); if (selectedZoneId === zone.id) selectedZoneId = ""; renderOverlay(); renderZoneList(); updateIdentityConfirmation(removedIdentity); });
         item.append(select, remove); list.append(item);
       });
       get("choice-wizard-delete-zone").disabled = !selectedZoneId;
@@ -205,8 +279,8 @@
       zones.forEach(function (zone) {
         var group = svg("g", { "data-zone-id": zone.id, class: zone.id === selectedZoneId ? "choice-wizard-zone is-selected" : "choice-wizard-zone" });
         group.append(svg("rect", { x: zone.x, y: zone.y, width: zone.w, height: zone.h, rx: 0.002 }));
-        var label = svg("text", { x: zone.x + 0.004, y: zone.y + 0.018, "pointer-events": "none" });
-        label.textContent = zoneTypeLabel(zone.type);
+        var label = svg("text", { x: zone.x + 0.004, y: zone.y + 0.018, "pointer-events": "none", "font-size": "0.014" });
+        label.textContent = zone.label || zoneTypeLabel(zone.type);
         group.append(label);
         if (zone.id === selectedZoneId) group.append(svg("rect", { x: zone.x + zone.w - 0.018, y: zone.y + zone.h - 0.018,
           width: 0.018, height: 0.018, class: "choice-wizard-resize", "data-zone-handle": "resize", "data-zone-id": zone.id }));
@@ -219,7 +293,7 @@
         var rect = suggestion.rect || suggestion;
         var group = svg("g", { class: "choice-wizard-ai-suggestion-zone", "data-ai-suggestion": index });
         group.append(svg("rect", { x: rect.x, y: rect.y, width: rect.w, height: rect.h }));
-        var label = svg("text", { x: rect.x + 0.004, y: rect.y + 0.018, "pointer-events": "none" });
+        var label = svg("text", { x: rect.x + 0.004, y: rect.y + 0.018, "pointer-events": "none", "font-size": "0.014" });
         label.textContent = suggestion.label;
         group.append(label); overlay.append(group);
       });
@@ -231,7 +305,8 @@
         var item = document.createElement("div"); item.className = "choice-wizard-ai-suggestion";
         var label = document.createElement("span"); label.textContent = suggestion.label +
           (suggestion.options ? " · " + suggestion.options.join("／") : "") +
-          (suggestion.rowsPerColumn ? " · " + suggestion.rowsPerColumn + " 行" : "");
+          (suggestion.rowsPerColumn ? " · " + suggestion.rowsPerColumn + " 行" : "") +
+          (suggestion.optionsPendingConfirmation ? " · 選項待確認" : "");
         var actions = document.createElement("div"); actions.className = "choice-wizard-ai-suggestion-actions";
         var accept = document.createElement("button"); accept.type = "button"; accept.className = "button compact primary"; accept.textContent = "接受並可調整";
         accept.addEventListener("click", function () {
@@ -239,7 +314,7 @@
           zones.push(accepted); selectedZoneId = accepted.id;
           aiSuggestions.splice(index, 1);
           renderOverlay(); renderZoneList(); renderAiSuggestions();
-          if (isIdentityZone(accepted)) updateIdentityConfirmation(true);
+          if (isPrivacyIdentityZone(accepted)) updateIdentityConfirmation(true);
         });
         var discard = document.createElement("button"); discard.type = "button"; discard.className = "button compact"; discard.textContent = "刪除建議";
         discard.addEventListener("click", function () { aiSuggestions.splice(index, 1); renderOverlay(); renderAiSuggestions(); });
@@ -255,9 +330,13 @@
       var names = { "text-name": "姓名", "text-subject": "科目", "text-other": "其他文字區", "class-grade-grid": "班別年級圈格",
         "class-form-grid": "班別字母圈格", "student-number-grid": "學號圈格", "class-handwrite": "班別手寫區", "student-handwrite": "學號手寫區",
         "answer-mc": "選擇題答案欄", "answer-tf": "是非題答案欄" };
-      return { id: "zone-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6), type: type,
+      var zone = { id: "zone-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6), type: type,
         label: names[type] || "新區域", x: point.x, y: point.y, w: 0, h: 0,
         digits: Number(get("choice-wizard-digits").value) || 4 };
+      if (isPrivacyIdentityZone(zone)) zone.redactForAi = true;
+      if (type === "answer-mc" || type === "answer-tf") { zone.groupSize = 0; zone.groupGap = 1; }
+      if (type === "class-grade-grid" || type === "class-form-grid") zone.options = api.normalizeGridOptions(type, null);
+      return zone;
     }
     function pointerDown(event) {
       if (!createMode || !samplePage || event.button !== 0) return;
@@ -302,11 +381,13 @@
           var optionsCount = get("choice-wizard-options").value.length;
           zone.options = zone.type === "answer-tf" ? ["T", "F"] : Array.from(get("choice-wizard-options").value);
           zone.rowsPerColumn = Number(get("choice-wizard-rows").value) || 10;
+          if (zone.groupSize == null) zone.groupSize = 0;
+          if (zone.groupGap == null) zone.groupGap = 1;
           zone.numbering = get("choice-wizard-numbering").value;
           if (zone.type === "answer-mc") zone.optionsCount = optionsCount;
-          zones.push(zone); selectedZoneId = zone.id; identityDecisionChanged = isIdentityZone(zone);
+          zones.push(zone); selectedZoneId = zone.id; identityDecisionChanged = isPrivacyIdentityZone(zone);
         }
-      } else if (isIdentityZone(drawing.zone) && (drawing.zone.x !== drawing.initial.x || drawing.zone.y !== drawing.initial.y ||
+      } else if (isPrivacyIdentityZone(drawing.zone) && (drawing.zone.x !== drawing.initial.x || drawing.zone.y !== drawing.initial.y ||
           drawing.zone.w !== drawing.initial.w || drawing.zone.h !== drawing.initial.h)) identityDecisionChanged = true;
       drawing = null; renderOverlay(); renderZoneList(); event.preventDefault();
       if (identityDecisionChanged) updateIdentityConfirmation(true);
@@ -363,16 +444,21 @@
     }
     function beginCreate() {
       if (!sampleFile) { setStatus("choice-wizard-source-status", "請先載入樣本 PDF。", true); return; }
-      createMode = true; selectedTemplate = null; zones = []; selectedZoneId = "";
-      get("choice-wizard-no-identity").checked = false; get("choice-wizard-identities-complete").checked = false;
-      clearPreparedAiImage(); clearAiSuggestions();
+      var continuing = createMode && zones.length > 0;
+      createMode = true; selectedTemplate = null;
+      if (!continuing) {
+        zones = []; selectedZoneId = "";
+        get("choice-wizard-no-identity").checked = false; get("choice-wizard-identities-complete").checked = false;
+        clearPreparedAiImage(); clearAiSuggestions();
+      }
       get("choice-wizard-builder").hidden = false;
-      setStatus("choice-wizard-source-status", "請拖拉標示文字遮罩、身份區及每欄答案範圍。", false);
+      setStatus("choice-wizard-source-status", "請拖拉標示姓名、科目、其他文字及手寫身份區；班別／班號圈格可先畫概略框，亦可留待 AI 建議。", false);
       renderOverlay(); renderZoneList(); updateSourceButtons();
     }
-    function openEditorForSelected() {
+    function openEditorForSelected(forceReset) {
       var definition = selectedDefinition();
       if (!definition || !sampleFile) return;
+      if (!forceReset && options.getEditorDraft()) return;
       get("choice-wizard-builder").hidden = true;
       get("choice-wizard-position-status").textContent = definition.source === "builtin"
         ? "內置範本會以自訂副本編輯；內置範本保持不變。"
@@ -418,6 +504,7 @@
         selectedTemplate = definition;
         if (!options.onSelectTemplate(definition)) return;
         get("choice-wizard-template").value = "";
+        openEditorForSelected(true);
         renderStage(3);
         setStatus("choice-wizard-position-status", "已建立待調整範本；按「儲存為自訂範本」後才可繼續。", false);
       } catch (error) {
@@ -425,11 +512,7 @@
       }
     }
     function privacyDefinition() {
-      var masks = zones.filter(isIdentityZone).map(function (zone) {
-        return { id: zone.id, label: zone.label || zoneTypeLabel(zone.type), x: zone.x, y: zone.y, w: zone.w, h: zone.h };
-      });
-      return { kind: "choice", identity: { fields: [], masks: masks,
-        noIdentityAreaDeclared: masks.length === 0 && get("choice-wizard-no-identity").checked } };
+      return api.createLayoutPrivacyDefinition(zones, get("choice-wizard-no-identity").checked);
     }
     async function prepareAiLayout() {
       if (!identityDecisionReady()) { updateAiButton(); return; }
@@ -438,14 +521,27 @@
       if (!samplePage || !createMode) { updateAiButton(); return; }
       clearPreparedAiImage(); clearAiSuggestions(); aiRequestBusy = true; updateAiButton();
       try {
-        var image = await options.createLayoutImage(get("choice-wizard-canvas"), privacyDefinition());
+        var layoutCanvas = document.createElement("canvas");
+        var baseViewport = samplePage.getViewport({ scale: 1 });
+        var layoutScale = Math.min(1600 / Math.max(baseViewport.width, baseViewport.height), 3);
+        var layoutViewport = samplePage.getViewport({ scale: layoutScale });
+        layoutCanvas.width = Math.ceil(layoutViewport.width); layoutCanvas.height = Math.ceil(layoutViewport.height);
+        await samplePage.render({ canvasContext: layoutCanvas.getContext("2d", { willReadFrequently: true }), viewport: layoutViewport }).promise;
+        var image;
+        try { image = await options.createLayoutImage(layoutCanvas, privacyDefinition()); }
+        finally { layoutCanvas.width = 0; layoutCanvas.height = 0; }
         image.provider = settings.provider; image.model = settings.model;
         preparedAiImage = image;
         get("choice-wizard-ai-preview-image").src = image.dataUrl;
         get("choice-wizard-ai-provider").textContent = "供應者：" + settings.providerLabel + "；模型：" + settings.model;
-        get("choice-wizard-ai-masks").textContent = image.redactedAreas.length
-          ? "已遮走：" + image.redactedAreas.join("、") + "（含每邊至少 1.5% 頁寬安全邊距）"
-          : "已確認沒有身份區；本次預覽不會遮走任何區域。";
+        var maskedAreas = image.redactedAreas.length ? image.redactedAreas.join("、") : "無（已確認沒有姓名等文字身份區）";
+        var unmaskedText = zones.filter(function (zone) { return isTextZone(zone) && zone.type !== "text-name" && zone.redactForAi === false; })
+          .map(function (zone) { return zone.label || zoneTypeLabel(zone.type); });
+        var visibleGrids = zones.filter(isIdentityGridZone).map(function (zone) { return zone.label || zoneTypeLabel(zone.type); });
+        get("choice-wizard-ai-masks").textContent = "已遮走：" + maskedAreas +
+          (image.redactedAreas.length ? "（含每邊至少 1.5% 頁寬安全邊距）" : "") +
+          "。教師選擇不遮：" + (unmaskedText.length ? unmaskedText.join("、") : "無") +
+          "。未遮（班別／班號代號圈格，供 AI 定位）：" + (visibleGrids.length ? visibleGrids.join("、") : "沒有已標示圈格；AI 可提出建議");
         get("choice-wizard-ai-confirmation").hidden = false;
         setStatus("choice-wizard-ai-status", "請核對以下實際送出影像。只有按「確認送出」才會連接服務；取消不會送出。", false);
       } catch (error) {
@@ -460,12 +556,14 @@
         output.push({ type: item.type === "tf" ? "answer-tf" : "answer-mc",
           label: item.type === "tf" ? "AI 建議是非題欄" : "AI 建議選擇題欄",
           x: item.rect.x, y: item.rect.y, w: item.rect.w, h: item.rect.h,
-          options: item.options.slice(), rowsPerColumn: item.rows, numbering: item.numbering });
+          options: item.options.slice(), rowsPerColumn: item.rows, groupSize: item.groupSize || 0,
+          groupGap: item.groupSize ? 1 : 0, numbering: item.numbering });
       });
       result.identityFields.forEach(function (item) {
         var labels = { "class-grade-grid": "AI 建議班別年級圈格", "class-form-grid": "AI 建議班別字母圈格", "student-number-grid": "AI 建議班號圈格" };
         output.push({ type: item.type, label: labels[item.type], x: item.rect.x, y: item.rect.y,
-          w: item.rect.w, h: item.rect.h, digits: item.digits || 4 });
+          w: item.rect.w, h: item.rect.h, options: item.options && item.options.slice(), digits: item.digits || 4,
+          optionsPendingConfirmation: item.optionsPendingConfirmation === true });
       });
       return output;
     }
@@ -478,13 +576,15 @@
         updateAiButton(); return;
       }
       var image = preparedAiImage;
+      var finalErrorMessage = "";
       aiRequestBusy = true; updateAiButton();
       get("choice-wizard-ai-confirm").disabled = true; get("choice-wizard-ai-cancel").disabled = true;
       try {
         var result = await options.requestAiLayout(image);
         image.dataUrl = ""; clearPreparedAiImage();
         if (!result || !result.ok) {
-          setStatus("choice-wizard-ai-status", result && result.message || "AI 版面建議失敗；沒有套用任何區域。", true);
+          finalErrorMessage = result && result.message || "AI 版面建議失敗；沒有套用任何區域。";
+          setStatus("choice-wizard-ai-status", finalErrorMessage, true);
           return;
         }
         aiSuggestions = suggestionZones(result);
@@ -492,9 +592,11 @@
         setStatus("choice-wizard-ai-status", result.message + " 共 " + aiSuggestions.length + " 項；接受後可在樣本頁移動、改大小或刪除。", false);
       } catch (error) {
         image.dataUrl = ""; clearPreparedAiImage();
-        setStatus("choice-wizard-ai-status", error && error.message ? error.message : "AI 版面建議失敗；沒有套用任何區域。", true);
+        finalErrorMessage = error && error.message ? error.message : "AI 版面建議失敗；沒有套用任何區域。";
+        setStatus("choice-wizard-ai-status", finalErrorMessage, true);
       } finally {
         aiRequestBusy = false; get("choice-wizard-ai-confirm").disabled = false; get("choice-wizard-ai-cancel").disabled = false; updateAiButton();
+        if (finalErrorMessage) setStatus("choice-wizard-ai-status", finalErrorMessage, true);
       }
     }
     function selectedOptions(type) {
@@ -599,6 +701,15 @@
       renderStage(3);
     }
 
+    function returnToSampleBuilder() {
+      if (createMode && zones.length) {
+        get("choice-wizard-builder").hidden = false;
+        updateSourceButtons(); renderOverlay(); renderZoneList();
+        setStatus("choice-wizard-source-status", "已保留原有範圍；可繼續調整後重新建立範本。", false);
+      }
+      renderStage(2);
+    }
+
     get("choice-wizard-select-choice").addEventListener("click", function () { renderStage(2); populateTemplates(); });
     get("choice-wizard-select-dictation").addEventListener("click", function () { showLegacy("dictation"); });
     get("choice-wizard-use-existing").addEventListener("click", function () {
@@ -643,7 +754,7 @@
     get("choice-wizard-next-from-source").addEventListener("click", enterStage3FromExisting);
     get("choice-wizard-build-template").addEventListener("click", handleBuildTemplate);
     get("choice-wizard-delete-zone").addEventListener("click", function () {
-      var removedIdentity = zones.some(function (zone) { return zone.id === selectedZoneId && isIdentityZone(zone); });
+      var removedIdentity = zones.some(function (zone) { return zone.id === selectedZoneId && isPrivacyIdentityZone(zone); });
       zones = zones.filter(function (zone) { return zone.id !== selectedZoneId; }); selectedZoneId = ""; renderOverlay(); renderZoneList();
       if (removedIdentity) updateIdentityConfirmation(true);
     });
@@ -687,7 +798,7 @@
       pill.addEventListener("click", function () {
         var target = Number(pill.dataset.wizardStep);
         if (target === 1) renderStage(1);
-        else if (target === 2) renderStage(2);
+        else if (target === 2) returnToSampleBuilder();
         else if (target === 3 && selectedTemplate && sampleFile) renderStage(3);
         else if (target === 4 && selectedTemplate && sampleFile && !get("choice-wizard-next-to-answers").disabled && options.isTemplateSaved(selectedTemplate.id)) renderStage(4);
         else if (target === 5 && selectedTemplate && sampleFile) {
@@ -697,7 +808,11 @@
       });
     });
     document.querySelectorAll("[data-wizard-back]").forEach(function (button) {
-      button.addEventListener("click", function () { renderStage(Number(button.dataset.wizardBack)); });
+      button.addEventListener("click", function () {
+        var target = Number(button.dataset.wizardBack);
+        if (target === 2 && currentStage === 3) returnToSampleBuilder();
+        else renderStage(target);
+      });
     });
     return {
       start: function () { populateTemplates(); renderStage(1); },

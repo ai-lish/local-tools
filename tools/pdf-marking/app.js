@@ -35,6 +35,9 @@
   var aiChoiceErrors = Object.create(null);
   var aiDictationResults = Object.create(null);
   var aiDictationErrors = Object.create(null);
+  var aiIdentityResults = Object.create(null);
+  var aiIdentityErrors = Object.create(null);
+  var aiIdentityPendingConfirmation = Object.create(null);
   var byId = function (id) { return document.getElementById(id); };
   var els = {
     pdfFile: byId("pdf-file"), clearPdf: byId("clear-pdf"), fileStatus: byId("file-status"),
@@ -57,7 +60,10 @@
     choicePrev: byId("choice-prev"), choiceNext: byId("choice-next"), choiceScore: byId("choice-score"),
     choiceReviews: byId("choice-reviews"), choiceAlignment: byId("choice-alignment"), choiceClass: byId("choice-class"),
     choiceStudentId: byId("choice-student-id"), choiceStage: byId("choice-stage"), reviewItems: byId("review-items"),
-    pageFlags: byId("page-flags"), dictationSegment: byId("dictation-segment"), dictationStyle: byId("dictation-style"),
+    pageFlags: byId("page-flags"), choiceIdentityReview: byId("choice-identity-review"),
+    choiceIdentityReviewPages: byId("choice-identity-review-pages"), choiceIdentityReviewCrops: byId("choice-identity-review-crops"),
+    choiceIdentityAiResults: byId("choice-identity-ai-results"),
+    dictationSegment: byId("dictation-segment"), dictationStyle: byId("dictation-style"),
     dictationAnswer: byId("dictation-answer"), firstRow: byId("dictation-first-row"),
     dictationBaseEnabled: byId("dictation-base-enabled"), dictationCalibration: byId("dictation-calibration"),
     firstRowField: byId("dictation-first-row-field"), sentenceToolbar: byId("sentence-mark-toolbar"),
@@ -82,6 +88,11 @@
     aiKey: byId("ai-review-key"), aiTest: byId("ai-review-test"), aiClearKey: byId("ai-review-clear-key"),
     aiStatus: byId("ai-review-status"), aiChoiceCurrent: byId("ai-review-choice-current"),
     aiChoiceAll: byId("ai-review-choice-all"), aiChoiceSuggestion: byId("ai-review-choice-suggestion"),
+    aiIdentityActions: byId("ai-review-identity-actions"),
+    aiIdentityCurrent: byId("ai-review-identity-current"), aiIdentityAll: byId("ai-review-identity-all"),
+    aiIdentityConfirmation: byId("ai-identity-confirmation"), aiIdentityConfirmCounts: byId("ai-identity-confirm-counts"),
+    aiIdentityConfirmPreviewSelect: byId("ai-identity-confirm-preview-select"), aiIdentityConfirmPreviewImage: byId("ai-identity-confirm-preview-image"),
+    aiIdentityConfirmSend: byId("ai-identity-confirm-send"), aiIdentityConfirmCancel: byId("ai-identity-confirm-cancel"),
     aiDictationCurrent: byId("ai-review-dictation-current"), aiDictationAll: byId("ai-review-dictation-all"),
     aiDictationActions: byId("ai-review-dictation-actions"), aiDictationResult: byId("ai-review-dictation-result"),
     copyExportTsv: byId("copy-export-tsv"), exportXlsx: byId("export-xlsx"),
@@ -132,18 +143,35 @@
     aiChoiceErrors = Object.create(null);
     aiDictationResults = Object.create(null);
     aiDictationErrors = Object.create(null);
+    aiIdentityResults = Object.create(null);
+    aiIdentityErrors = Object.create(null);
+    aiIdentityPendingConfirmation = Object.create(null);
     els.aiChoiceSuggestion.replaceChildren();
     els.aiChoiceSuggestion.hidden = true;
     els.aiDictationResult.replaceChildren();
     els.aiDictationResult.hidden = true;
+    els.choiceIdentityAiResults.replaceChildren();
+    els.aiIdentityConfirmation.hidden = true;
+    els.aiIdentityConfirmPreviewImage.removeAttribute("src");
+  }
+
+  function hasIdentityAiZones() {
+    var identity = state.template && state.template.identity;
+    return Boolean(state.template && state.template.kind === "choice" && identity &&
+      (Array.isArray(identity.fields) && identity.fields.some(function (field) { return field && ["class-grade", "class-form", "student-number"].indexOf(field.id) >= 0; }) ||
+        Array.isArray(identity.masks) && identity.masks.some(function (mask) { return mask && ["class-handwrite", "student-handwrite"].indexOf(mask.type) >= 0; })));
   }
 
   function updateAiControls() {
     var choiceQueue = review.buildReviewQueue(state.choicePages, state.pageCount);
     var focused = choiceQueue.some(function (entry) { return entry.key === state.focusKey; });
     var dictationReady = Boolean(state.pdfDoc && state.mode === "dictation" && state.dictationStyle === "sentence" && state.dictationAnswer.length);
+    var identityReady = Boolean(state.pdfDoc && state.mode === "choice" && Object.keys(state.choicePages).length && hasIdentityAiZones());
     els.aiChoiceCurrent.disabled = !aiReady() || aiMemory.busy || state.mode !== "choice" || !focused;
     els.aiChoiceAll.disabled = !aiReady() || aiMemory.busy || state.mode !== "choice" || !choiceQueue.length;
+    els.aiIdentityCurrent.disabled = !aiReady() || aiMemory.busy || !identityReady || !state.choicePages[state.currentPage];
+    els.aiIdentityAll.disabled = !aiReady() || aiMemory.busy || !identityReady;
+    els.aiIdentityActions.hidden = state.mode !== "choice";
     els.aiDictationCurrent.disabled = !aiReady() || aiMemory.busy || !dictationReady;
     els.aiDictationAll.disabled = !aiReady() || aiMemory.busy || !dictationReady || !state.pageCount;
     els.aiDictationActions.hidden = state.dictationStyle !== "sentence";
@@ -222,6 +250,43 @@
     return window.confirm("即將以 " + providerLabel(aiMemory.provider) + " 送出 " + count + " 張去識別裁切圖。\n只含裁切圖、不含姓名／班別／學號。\n按「取消」會取消整批；繼續即會把裁切圖傳往所選服務。\n是否繼續？");
   }
 
+  function confirmIdentityBatch(prepared) {
+    var gridCount = prepared.filter(function (item) { return item.entry.source === "grid"; }).length;
+    var handwriteCount = prepared.filter(function (item) { return item.entry.source === "handwriting"; }).length;
+    var select = els.aiIdentityConfirmPreviewSelect;
+    select.replaceChildren();
+    prepared.forEach(function (item, index) {
+      var option = document.createElement("option"); option.value = String(index);
+      option.textContent = item.entry.label; select.append(option);
+    });
+    els.aiIdentityConfirmCounts.textContent = "選擇題裁切 0 張；身份圈格裁切 " + gridCount +
+      " 張（只含圈格，不含姓名）；手寫班別／班號裁切 " + handwriteCount + " 張（只含指定手寫區，不含姓名、科目、學校或其他文字區）。";
+    function showPreview() {
+      var selected = prepared[Number(select.value)] || prepared[0];
+      if (selected && selected.image && selected.image.dataUrl) els.aiIdentityConfirmPreviewImage.src = selected.image.dataUrl;
+      else els.aiIdentityConfirmPreviewImage.removeAttribute("src");
+      els.aiIdentityConfirmPreviewImage.alt = selected ? "第 " + selected.entry.pageNumber + " 頁「" + selected.entry.label + "」身份核對裁切預覽" : "身份核對裁切預覽";
+    }
+    showPreview();
+    els.aiIdentityConfirmation.hidden = false;
+    return new Promise(function (resolve) {
+      function finish(confirmed) {
+        els.aiIdentityConfirmation.hidden = true;
+        els.aiIdentityConfirmPreviewImage.removeAttribute("src");
+        select.replaceChildren();
+        els.aiIdentityConfirmSend.removeEventListener("click", onConfirm);
+        els.aiIdentityConfirmCancel.removeEventListener("click", onCancel);
+        select.removeEventListener("change", showPreview);
+        resolve(confirmed);
+      }
+      function onConfirm() { finish(true); }
+      function onCancel() { finish(false); }
+      els.aiIdentityConfirmSend.addEventListener("click", onConfirm);
+      els.aiIdentityConfirmCancel.addEventListener("click", onCancel);
+      select.addEventListener("change", showPreview);
+    });
+  }
+
   async function runPreparedAiBatch(task, entries, prepareImage, onSuccess, errorMap, errorKey) {
     if (!aiReady() || aiMemory.busy) {
       setAiStatus("請先開啟 AI 覆核並輸入有效 API key 及模型名稱。", true);
@@ -248,7 +313,8 @@
       renderCurrentMode();
       return;
     }
-    if (!aiConfirmation(prepared.length)) {
+    var confirmed = task === "identity" ? await confirmIdentityBatch(prepared) : aiConfirmation(prepared.length);
+    if (!confirmed) {
       aiMemory.busy = false;
       prepared.forEach(function (item) { item.image.dataUrl = ""; });
       setAiStatus("已取消；沒有送出圖片。", false);
@@ -265,8 +331,13 @@
         var current = prepared[next++];
         try {
           var allowed = task === "choice" ? current.entry.options : undefined;
-          var result = await aiReview.request(aiMemory.provider, aiMemory.model, aiMemory.credential,
-            task, current.image, allowed);
+          var result;
+          var attempts = task === "identity" ? 2 : 1;
+          for (var attempt = 0; attempt < attempts; attempt += 1) {
+            result = await aiReview.request(aiMemory.provider, aiMemory.model, aiMemory.credential,
+              task, current.image, allowed, undefined, task === "identity" ? current.entry.identityContext : undefined);
+            if (result.ok || attempt + 1 >= attempts) break;
+          }
           if (result.ok) {
             await onSuccess(current.entry, result);
             delete errorMap[errorKey(current.entry)];
@@ -361,6 +432,66 @@
       }
       aiDictationResults[entry.key] = { answer: answerSnapshot, transcription: result.transcription, alignment: alignment };
     }, aiDictationErrors, function (entry) { return entry.key; });
+  }
+
+  function identityAiEntries(allPages) {
+    var pages = allPages ? Array.from({ length: state.pageCount }, function (_, index) { return index + 1; }) : [state.currentPage];
+    var entries = [];
+    pages.forEach(function (pageNumber) {
+      if (!state.choicePages[pageNumber]) return;
+      var identity = state.template && state.template.identity;
+      if (!identity) return;
+      (Array.isArray(identity.fields) ? identity.fields : []).forEach(function (field) {
+        var fieldType = field && field.id === "class-grade" ? "class-grade-grid" :
+          field && field.id === "class-form" ? "class-form-grid" :
+            field && field.id === "student-number" ? "student-number-grid" : "";
+        if (!fieldType) return;
+        var label = fieldType === "class-grade-grid" ? "班別年級圈格" :
+          fieldType === "class-form-grid" ? "班別字母圈格" : "學號圈格";
+        entries.push({ pageNumber: pageNumber, key: pageNumber + ":grid:" + fieldType, source: "grid",
+          label: "第 " + pageNumber + " 頁 · " + label, fieldType: fieldType,
+          identityContext: { mode: "grid", fieldType: fieldType,
+            options: Array.isArray(field.options) ? field.options.slice() : [], digits: Number(field.digits) || 0 } });
+      });
+      (Array.isArray(identity.masks) ? identity.masks : []).forEach(function (mask) {
+        if (!mask || ["class-handwrite", "student-handwrite"].indexOf(mask.type) < 0) return;
+        var label = mask.type === "class-handwrite" ? "手寫班別區" : "手寫班號區";
+        entries.push({ pageNumber: pageNumber, key: pageNumber + ":handwriting:" + String(mask.id || mask.type), source: "handwriting",
+          label: "第 " + pageNumber + " 頁 · " + label, fieldType: mask.type, maskId: mask.id,
+          identityContext: { mode: "handwriting", fieldType: mask.type } });
+      });
+    });
+    return entries;
+  }
+
+  async function makeIdentityAiImage(entry) {
+    var pdfPage = await state.pdfDoc.getPage(entry.pageNumber);
+    var base = pdfPage.getViewport({ scale: 1 });
+    var rendered = await renderPdfToCanvas(entry.pageNumber, Math.min(1.65, 1180 / base.width));
+    var pageRecord = state.choicePages[entry.pageNumber];
+    return aiReview.createIdentityCrop(rendered.canvas, state.template,
+      { source: entry.source, fieldType: entry.fieldType, maskId: entry.maskId }, {
+        templates: templates, geometry: geometry,
+        calibration: pageRecord && pageRecord.metadataCalibration
+      });
+  }
+
+  function mergeIdentityResult(entry, result) {
+    var pageResult = aiIdentityResults[entry.pageNumber] || { grid: {}, handwriting: {} };
+    var bucket = entry.source === "grid" ? pageResult.grid : pageResult.handwriting;
+    var key = entry.source === "grid" ? entry.fieldType : entry.fieldType;
+    bucket[key] = result;
+    aiIdentityResults[entry.pageNumber] = pageResult;
+  }
+
+  async function runIdentityAi(allPages) {
+    var entries = identityAiEntries(allPages);
+    if (!entries.length) {
+      setAiStatus("此頁或範本沒有可用的班別／學號圈格或手寫區。", true);
+      return;
+    }
+    await runPreparedAiBatch("identity", entries, makeIdentityAiImage, mergeIdentityResult,
+      aiIdentityErrors, function (entry) { return entry.key; });
   }
 
   function renderChoiceAiSuggestion(current) {
@@ -828,6 +959,272 @@
     renderFocusControls(queue);
   }
 
+  function identityValueText(value, blankLabel) {
+    if (Array.isArray(value)) return value.length ? value.map(function (item) { return identityValueText(item, blankLabel); }).join("、") : (blankLabel || "空白");
+    if (value == null || value === "") return blankLabel || "空白";
+    return String(value);
+  }
+
+  function identitySingleValue(value) {
+    if (typeof value === "string") return value;
+    if (Array.isArray(value) && value.length === 1 && typeof value[0] === "string") return value[0];
+    return null;
+  }
+
+  function identityGridClass(result) {
+    if (!result || !result.grid) return { text: "未讀取", value: null };
+    var gradeField = state.template.identity.fields.find(function (field) { return field.id === "class-grade"; });
+    var formField = state.template.identity.fields.find(function (field) { return field.id === "class-form"; });
+    var gradeValue = gradeField ? result.grid["class-grade-grid"] && result.grid["class-grade-grid"].classGrade : "";
+    var formValue = formField ? result.grid["class-form-grid"] && result.grid["class-form-grid"].classForm : "";
+    var gradeText = gradeField ? identityValueText(gradeValue) : "";
+    var formText = formField ? identityValueText(formValue) : "";
+    var gradeSingle = gradeField ? identitySingleValue(gradeValue) : "";
+    var formSingle = formField ? identitySingleValue(formValue) : "";
+    return { text: (gradeText + formText) || "未讀取",
+      value: gradeSingle !== null && formSingle !== null ? gradeSingle + formSingle : null };
+  }
+
+  function identityGridNumber(result) {
+    var field = state.template.identity.fields.find(function (entry) { return entry.id === "student-number"; });
+    var response = result && result.grid && result.grid["student-number-grid"];
+    if (!field || !response || !Array.isArray(response.studentNumber)) return { text: "未讀取", value: null };
+    var slots = response.studentNumber;
+    var text = slots.map(function (slot) { return identityValueText(slot, "空白"); }).join(" | ");
+    var value = slots.every(function (slot) { return typeof slot === "string" && /^\d$/.test(slot); }) ? slots.join("") : null;
+    return { text: text, value: value };
+  }
+
+  function identityLocalValues(page) {
+    var metadata = page && page.metadata || {};
+    var fields = state.template && state.template.identity && state.template.identity.fields || [];
+    var gradeRequired = fields.some(function (field) { return field && field.id === "class-grade"; });
+    var formRequired = fields.some(function (field) { return field && field.id === "class-form"; });
+    var numberField = fields.find(function (field) { return field && field.id === "student-number"; });
+    var grade = metadata.grade || {};
+    var form = metadata.form || {};
+    var localClass = page && page.classWasEdited ? String(page.classValue || "") :
+      (gradeRequired && grade.status === "read" ? String(grade.value || "") : "") +
+      (formRequired && form.status === "read" ? String(form.value || "") : "");
+    var digits = Array.isArray(metadata.idDigits) ? metadata.idDigits : [];
+    var localNumber = page && page.studentIdWasEdited ? String(page.studentId || "") :
+      (digits.length && digits.every(function (entry) { return entry && entry.status === "read" && /^\d$/.test(String(entry.value || "")); })
+        ? digits.map(function (entry) { return entry.value; }).join("") : "");
+    var classConfirmed = (!gradeRequired || grade.status === "read") &&
+      (!formRequired || form.status === "read") || page && page.classWasEdited;
+    var numberConfirmed = !numberField || (digits.length === numberField.digits &&
+      digits.every(function (entry) { return entry && entry.status === "read"; })) || page && page.studentIdWasEdited;
+    return { classValue: localClass || null, studentId: localNumber || null,
+      classText: localClass || (classConfirmed ? "空白" : "未確認"),
+      numberText: localNumber || (numberConfirmed ? "空白" : "未確認"),
+      confirmed: model.choiceIdentityConfirmed(page) };
+  }
+
+  function identityComparison(pageNumber) {
+    var page = state.choicePages[pageNumber];
+    var result = aiIdentityResults[pageNumber];
+    if (!page || !result) return null;
+    var circleClass = identityGridClass(result);
+    var circleNumber = identityGridNumber(result);
+    var handClassResult = result.handwriting && result.handwriting["class-handwrite"];
+    var handNumberResult = result.handwriting && result.handwriting["student-handwrite"];
+    var handClass = handClassResult ? String(handClassResult.handwrittenClass || "") : null;
+    var handNumber = handNumberResult ? String(handNumberResult.handwrittenNumber || "") : null;
+    var local = identityLocalValues(page);
+    var mismatch = !local.confirmed;
+    if (circleClass.value != null && local.classValue != null && circleClass.value !== local.classValue) mismatch = true;
+    if (circleNumber.value != null && local.studentId != null && circleNumber.value !== local.studentId) mismatch = true;
+    if (handClass != null && circleClass.value != null && handClass !== circleClass.value) mismatch = true;
+    if (handNumber != null && circleNumber.value != null && handNumber !== circleNumber.value) mismatch = true;
+    if (handClass != null && local.classValue != null && handClass !== local.classValue) mismatch = true;
+    if (handNumber != null && local.studentId != null && handNumber !== local.studentId) mismatch = true;
+    var circlePresent = result.grid && Object.keys(result.grid).length > 0;
+    var handPresent = result.handwriting && Object.keys(result.handwriting).length > 0;
+    if (!circlePresent && !handPresent) return null;
+    return { needsReview: mismatch, local: local, circleClass: circleClass, circleNumber: circleNumber,
+      handClass: handClass, handNumber: handNumber,
+      circleText: "班別 " + circleClass.text + "／學號 " + circleNumber.text,
+      handText: handPresent ? "班別 " + (handClass == null ? "未讀取" : handClass || "空白") + "／學號 " +
+        (handNumber == null ? "未讀取" : handNumber || "空白") : "未設定手寫區" };
+  }
+
+  function identityAdoption(pageNumber, source) {
+    var comparison = identityComparison(pageNumber);
+    if (!comparison) return null;
+    var identity = state.template.identity;
+    var gradeField = identity.fields.find(function (field) { return field.id === "class-grade"; });
+    var formField = identity.fields.find(function (field) { return field.id === "class-form"; });
+    var numberField = identity.fields.find(function (field) { return field.id === "student-number"; });
+    var suggestion = {};
+    if (source === "grid") {
+      var grid = aiIdentityResults[pageNumber].grid || {};
+      var grade = gradeField ? identitySingleValue(grid["class-grade-grid"] && grid["class-grade-grid"].classGrade) : "";
+      var form = formField ? identitySingleValue(grid["class-form-grid"] && grid["class-form-grid"].classForm) : "";
+      var number = grid["student-number-grid"] && grid["student-number-grid"].studentNumber;
+      if ((gradeField || formField) && (!gradeField || grade) && (!formField || form)) {
+        suggestion.classValue = String(grade || "") + String(form || "");
+      }
+      if (numberField && Array.isArray(number) && number.length === numberField.digits && number.every(function (slot) { return typeof slot === "string" && /^\d$/.test(slot); })) {
+        suggestion.studentId = number.join("");
+      }
+    } else {
+      var hand = aiIdentityResults[pageNumber].handwriting || {};
+      var handClass = hand["class-handwrite"];
+      var handNumber = hand["student-handwrite"];
+      if (handClass && /^[1-9][A-Z]$/.test(handClass.handwrittenClass || "")) suggestion.classValue = handClass.handwrittenClass;
+      if (handNumber && /^\d{1,3}$/.test(handNumber.handwrittenNumber || "")) suggestion.studentId = handNumber.handwrittenNumber;
+    }
+    return Object.keys(suggestion).length ? suggestion : null;
+  }
+
+  function adoptIdentitySuggestion(pageNumber, source) {
+    var suggestion = identityAdoption(pageNumber, source);
+    var page = state.choicePages[pageNumber];
+    if (!suggestion || !page) return;
+    if (Object.prototype.hasOwnProperty.call(suggestion, "classValue")) {
+      page.classValue = suggestion.classValue;
+      page.classWasEdited = false;
+      if (page.metadata) {
+        if (page.metadata.grade) page.metadata.grade.status = "review";
+        if (page.metadata.form) page.metadata.form.status = "review";
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(suggestion, "studentId")) {
+      page.studentId = suggestion.studentId;
+      page.studentIdWasEdited = false;
+      if (page.metadata) (page.metadata.idDigits || []).forEach(function (digit) { digit.status = "review"; });
+    }
+    aiIdentityPendingConfirmation[pageNumber] = true;
+    refreshChoiceIdentityWarnings();
+    renderCurrentMode();
+  }
+
+  function confirmAdoptedIdentity(pageNumber) {
+    var page = state.choicePages[pageNumber];
+    if (!page || !aiIdentityPendingConfirmation[pageNumber]) return;
+    page.classWasEdited = true;
+    page.studentIdWasEdited = true;
+    if (page.metadata) {
+      if (page.metadata.grade) page.metadata.grade.status = "manual";
+      if (page.metadata.form) page.metadata.form.status = "manual";
+      (page.metadata.idDigits || []).forEach(function (digit) { digit.status = "manual"; });
+    }
+    if (!model.choiceIdentityConfirmed(page)) {
+      setAiStatus("班別／學號仍未符合範本要求，請核對欄位後再次確認。", true);
+      refreshChoiceIdentityWarnings();
+      renderCurrentMode();
+      return;
+    }
+    delete aiIdentityPendingConfirmation[pageNumber];
+    refreshChoiceIdentityWarnings();
+    renderCurrentMode();
+  }
+
+  function renderIdentityAiResult(pageNumber, comparison) {
+    var container = els.choiceIdentityAiResults;
+    container.replaceChildren();
+    if (!comparison || !comparison.needsReview || !aiIdentityResults[pageNumber]) return;
+    var card = document.createElement("article"); card.className = "choice-identity-ai-result";
+    var heading = document.createElement("strong"); heading.textContent = "第 " + pageNumber + " 頁 · 班別／學號 AI 核對";
+    var circle = document.createElement("p"); circle.textContent = "AI 圈格讀到：" + comparison.circleText;
+    var handwriting = document.createElement("p"); handwriting.textContent = "AI 手寫讀到：" + comparison.handText;
+    var local = document.createElement("p"); local.textContent = "本機讀到：班別 " + comparison.local.classText + "／學號 " + comparison.local.numberText;
+    card.append(heading, circle, handwriting, local);
+    var circleSuggestion = identityAdoption(pageNumber, "grid");
+    var handSuggestion = identityAdoption(pageNumber, "handwriting");
+    var actions = document.createElement("div"); actions.className = "toolbar-row";
+    if (circleSuggestion) {
+      var adoptCircle = document.createElement("button"); adoptCircle.type = "button"; adoptCircle.className = "button";
+      adoptCircle.textContent = "採用 AI 圈格結果（仍須老師確認）";
+      adoptCircle.addEventListener("click", function () { adoptIdentitySuggestion(pageNumber, "grid"); });
+      actions.append(adoptCircle);
+    }
+    if (handSuggestion) {
+      var adoptHand = document.createElement("button"); adoptHand.type = "button"; adoptHand.className = "button";
+      adoptHand.textContent = "採用 AI 手寫結果（仍須老師確認）";
+      adoptHand.addEventListener("click", function () { adoptIdentitySuggestion(pageNumber, "handwriting"); });
+      actions.append(adoptHand);
+    }
+    if (aiIdentityPendingConfirmation[pageNumber]) {
+      var confirm = document.createElement("button"); confirm.type = "button"; confirm.className = "button primary";
+      confirm.textContent = "確認班別及學號無誤";
+      confirm.addEventListener("click", function () { confirmAdoptedIdentity(pageNumber); });
+      actions.append(confirm);
+    }
+    if (actions.childNodes.length) card.append(actions);
+    container.append(card);
+  }
+
+  function renderChoiceIdentityCrossCheck(sourceCanvas) {
+    if (!els.choiceIdentityReview) return;
+    els.choiceIdentityReviewPages.replaceChildren();
+    els.choiceIdentityReviewCrops.replaceChildren();
+    els.choiceIdentityAiResults.replaceChildren();
+    if (!state.pdfDoc || !state.template || state.template.kind !== "choice") {
+      els.choiceIdentityReview.hidden = true;
+      return;
+    }
+    var warnings = model.choiceIdentityWarnings(state.choicePages, state.pageCount);
+    var displayWarnings = {};
+    Object.keys(warnings).forEach(function (pageNumber) { displayWarnings[pageNumber] = warnings[pageNumber].slice(); });
+    Object.keys(aiIdentityResults).forEach(function (pageNumber) {
+      var comparison = identityComparison(Number(pageNumber));
+      if (!comparison || !comparison.needsReview) return;
+      if (!displayWarnings[pageNumber]) displayWarnings[pageNumber] = [];
+      displayWarnings[pageNumber].push("AI 圈格／手寫結果與本機讀圈不一致或未確認");
+    });
+    var pageNumbers = Object.keys(displayWarnings).map(Number).filter(Number.isInteger).sort(function (a, b) { return a - b; });
+    els.choiceIdentityReview.hidden = pageNumbers.length === 0;
+    if (!pageNumbers.length) return;
+    pageNumbers.forEach(function (pageNumber) {
+      var button = document.createElement("button");
+      button.type = "button"; button.className = "choice-identity-review-page";
+      button.textContent = "第 " + pageNumber + " 頁 · " + displayWarnings[pageNumber].join("；");
+      button.setAttribute("aria-current", pageNumber === state.currentPage ? "true" : "false");
+      button.addEventListener("click", function () {
+        state.currentPage = pageNumber;
+        renderCurrentMode();
+      });
+      els.choiceIdentityReviewPages.append(button);
+    });
+    if (!pageNumbers.includes(state.currentPage)) return;
+    renderIdentityAiResult(state.currentPage, identityComparison(state.currentPage));
+    if (!sourceCanvas) return;
+    var masks = state.template.identity && Array.isArray(state.template.identity.masks) ? state.template.identity.masks : [];
+    var textMasks = masks.filter(function (mask) {
+      return mask && ["text-name", "text-subject", "text-other"].indexOf(mask.type) >= 0;
+    });
+    if (!textMasks.length && masks.every(function (mask) { return !mask || !mask.type; })) {
+      textMasks = masks.slice();
+    }
+    if (!textMasks.length) {
+      var none = document.createElement("p"); none.className = "muted small";
+      none.textContent = "此範本沒有姓名或文字區座標；請按上方頁碼核對本頁，並在班別／學號欄手動修正。";
+      els.choiceIdentityReviewCrops.append(none);
+      return;
+    }
+    textMasks.forEach(function (mask, index) {
+      if (![mask.x, mask.y, mask.w, mask.h].every(Number.isFinite)) return;
+      var left = Math.max(0, Math.floor(mask.x * sourceCanvas.width));
+      var top = Math.max(0, Math.floor(mask.y * sourceCanvas.height));
+      var right = Math.min(sourceCanvas.width, Math.ceil((mask.x + mask.w) * sourceCanvas.width));
+      var bottom = Math.min(sourceCanvas.height, Math.ceil((mask.y + mask.h) * sourceCanvas.height));
+      if (left >= right || top >= bottom) return;
+      var frame = document.createElement("figure"); frame.className = "choice-identity-review-crop";
+      var caption = document.createElement("figcaption"); caption.textContent = mask.label || (index === 0 ? "姓名區" : "文字區 " + (index + 1));
+      var crop = document.createElement("canvas");
+      var cropWidth = right - left; var cropHeight = bottom - top;
+      var factor = Math.min(6, Math.max(1, Math.min(480 / cropWidth, 210 / cropHeight)));
+      crop.width = Math.max(1, Math.round(cropWidth * factor)); crop.height = Math.max(1, Math.round(cropHeight * factor));
+      var context = crop.getContext("2d");
+      if (!context) return;
+      context.imageSmoothingEnabled = false;
+      context.drawImage(sourceCanvas, left, top, cropWidth, cropHeight, 0, 0, crop.width, crop.height);
+      crop.setAttribute("role", "img"); crop.setAttribute("aria-label", "第 " + state.currentPage + " 頁的本機「" + caption.textContent + "」放大裁切");
+      frame.append(caption, crop); els.choiceIdentityReviewCrops.append(frame);
+    });
+  }
+
   function renderFocusPreview(sourceCanvas, viewport) {
     var queue = review.buildReviewQueue(state.choicePages, state.pageCount);
     var current = queue.find(function (entry) { return entry.key === state.focusKey; });
@@ -954,6 +1351,7 @@
     renderChoiceSummary(pageRecord);
     if (!state.pdfDoc) {
       els.choiceStage.innerHTML = '<p class="empty-state">選擇 PDF 後，答題紙會顯示在這裏。</p>';
+      renderChoiceIdentityCrossCheck(null);
       return;
     }
     var width = Math.max(480, Math.min(1050, els.choiceStage.clientWidth || 820));
@@ -972,6 +1370,7 @@
       els.choiceStage.append(note);
     }
     renderFocusPreview(rendered.canvas, rendered.viewport);
+    renderChoiceIdentityCrossCheck(rendered.canvas);
   }
 
   function dictationPageRecord() {
@@ -2263,6 +2662,8 @@
   els.aiTest.addEventListener("click", testAiConnection);
   els.aiChoiceCurrent.addEventListener("click", function () { runChoiceAi(false); });
   els.aiChoiceAll.addEventListener("click", function () { runChoiceAi(true); });
+  els.aiIdentityCurrent.addEventListener("click", function () { runIdentityAi(false); });
+  els.aiIdentityAll.addEventListener("click", function () { runIdentityAi(true); });
   els.aiDictationCurrent.addEventListener("click", function () { runDictationAi(false); });
   els.aiDictationAll.addEventListener("click", function () { runDictationAi(true); });
   els.stepPills.forEach(function (pill) { pill.addEventListener("click", function () { setStep(Number(pill.dataset.step)); renderCurrentMode(); }); });

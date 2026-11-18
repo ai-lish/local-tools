@@ -81,6 +81,19 @@ h3 { font-size: 14px; }
 .empty-state { padding: 50px 20px; color: var(--muted); text-align: center; }
 .review-list { position: sticky; top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfd; }
 .review-list h3 { margin-bottom: 5px; }
+.choice-identity-review { min-width: 0; margin-top: 12px; padding: 10px; border: 1px solid #b9c8d3; border-radius: 10px; background: #fff; }
+.choice-identity-review[hidden] { display: none !important; }
+.choice-identity-review h4 { margin: 0 0 6px; }
+.choice-identity-review-pages, .choice-identity-review-crops { display: grid; gap: 7px; min-width: 0; }
+.choice-identity-ai-results { display: grid; gap: 8px; min-width: 0; margin: 8px 0; }
+.choice-identity-ai-result { min-width: 0; padding: 8px; border: 1px solid #dfbf7c; border-radius: 8px; background: #fff9e9; overflow-wrap: anywhere; }
+.choice-identity-ai-result p { margin: 4px 0; }
+.choice-identity-ai-result .toolbar-row { margin-top: 7px; }
+.choice-identity-review-page { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--navy); background: #f5f8fa; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.choice-identity-review-page[aria-current="true"] { border-color: var(--blue); background: #eaf4fb; }
+.choice-identity-review-crop { min-width: 0; margin: 0; padding: 7px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.choice-identity-review-crop figcaption { margin-bottom: 5px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.choice-identity-review-crop canvas { display: block; max-width: 100%; max-height: 210px; border: 1px solid #d7dfe5; image-rendering: pixelated; }
 .review-items { display: grid; gap: 6px; max-height: 420px; margin-top: 10px; overflow: auto; }
 .review-item { display: flex; align-items: center; justify-content: space-between; gap: 7px; width: 100%; padding: 7px 8px; border: 1px solid #efcf9d; border-radius: 8px; color: #71400c; background: var(--gold-soft); text-align: left; font-size: 12px; }
 .review-item:hover { border-color: var(--orange); }
@@ -260,6 +273,11 @@ footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: cent
 .ai-review-settings > .muted { margin: 9px 0 4px; }
 .ai-review-status { min-height: 1.4em; margin: 6px 0 0; color: var(--navy); font-size: 13px; font-weight: 700; }
 .ai-review-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.ai-identity-confirmation { min-width: 0; margin: 10px 0; padding: 11px; border: 1px solid #c4d4df; border-radius: 9px; background: #fff; }
+.ai-identity-confirmation[hidden] { display: none !important; }
+.ai-identity-confirmation h4 { margin: 0 0 6px; }
+.ai-identity-confirm-preview { display: grid; place-items: center; min-width: 0; max-height: 220px; margin: 8px 0; overflow: auto; border: 1px solid #d7dfe5; background: #f7f9fa; }
+.ai-identity-confirm-preview img { display: block; max-width: 100%; max-height: 210px; object-fit: contain; image-rendering: pixelated; }
 .ai-review-result { min-width: 0; margin: 10px 0; padding: 11px; border: 1px solid #c4d4df; border-radius: 9px; background: #fff; overflow-wrap: anywhere; }
 .ai-review-result p { margin: 4px 0; }
 .ai-review-difference { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
@@ -358,15 +376,19 @@ footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: cent
 .choice-wizard-zone { cursor: move; }
 .choice-wizard-zone rect:first-child { fill: rgba(31, 110, 164, .12); stroke: #176b9b; stroke-width: .0022; vector-effect: non-scaling-stroke; }
 .choice-wizard-zone.is-selected rect:first-child { fill: rgba(219, 122, 24, .15); stroke: #a45b16; stroke-width: .003; }
-.choice-wizard-zone text { fill: #142a3b; font-size: .014; font-weight: 800; }
+.choice-wizard-zone text, .choice-wizard-ai-suggestion-zone text { fill: #142a3b; font-weight: 800; }
 .choice-wizard-resize { fill: #a45b16; stroke: #fff; stroke-width: .0015; cursor: nwse-resize; }
 .choice-wizard-zone-preview { fill: rgba(36, 132, 86, .14); stroke: #248456; stroke-width: .0025; stroke-dasharray: .008 .005; vector-effect: non-scaling-stroke; pointer-events: none; }
 .choice-wizard-zone-list { display: grid; gap: 6px; margin: 9px 0; }
-.choice-wizard-zone-item { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.choice-wizard-zone-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
 .choice-wizard-zone-item > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .choice-wizard-zone-item.selected { border-color: var(--orange); }
 .choice-wizard-zone-rows { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; }
 .choice-wizard-zone-rows input { width: 72px; min-width: 0; padding: 5px 7px; }
+.choice-wizard-zone-rows input[aria-label*="選項"] { width: 150px; max-width: 100%; }
+.choice-wizard-zone-label input { width: 150px; }
+.choice-wizard-zone-redact { margin: 0; white-space: nowrap; }
+.choice-wizard-zone-redact input { width: auto; }
 .choice-wizard-count-slot { display: flex; flex-wrap: wrap; gap: 9px; margin: 12px 0; }
 .choice-wizard-count-slot .field { flex: 1 1 160px; min-width: 0; margin: 0; }
 .choice-wizard-numbering-row { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; min-width: 0; margin: 10px 0; }
@@ -415,7 +437,7 @@ footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: cent
   .choice-wizard-category-grid { grid-template-columns: 1fr; }
   .choice-wizard-source-row, .choice-wizard-controls, .choice-wizard-zone-controls { align-items: stretch; }
   .choice-wizard-source-row .field, .choice-wizard-controls .field, .choice-wizard-zone-controls .field { flex-basis: 100%; }
-  .choice-wizard-zone-item { flex-wrap: wrap; }
+  .choice-wizard-zone-item { align-items: stretch; }
   .choice-wizard-zone-item > span { flex-basis: 100%; }
   .choice-wizard-zone-rows { flex: 1 1 auto; }
   .wizard-navigation > .button { flex: 1 1 130px; }

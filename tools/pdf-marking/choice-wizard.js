@@ -3,6 +3,9 @@
 
   var DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
   var MC_OPTIONS = ["A", "B", "C", "D", "E", "F"];
+  var GRADE_OPTIONS = ["1", "2", "3", "4", "5", "6"];
+  var GRADE_GRID_LABELS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+  var FORM_GRID_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function spread(start, end, count) {
@@ -14,7 +17,88 @@
     return spread(start + margin, start + length - margin, count);
   }
   function zoneMask(zone) {
-    return { id: zone.id, label: zone.label, x: zone.x, y: zone.y, w: zone.w, h: zone.h };
+    var mask = { id: zone.id, label: zone.label, x: zone.x, y: zone.y, w: zone.w, h: zone.h };
+    if (zone.type) mask.type = zone.type;
+    if (typeof zone.redactForAi === "boolean") mask.redactForAi = zone.redactForAi;
+    return mask;
+  }
+
+  function answerOptions(type, value) {
+    var allowed = type === "answer-tf" ? ["T", "F"] : MC_OPTIONS;
+    var raw = Array.isArray(value) ? value : String(value == null ? "ABCD" : value).split(/[，,\s]+/);
+    var options = raw.map(function (option) { return String(option).trim().toUpperCase(); }).filter(Boolean);
+    if (options.length < 2 || options.length > (type === "answer-tf" ? 2 : 6) ||
+        options.some(function (option) { return allowed.indexOf(option) < 0; }) || new Set(options).size !== options.length) {
+      throw new Error(type === "answer-tf" ? "是非題選項須為 T、F。" : "選擇題選項須為 2 至 6 個不重複的 A–F 標籤。");
+    }
+    return options;
+  }
+
+  function answerRows(zone, count) {
+    var groupSize = Math.max(0, Math.min(250, Math.floor(Number(zone.groupSize) || 0)));
+    var groupGap = Math.max(0, Math.min(10, Number(zone.groupGap) || 0));
+    if (!groupSize) {
+      var linear = centerRange(zone.y, zone.h, count, zone.h * 0.05);
+      return { mode: "linear", start: linear[0], pitch: linear.length > 1 ? linear[1] - linear[0] : zone.h, count: linear.length };
+    }
+    var margin = zone.h * 0.05;
+    var top = zone.y + margin;
+    var bottom = zone.y + zone.h - margin;
+    var groupsCount = Math.ceil(count / groupSize);
+    var intervals = Math.max(1, count - 1 + (groupsCount - 1) * groupGap);
+    var step = (bottom - top) / intervals;
+    var groups = [];
+    var logicalIndex = 0;
+    for (var start = 0; start < count; start += groupSize) {
+      var size = Math.min(groupSize, count - start);
+      var group = [];
+      for (var index = 0; index < size; index += 1) group.push(top + logicalIndex++ * step);
+      groups.push(group);
+      if (start + size < count) logicalIndex += groupGap;
+    }
+    return { mode: "list", groups: groups };
+  }
+
+  function answerRowCount(rows) {
+    if (!rows) return 0;
+    if (rows.mode === "list") return (rows.groups || []).reduce(function (total, group) {
+      return total + (Array.isArray(group) ? group.length : 0);
+    }, 0);
+    return Number(rows.count) || 0;
+  }
+
+  function isLayoutPrivacyZone(zone) {
+    return Boolean(zone && ["text-name", "text-subject", "text-other", "class-handwrite", "student-handwrite"].indexOf(zone.type) >= 0);
+  }
+
+  function isIdentityGridZone(zone) {
+    return Boolean(zone && ["class-grade-grid", "class-form-grid", "student-number-grid"].indexOf(zone.type) >= 0);
+  }
+
+  function layoutPrivacyDecisionReady(zones, identitiesComplete, noTextIdentityConfirmed) {
+    var hasTextIdentity = Array.isArray(zones) && zones.some(isLayoutPrivacyZone);
+    return hasTextIdentity ? identitiesComplete === true : noTextIdentityConfirmed === true;
+  }
+
+  function createLayoutPrivacyDefinition(zones, noTextIdentityConfirmed) {
+    var masks = (Array.isArray(zones) ? zones : []).filter(isLayoutPrivacyZone).map(zoneMask);
+    return { kind: "choice", identity: { fields: [], masks: masks,
+      noIdentityAreaDeclared: masks.length === 0 && noTextIdentityConfirmed === true } };
+  }
+
+  function normalizeGridOptions(type, value) {
+    var allowed = type === "class-grade-grid" ? GRADE_GRID_LABELS : type === "class-form-grid" ? FORM_GRID_LABELS : null;
+    if (!allowed) throw new Error("只可設定班別年級或班別字母圈格選項。");
+    var defaults = type === "class-grade-grid" ? GRADE_OPTIONS.slice() : MC_OPTIONS.slice();
+    var raw = value == null ? defaults : Array.isArray(value) ? value : String(value).split(/[，,]/);
+    var options = raw.map(function (option) { return String(option).trim().toUpperCase(); }).filter(Boolean);
+    if (options.length < 2 || options.length > 12 || options.some(function (option) { return allowed.indexOf(option) < 0; }) ||
+        new Set(options).size !== options.length) {
+      throw new Error(type === "class-grade-grid"
+        ? "班別年級圈格選項須為 2 至 12 個不重複的 1–9 標籤，並以逗號分隔。"
+        : "班別字母圈格選項須為 2 至 12 個不重複的 A–Z 標籤，並以逗號分隔。");
+    }
+    return options;
   }
 
   function createTemplateFromZones(options) {
@@ -48,11 +132,13 @@
         throw new Error("第 " + (index + 1) + " 個範圍超出頁面。");
       }
       if (clean.type === "text-name" || clean.type === "text-subject" || clean.type === "text-other" || clean.type === "class-handwrite" || clean.type === "student-handwrite" || clean.type === "class-grade-grid" || clean.type === "class-form-grid" || clean.type === "student-number-grid") {
+        if (clean.type === "text-name" || clean.type === "class-handwrite" || clean.type === "student-handwrite") clean.redactForAi = true;
+        else if (clean.type === "text-subject" || clean.type === "text-other") clean.redactForAi = clean.redactForAi !== false;
         definition.identity.masks.push(zoneMask(clean));
       }
       if (clean.type === "class-grade-grid" || clean.type === "class-form-grid") {
         var grade = clean.type === "class-grade-grid";
-        var choices = grade ? ["1", "2", "3", "4", "5", "6"] : ["A", "B", "C", "D", "E", "F"];
+        var choices = normalizeGridOptions(clean.type, clean.options);
         var rows = centerRange(clean.y, clean.h, choices.length, clean.h * 0.12);
         definition.identity.fields.push({ id: grade ? "class-grade" : "class-form", label: grade ? "班別年級" : "班別字母",
           options: choices, x: clean.x + clean.w / 2, rows: { mode: "linear", start: rows[0], pitch: rows.length > 1 ? rows[1] - rows[0] : clean.h, count: rows.length } });
@@ -74,13 +160,13 @@
       var optionsForType = type === "mc" ? (settings.mcOptions || ["A", "B", "C", "D"]) : ["T", "F"];
       var generatedColumns = columns.map(function (zone, columnIndex) {
         var rowCount = Math.max(1, Math.min(250, Math.floor(Number(zone.rowsPerColumn) || Number(settings.rowsPerColumn) || 1)));
-        var columnOptions = Array.isArray(zone.options) ? zone.options.slice() : optionsForType.slice();
+        var columnOptions = answerOptions(zone.type, Array.isArray(zone.options) ? zone.options : optionsForType);
         var optionXs = centerRange(zone.x, zone.w, columnOptions.length, zone.w * 0.08);
-        var rowYs = centerRange(zone.y, zone.h, rowCount, zone.h * 0.05);
+        var rowSpec = answerRows(zone, rowCount);
         return { xs: optionXs, options: columnOptions,
-          rows: { mode: "linear", start: rowYs[0], pitch: rowYs.length > 1 ? rowYs[1] - rowYs[0] : zone.h, count: rowYs.length }, wizardColumn: columnIndex };
+          rows: rowSpec, wizardColumn: columnIndex };
       });
-      var maxCount = Math.min(250, generatedColumns.reduce(function (sum, column) { return sum + column.rows.count; }, 0));
+      var maxCount = Math.min(250, generatedColumns.reduce(function (sum, column) { return sum + answerRowCount(column.rows); }, 0));
       var baseOptions = generatedColumns[0].options;
       definition.blocks.push({ id: type, type: type, label: type === "mc" ? "選擇題" : "是非題",
         maxCount: maxCount, numbering: settings[type + "Numbering"] === "row-major" ? "row-major" : "column-major",
@@ -90,7 +176,7 @@
           if (JSON.stringify(column.options) !== JSON.stringify(baseOptions)) result.options = column.options.slice();
           return result;
         }),
-        rows: { mode: "linear", start: generatedColumns[0].rows.start, pitch: generatedColumns[0].rows.pitch, count: generatedColumns[0].rows.count } });
+        rows: clone(generatedColumns[0].rows) });
     });
     if (!definition.blocks.length) throw new Error("請至少標示一欄選擇題或是非題答案範圍。");
     if (definition.identity.fields.length > 10) throw new Error("身份圈格最多可設 10 欄。");
@@ -127,7 +213,10 @@
     return { grade: Boolean(base.grade), form: Boolean(base.form), studentDigits: Math.max(0, Number(base.studentDigits) || 0) };
   }
 
-  var api = { createTemplateFromZones: createTemplateFromZones, keyArray: keyArray, toggleAnswer: toggleAnswer, identityRequirements: identityRequirements };
+  var api = { createTemplateFromZones: createTemplateFromZones, keyArray: keyArray, toggleAnswer: toggleAnswer,
+    identityRequirements: identityRequirements, isLayoutPrivacyZone: isLayoutPrivacyZone, isIdentityGridZone: isIdentityGridZone,
+    layoutPrivacyDecisionReady: layoutPrivacyDecisionReady, createLayoutPrivacyDefinition: createLayoutPrivacyDefinition,
+    normalizeGridOptions: normalizeGridOptions, answerOptions: answerOptions, answerRows: answerRows };
   root.PdfMarkingChoiceWizard = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
