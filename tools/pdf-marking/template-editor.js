@@ -730,6 +730,36 @@
     if (!validation.ok) return { ok: false, errors: validation.errors, warnings: validation.warnings || [] };
     return saveFn(clean);
   }
+  function clampSelectedZoom(value, minimum, maximum) {
+    var lower = Number.isFinite(Number(minimum)) ? Number(minimum) : 1;
+    var upper = Number.isFinite(Number(maximum)) ? Math.max(lower, Number(maximum)) : 8;
+    var zoom = Number.isFinite(Number(value)) ? Number(value) : lower;
+    return Math.max(lower, Math.min(upper, zoom));
+  }
+  function selectedBubbleRadius(pageWidth, bubbleRadius, selectedView) {
+    var fraction = Number(bubbleRadius) > 0 ? Number(bubbleRadius) * 0.65 : 0.0077 * 0.65;
+    var radius = Math.max(3, Math.min(15, Math.max(0, Number(pageWidth) || 0) * fraction));
+    return selectedView ? Math.max(14, radius) : radius;
+  }
+  function calculateSelectedZoom(options) {
+    var settings = options || {};
+    var frameWidth = Math.max(1, Number(settings.frameWidth) || 1);
+    var frameHeight = Math.max(1, Number(settings.frameHeight) || 1);
+    var pageAspect = Math.max(0.01, Number(settings.pageAspect) || 1);
+    var boundsValue = settings.bounds || null;
+    var width = boundsValue ? Math.max(0, Number(boundsValue.maxX) - Number(boundsValue.minX)) : 0;
+    var height = boundsValue ? Math.max(0, Number(boundsValue.maxY) - Number(boundsValue.minY)) : 0;
+    var groupFit = Infinity;
+    if (width > 0) groupFit = Math.min(groupFit, 0.72 / width);
+    if (height > 0) groupFit = Math.min(groupFit, 0.72 * frameHeight / (frameWidth * pageAspect * height));
+    if (!Number.isFinite(groupFit)) groupFit = 1;
+    var bubbleRadius = Number(settings.bubbleRadius) > 0 ? Number(settings.bubbleRadius) : 0.0077;
+    var minCircleDiameter = Number(settings.minCircleDiameter) > 0 ? Number(settings.minCircleDiameter) : 28;
+    var circleZoom = minCircleDiameter / (2 * frameWidth * bubbleRadius * 0.65);
+    var fitZoom = clampSelectedZoom(settings.fitZoom, 0.05, 1);
+    var maxZoom = Number(settings.maxZoom) > 0 ? Number(settings.maxZoom) : 8;
+    return clampSelectedZoom(Math.max(fitZoom, groupFit, circleZoom), fitZoom, maxZoom);
+  }
 
   var api = {
     clone: clone,
@@ -744,6 +774,9 @@
     moveGroupRows: moveGroupRows,
     setAllMcRowSpacing: setAllMcRowSpacing,
     setAllMcRowSpacingFromGroup: setAllMcRowSpacingFromGroup,
+    clampSelectedZoom: clampSelectedZoom,
+    selectedBubbleRadius: selectedBubbleRadius,
+    calculateSelectedZoom: calculateSelectedZoom,
     autoAlignTargetForGroup: autoAlignTargetForGroup,
     listAutoAlignTargets: listAutoAlignTargets,
     fitAutoAlignment: fitAutoAlignment,

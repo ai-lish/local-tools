@@ -20,6 +20,8 @@
       "template-editor-option-spacing", "template-editor-row-spacing", "template-editor-all-columns-wrap",
       "template-editor-all-columns", "template-editor-row-all-wrap", "template-editor-row-all",
       "template-editor-row-all-apply", "template-editor-view-fit", "template-editor-view-width", "template-editor-view-selected",
+      "template-editor-zoom-in", "template-editor-zoom-out", "template-editor-controls",
+      "template-editor-controls-toggle", "template-editor-row-scope",
       "template-editor-undo", "template-editor-reset", "template-editor-test",
       "template-editor-auto-align-scope", "template-editor-auto-align", "template-editor-auto-align-apply",
       "template-editor-auto-align-cancel", "template-editor-auto-align-preview",
@@ -29,10 +31,13 @@
 
     var session = null;
     var sampleBytes = null;
+    var editorSampleFile = null;
     var sampleDocument = null;
     var samplePage = null;
     var sampleViewport = null;
     var sampleRenderTask = null;
+    var sampleRenderBarrier = Promise.resolve();
+    var sampleLoadToken = 0;
     var renderToken = 0;
     var detectedResult = null;
     var autoAlignPreview = null;
@@ -40,6 +45,8 @@
     var drag = null;
     var controlEdit = null;
     var viewMode = "fit";
+    var selectedZoom = null;
+    var resizeRenderTimer = null;
 
     function clone(value) { return editor.clone(value); }
     function svgElement(name, attributes) {
@@ -51,36 +58,65 @@
       elements["template-editor-status"].textContent = message || "";
       elements["template-editor-status"].classList.toggle("is-error", Boolean(isError));
     }
+    function updateRowScopeIndicator() {
+      var enabled = Boolean(elements["template-editor-row-all"].checked);
+      elements["template-editor-row-scope"].hidden = !enabled;
+      elements["template-editor-controls"].classList.toggle("has-row-all", enabled);
+    }
     function selectedGroup() {
       return session ? editor.listGroups(session.draft).find(function (group) {
         return group.id === elements["template-editor-group"].value;
       }) || null : null;
     }
+    function fitZoomForPage(frameWidth, aspect) {
+      var maxHeight = Math.max(220, Math.min(window.innerHeight * 0.68, window.innerHeight - 250));
+      return Math.max(0.05, Math.min(1, maxHeight / Math.max(1, frameWidth * aspect)));
+    }
+    function displayWidthForAspect(aspect) {
+      var frame = elements["template-editor-frame"];
+      var frameWidth = Math.max(1, frame.clientWidth - 2);
+      if (viewMode === "fit") {
+        frame.style.height = "";
+        var maxHeight = Math.max(220, Math.min(window.innerHeight * 0.68, window.innerHeight - 250));
+        return Math.min(frameWidth, maxHeight / Math.max(0.01, aspect));
+      }
+      if (viewMode === "width") {
+        frame.style.height = "";
+        return frameWidth;
+      }
+      frame.style.height = Math.max(260, Math.floor(window.innerHeight * 0.62)) + "px";
+      var frameHeight = Math.max(1, frame.clientHeight);
+      if (!Number.isFinite(selectedZoom)) {
+        var group = selectedGroup();
+        selectedZoom = editor.calculateSelectedZoom({
+          frameWidth: frameWidth, frameHeight: frameHeight, pageAspect: aspect,
+          bounds: group && group.bounds, bubbleRadius: session && session.draft.bubble && session.draft.bubble.radius,
+          fitZoom: fitZoomForPage(frameWidth, aspect), minCircleDiameter: 28, maxZoom: 8
+        });
+      }
+      selectedZoom = editor.clampSelectedZoom(selectedZoom, fitZoomForPage(frameWidth, aspect), 8);
+      return frameWidth * selectedZoom;
+    }
+    function updateZoomControls() {
+      var canvas = elements["template-editor-canvas"];
+      var active = viewMode === "selected" && Boolean(samplePage && canvas && !canvas.hidden);
+      var minimum = sampleViewport ? fitZoomForPage(Math.max(1, elements["template-editor-frame"].clientWidth - 2),
+        sampleViewport.height / sampleViewport.width) : 1;
+      elements["template-editor-zoom-in"].disabled = !active || selectedZoom >= 8 - 0.001;
+      elements["template-editor-zoom-out"].disabled = !active || selectedZoom <= minimum + 0.001;
+    }
     function updateSampleDisplay(scrollToSelection) {
       var canvas = elements["template-editor-canvas"];
       var frame = elements["template-editor-frame"];
       var svg = elements["template-editor-overlay"];
-      if (!canvas || canvas.hidden || !canvas.width || !canvas.height) return;
-      var frameWidth = Math.max(1, frame.clientWidth - 2);
-      var aspect = canvas.height / canvas.width;
-      var displayWidth = frameWidth;
-      var displayHeight;
-      frame.classList.toggle("is-zoomed", viewMode === "selected");
-      if (viewMode === "fit") {
-        var maxHeight = Math.max(220, Math.min(window.innerHeight * 0.68, window.innerHeight - 250));
-        displayWidth = Math.min(frameWidth, maxHeight / aspect);
-      } else if (viewMode === "selected") {
-        frame.style.height = Math.max(260, Math.floor(window.innerHeight * 0.62)) + "px";
-        var group = selectedGroup();
-        var groupWidth = group && group.bounds ? Math.max(1, (group.bounds.maxX - group.bounds.minX) * frameWidth) : frameWidth * 0.4;
-        var groupHeight = group && group.bounds ? Math.max(1, (group.bounds.maxY - group.bounds.minY) * frameWidth * aspect) : frame.clientHeight * 0.4;
-        var zoom = Math.min(4, Math.max(1.5, Math.min(frameWidth * 0.72 / groupWidth, frame.clientHeight * 0.72 / groupHeight)));
-        displayWidth = frameWidth * zoom;
-      } else {
-        frame.style.height = "";
+      if (!canvas || canvas.hidden || !canvas.width || !canvas.height || !sampleViewport) {
+        updateZoomControls();
+        return;
       }
-      if (viewMode !== "selected") frame.style.height = "";
-      displayHeight = displayWidth * aspect;
+      var aspect = sampleViewport.height / sampleViewport.width;
+      var displayWidth = displayWidthForAspect(aspect);
+      var displayHeight = displayWidth * aspect;
+      frame.classList.toggle("is-zoomed", viewMode === "selected");
       canvas.style.width = displayWidth + "px";
       canvas.style.height = displayHeight + "px";
       svg.style.left = viewMode === "selected" ? "0" : "50%";
@@ -93,10 +129,24 @@
       if (scrollToSelection && viewMode === "selected") {
         var selected = selectedGroup();
         if (selected && selected.bounds) {
-          frame.scrollLeft = ((selected.bounds.minX + selected.bounds.maxX) / 2) * displayWidth - frame.clientWidth / 2;
-          frame.scrollTop = ((selected.bounds.minY + selected.bounds.maxY) / 2) * displayHeight - frame.clientHeight / 2;
+          var frameRect = frame.getBoundingClientRect();
+          var controlsRect = elements["template-editor-controls"].getBoundingClientRect();
+          var firstCircleGap = 8;
+          var firstCircleRadius = editor.selectedBubbleRadius(displayWidth,
+            session.draft.bubble && session.draft.bubble.radius, true);
+          var firstCircleY = selected.bounds.minY * displayHeight;
+          var requiredFrameTop = controlsRect.bottom + firstCircleGap + firstCircleRadius - firstCircleY;
+          if (frameRect.top < requiredFrameTop) {
+            window.scrollBy(0, frameRect.top - requiredFrameTop);
+            frameRect = frame.getBoundingClientRect();
+            controlsRect = elements["template-editor-controls"].getBoundingClientRect();
+          }
+          var hiddenTop = Math.max(0, Math.min(frame.clientHeight, controlsRect.bottom - frameRect.top));
+          frame.scrollLeft = Math.max(0, selected.bounds.minX * displayWidth - firstCircleGap - firstCircleRadius);
+          frame.scrollTop = Math.max(0, firstCircleY - hiddenTop - firstCircleGap - firstCircleRadius);
         }
       }
+      updateZoomControls();
     }
     function isDirty() {
       return Boolean(session && (JSON.stringify(session.draft) !== JSON.stringify(session.resetDraft) ||
@@ -133,7 +183,12 @@
         elements["template-editor-group"].append(option);
       });
       elements["template-editor-group"].disabled = groups.length === 0;
-      elements["template-editor-group"].value = groups.some(function (group) { return group.id === previous; }) ? previous : groups[0].id;
+      var firstChoiceGroup = groups.find(function (group) {
+        return ["mc-column", "mc-column-rows", "mc-rows"].indexOf(group.kind) >= 0;
+      });
+      var preferredGroup = firstChoiceGroup || groups[0];
+      elements["template-editor-group"].value = groups.some(function (group) { return group.id === previous; })
+        ? previous : preferredGroup && preferredGroup.id || "";
       var group = selectedGroup();
       var spacing = group ? editor.groupSpacing(session.draft, group.id) : { optionSpacing: null, rowSpacing: null };
       var optionInput = elements["template-editor-option-spacing"];
@@ -147,6 +202,7 @@
       elements["template-editor-row-all-wrap"].hidden = !isMcRows;
       elements["template-editor-row-all-apply"].hidden = !isMcRows;
       elements["template-editor-row-all-apply"].disabled = !spacing.rowSpacing || !isMcRows;
+      updateRowScopeIndicator();
       elements["template-editor-undo"].disabled = undoStack.length === 0;
       elements["template-editor-reset"].disabled = !session;
       elements["template-editor-test"].disabled = !samplePage;
@@ -197,9 +253,11 @@
         mcCount: (definition.blocks.find(function (block) { return block.type === "mc"; }) || { maxCount: 0 }).maxCount,
         tfCount: (definition.blocks.find(function (block) { return block.type === "tf"; }) || { maxCount: 0 }).maxCount
       });
-      var radius = Math.max(3, Math.min(15, width * (definition.bubble && definition.bubble.radius || 0.0077) * 0.65));
+      var bubbleRadius = definition.bubble && definition.bubble.radius || 0.0077;
+      var radius = Math.max(3, Math.min(15, width * bubbleRadius * 0.65));
+      var selectedRadius = editor.selectedBubbleRadius(width, bubbleRadius, viewMode === "selected");
       expanded.bubbles.forEach(function (bubble) {
-        drawCircle(svg, { x: bubble.x * width, y: bubble.y * height, type: bubble.type }, radius,
+        drawCircle(svg, { x: bubble.x * width, y: bubble.y * height, type: bubble.type }, selectedRadius,
           COLORS[bubble.type] || COLORS.mc, "template-editor-bubble", bubble.type + " " + (bubble.option || ""));
       });
       editor.listGroups(definition).forEach(function (group) {
@@ -292,19 +350,31 @@
           "#d21f2b", "template-editor-detected", "讀圈實際位置：學號 " + bubble.option);
       }); });
     }
-    function clearSample() {
+    function clearSample(preserveViewMode) {
       renderToken += 1;
+      sampleLoadToken += 1;
       if (sampleRenderTask && typeof sampleRenderTask.cancel === "function") {
-        try { sampleRenderTask.cancel(); } catch (error) { /* ignore cancelled render */ }
+        var cancelledTask = sampleRenderTask;
+        try { cancelledTask.cancel(); } catch (error) { /* ignore cancelled render */ }
+        sampleRenderBarrier = Promise.all([sampleRenderBarrier,
+          Promise.resolve(cancelledTask.promise).catch(function () { /* cancelled render is expected */ })]);
       }
       sampleRenderTask = null; samplePage = null; sampleViewport = null;
-      viewMode = "fit";
-      elements["template-editor-view-fit"].setAttribute("aria-pressed", "true");
-      elements["template-editor-view-width"].setAttribute("aria-pressed", "false");
-      elements["template-editor-view-selected"].setAttribute("aria-pressed", "false");
+      editorSampleFile = null;
+      if (!preserveViewMode) {
+        viewMode = "fit";
+        selectedZoom = null;
+        elements["template-editor-view-fit"].setAttribute("aria-pressed", "true");
+        elements["template-editor-view-width"].setAttribute("aria-pressed", "false");
+        elements["template-editor-view-selected"].setAttribute("aria-pressed", "false");
+      }
       elements["template-editor-frame"].classList.remove("is-zoomed");
       elements["template-editor-frame"].style.height = "";
-      if (sampleDocument && typeof sampleDocument.destroy === "function") sampleDocument.destroy();
+      var previousDocument = sampleDocument;
+      if (previousDocument && typeof previousDocument.destroy === "function") {
+        sampleRenderBarrier = Promise.all([sampleRenderBarrier,
+          Promise.resolve().then(function () { return previousDocument.destroy(); }).catch(function () { /* destroyed document errors are expected */ })]);
+      }
       sampleDocument = null; sampleBytes = null; detectedResult = null;
       autoAlignPreview = null;
       elements["template-editor-canvas"].width = 1; elements["template-editor-canvas"].height = 1;
@@ -316,33 +386,51 @@
       elements["template-editor-page-status"].textContent = "";
       elements["template-editor-result"].textContent = "測試後會顯示班別、學號、首十題答案及待覆核數。";
       renderOverlay();
+      updateZoomControls();
     }
-    async function renderSamplePage() {
+    async function renderSamplePage(scrollToSelection) {
       if (!sampleDocument) return;
-      var token = ++renderToken;
-      if (sampleRenderTask && typeof sampleRenderTask.cancel === "function") {
-        try { sampleRenderTask.cancel(); } catch (error) { /* ignore cancelled render */ }
+      if (resizeRenderTimer) {
+        window.clearTimeout(resizeRenderTimer);
+        resizeRenderTimer = null;
       }
+      var token = ++renderToken;
+      elements["template-editor-page-status"].classList.remove("is-error");
+      elements["template-editor-page-status"].textContent = "正在本機轉正及顯示樣本頁…";
+      await sampleRenderBarrier;
+      if (token !== renderToken) return;
+      var previousRenderTask = sampleRenderTask;
+      if (previousRenderTask && typeof previousRenderTask.cancel === "function") {
+        try { previousRenderTask.cancel(); } catch (error) { /* ignore cancelled render */ }
+        try { await previousRenderTask.promise; } catch (error) { /* cancelled render is expected */ }
+      }
+      if (token !== renderToken) return;
       var pageNumber = Math.max(1, Math.min(sampleDocument.numPages, Number(elements["template-editor-page-number"].value) || 1));
       elements["template-editor-page-number"].value = String(pageNumber);
-      elements["template-editor-page-status"].textContent = "正在本機轉正及顯示樣本頁…";
       try {
         var page = await sampleDocument.getPage(pageNumber);
         var baseViewport = page.getViewport({ scale: 1 });
-        var scale = Math.min(1.6, 1200 / Math.max(1, baseViewport.width));
-        var viewport = page.getViewport({ scale: scale });
+        var aspect = baseViewport.height / Math.max(1, baseViewport.width);
+        var displayWidth = displayWidthForAspect(aspect);
+        var viewport = page.getViewport({ scale: displayWidth / Math.max(1, baseViewport.width) });
+        var requestedOutputScale = Math.max(1, Number(window.devicePixelRatio) || 1);
+        var outputScale = Math.min(requestedOutputScale, 4000 / Math.max(viewport.width, viewport.height));
+        outputScale = Math.max(0.1, outputScale);
         if (token !== renderToken) return;
         var canvas = elements["template-editor-canvas"];
-        canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height); canvas.hidden = false;
+        canvas.width = Math.ceil(viewport.width * outputScale); canvas.height = Math.ceil(viewport.height * outputScale);
+        canvas.style.width = viewport.width + "px"; canvas.style.height = viewport.height + "px"; canvas.hidden = false;
         elements["template-editor-empty"].hidden = true;
         var context = canvas.getContext("2d", { willReadFrequently: true });
         samplePage = page; sampleViewport = viewport;
-        sampleRenderTask = page.render({ canvasContext: context, viewport: viewport });
+        var renderOptions = { canvasContext: context, viewport: viewport };
+        if (outputScale !== 1) renderOptions.transform = [outputScale, 0, 0, outputScale, 0, 0];
+        sampleRenderTask = page.render(renderOptions);
         await sampleRenderTask.promise;
         if (token !== renderToken) return;
         sampleRenderTask = null;
         resetTest();
-        updateSampleDisplay(false);
+        updateSampleDisplay(Boolean(scrollToSelection));
         elements["template-editor-page-status"].textContent = "第 " + pageNumber + " / " + sampleDocument.numPages + " 頁；旋轉 " +
           (page.rotate || 0) + "°，已由 PDF.js 轉正。拖拉底圖可移動所選組。";
         elements["template-editor-test"].disabled = false;
@@ -356,7 +444,9 @@
     }
     async function loadSample(file) {
       if (!file) return;
-      clearSample();
+      clearSample(true);
+      var loadToken = sampleLoadToken;
+      editorSampleFile = file;
       elements["template-editor-page-status"].classList.remove("is-error");
       if ((!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") || !root.pdfjsLib || !root.LT_PDF_WORKER_SRC) {
         elements["template-editor-page-status"].textContent = !root.pdfjsLib || !root.LT_PDF_WORKER_SRC
@@ -366,14 +456,23 @@
         return;
       }
       try {
-        sampleBytes = new Uint8Array(await file.arrayBuffer());
-        sampleDocument = await root.pdfjsLib.getDocument({ data: sampleBytes.slice(), isEvalSupported: false }).promise;
+        var bytes = new Uint8Array(await file.arrayBuffer());
+        await sampleRenderBarrier;
+        if (loadToken !== sampleLoadToken) return;
+        var document = await root.pdfjsLib.getDocument({ data: bytes.slice(), isEvalSupported: false }).promise;
+        if (loadToken !== sampleLoadToken) {
+          if (typeof document.destroy === "function") await document.destroy();
+          return;
+        }
+        sampleBytes = bytes;
+        sampleDocument = document;
         elements["template-editor-page-number"].min = "1";
         elements["template-editor-page-number"].max = String(sampleDocument.numPages);
         elements["template-editor-page-number"].value = "1";
         elements["template-editor-page-number"].disabled = false;
-        await renderSamplePage();
+        await renderSamplePage(true);
       } catch (error) {
+        if (loadToken !== sampleLoadToken) return;
         clearSample();
         elements["template-editor-page-status"].textContent = "PDF 無法開啟；請確認檔案完整、未加密，並使用 PDF 格式。";
         elements["template-editor-page-status"].classList.add("is-error");
@@ -509,6 +608,7 @@
       var result = editor.saveValidated(session.draft, templates, options.onSave);
       if (result && result.ok) {
         session.draft = clone(result.template || session.draft);
+        session.selectedTemplateId = session.draft.id;
         session.resetDraft = clone(session.draft);
         elements["template-editor-name"].value = session.draft.name;
         undoStack = [];
@@ -539,6 +639,7 @@
     }
     function open(selected) {
       if (!selected || selected.kind !== "choice") return false;
+      clearSample();
       var draft = clone(selected); var isBuiltin = selected.source === "builtin";
       if (isBuiltin) {
         var slug = selected.id.replace(/^builtin:/, "").toLowerCase().replace(/[^a-z0-9._-]/g, "-").slice(0, 36);
@@ -546,18 +647,21 @@
         draft.source = "custom";
         draft.name = (selected.name.slice(0, 88) + "（自訂副本）").slice(0, 100);
       }
-      session = { draft: draft, resetDraft: clone(draft), original: clone(selected), copiedBuiltin: isBuiltin };
+      session = { draft: draft, resetDraft: clone(draft), original: clone(selected), copiedBuiltin: isBuiltin,
+        selectedTemplateId: selected.id };
       undoStack = []; detectedResult = null; autoAlignPreview = null; controlEdit = null;
-      viewMode = "fit";
-      elements["template-editor-view-fit"].setAttribute("aria-pressed", "true");
+      selectedZoom = null;
+      viewMode = "selected";
+      elements["template-editor-view-fit"].setAttribute("aria-pressed", "false");
       elements["template-editor-view-width"].setAttribute("aria-pressed", "false");
-      elements["template-editor-view-selected"].setAttribute("aria-pressed", "false");
+      elements["template-editor-view-selected"].setAttribute("aria-pressed", "true");
       elements["template-selection-panel"].hidden = true;
       elements["template-editor-panel"].hidden = false;
       elements["template-editor-copy-note"].textContent = isBuiltin
         ? "已建立「" + draft.name + "」自訂副本；內置範本保持不變。"
         : "正在編輯自訂範本「" + selected.name + "」；尚未儲存前，既有範本不會改動。";
       elements["template-editor-name"].value = draft.name;
+      elements["template-editor-group"].value = "";
       elements["template-editor-all-columns"].checked = false;
       setStatus("所有圈位均符合範本座標範圍。", false);
       renderControls();
@@ -705,14 +809,23 @@
     }
 
     elements["template-editor-pdf-file"].addEventListener("change", function () { loadSample(elements["template-editor-pdf-file"].files[0]); });
-    elements["template-editor-page-number"].addEventListener("change", renderSamplePage);
+    elements["template-editor-page-number"].addEventListener("change", function () { renderSamplePage(true); });
     elements["template-editor-group"].addEventListener("change", function () {
-      autoAlignPreview = null; renderControls(); updateSampleDisplay(true);
+      autoAlignPreview = null; renderControls();
+      if (viewMode === "selected" && sampleDocument) renderSamplePage(true);
+      else updateSampleDisplay(true);
     });
     elements["template-editor-option-spacing"].addEventListener("input", function () { applySpacing("option"); });
     elements["template-editor-option-spacing"].addEventListener("change", function () { finishSpacing("option"); });
     elements["template-editor-row-spacing"].addEventListener("input", function () { applySpacing("row"); });
     elements["template-editor-row-spacing"].addEventListener("change", function () { finishSpacing("row"); });
+    elements["template-editor-row-all"].addEventListener("change", updateRowScopeIndicator);
+    elements["template-editor-controls-toggle"].addEventListener("click", function () {
+      var expanded = this.getAttribute("aria-expanded") !== "true";
+      this.setAttribute("aria-expanded", expanded ? "true" : "false");
+      this.textContent = expanded ? "收合常用工具" : "展開常用工具";
+      elements["template-editor-controls"].classList.toggle("is-expanded", expanded);
+    });
     elements["template-editor-row-all-apply"].addEventListener("click", function () {
       if (!session || !selectedGroup()) return;
       var before = clone(session.draft); var candidate = clone(session.draft);
@@ -732,9 +845,29 @@
           var id = mode === "fit" ? "template-editor-view-fit" : mode === "width" ? "template-editor-view-width" : "template-editor-view-selected";
           elements[id].setAttribute("aria-pressed", mode === viewMode ? "true" : "false");
         });
-        updateSampleDisplay(true);
+        if (sampleDocument) renderSamplePage(true);
+        else updateSampleDisplay(true);
       });
     });
+    function changeSelectedZoom(factor) {
+      if (!samplePage || !sampleViewport) return;
+      if (viewMode !== "selected") {
+        viewMode = "selected";
+        elements["template-editor-view-fit"].setAttribute("aria-pressed", "false");
+        elements["template-editor-view-width"].setAttribute("aria-pressed", "false");
+        elements["template-editor-view-selected"].setAttribute("aria-pressed", "true");
+        selectedZoom = null;
+        updateSampleDisplay(false);
+      }
+      var frame = elements["template-editor-frame"];
+      var frameWidth = Math.max(1, frame.clientWidth - 2);
+      var aspect = sampleViewport.height / sampleViewport.width;
+      selectedZoom = editor.clampSelectedZoom(selectedZoom * factor, fitZoomForPage(frameWidth, aspect), 8);
+      updateSampleDisplay(true);
+      renderSamplePage(true);
+    }
+    elements["template-editor-zoom-in"].addEventListener("click", function () { changeSelectedZoom(1.25); });
+    elements["template-editor-zoom-out"].addEventListener("click", function () { changeSelectedZoom(0.8); });
     elements["template-editor-all-columns"].addEventListener("change", function () {
       var group = selectedGroup();
       if (!session || !group || group.kind !== "mc-column" || !this.checked) return;
@@ -761,13 +894,25 @@
     elements["template-editor-overlay"].addEventListener("pointerup", pointerUp);
     elements["template-editor-overlay"].addEventListener("pointercancel", pointerUp);
     elements["template-editor-overlay"].addEventListener("keydown", nudge);
-    window.addEventListener("resize", function () { updateSampleDisplay(false); });
+    window.addEventListener("resize", function () {
+      if (resizeRenderTimer) window.clearTimeout(resizeRenderTimer);
+      resizeRenderTimer = window.setTimeout(function () {
+        resizeRenderTimer = null;
+        if (sampleDocument) renderSamplePage(viewMode === "selected");
+        else updateSampleDisplay(false);
+      }, 90);
+    });
     elements["edit-template-layout"].addEventListener("click", function () {
       var selected = options.getSelectedTemplate();
       if (selected && selected.kind === "choice") open(selected);
     });
     return { open: open, close: close, loadSample: loadSample, setNumbering: setNumbering,
-      getDraft: function () { return session ? clone(session.draft) : null; } };
+      getDraft: function () { return session ? clone(session.draft) : null; },
+      getContext: function () {
+        return session ? { templateId: session.selectedTemplateId, sampleFile: editorSampleFile,
+          draftId: session.draft.id, name: session.draft.name } : null;
+      },
+      hasUnsavedChanges: isDirty };
   }
 
   root.PdfMarkingTemplateEditorUI = { create: create };

@@ -8,6 +8,12 @@
   var FORM_GRID_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function editorTransition(currentTemplateId, currentSampleFile, nextTemplateId, nextSampleFile, hasDraft) {
+    if (!hasDraft || !currentTemplateId) return "open";
+    if (currentTemplateId !== nextTemplateId) return "reopen";
+    if (currentSampleFile !== nextSampleFile) return "reload-sample";
+    return "preserve";
+  }
   function spread(start, end, count) {
     if (count <= 1) return [(start + end) / 2];
     return Array.from({ length: count }, function (_, index) { return start + (end - start) * index / (count - 1); });
@@ -565,7 +571,8 @@
     return { grade: Boolean(base.grade), form: Boolean(base.form), studentDigits: Math.max(0, Number(base.studentDigits) || 0) };
   }
 
-  var api = { createTemplateFromZones: createTemplateFromZones, keyArray: keyArray, toggleAnswer: toggleAnswer,
+  var api = { createTemplateFromZones: createTemplateFromZones, editorTransition: editorTransition,
+    keyArray: keyArray, toggleAnswer: toggleAnswer,
     pdfTextLines: pdfTextLines, parseAnswerKeyText: parseAnswerKeyText,
     identityRequirements: identityRequirements, isLayoutPrivacyZone: isLayoutPrivacyZone, isIdentityGridZone: isIdentityGridZone,
     layoutPrivacyDecisionReady: layoutPrivacyDecisionReady, createLayoutPrivacyDefinition: createLayoutPrivacyDefinition,

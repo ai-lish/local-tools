@@ -23,6 +23,7 @@
     var tfKeyLabel = get("tf-key").closest("label");
     var currentStage = 1;
     var selectedTemplate = null;
+    var pendingEditorReplacementId = "";
     var pendingOrderTemplate = null;
     var sampleFile = null;
     var sampleDocument = null;
@@ -90,6 +91,7 @@
       else settingsPanel.append(mcKeyLabel, tfKeyLabel);
     }
     function renderStage(stage) {
+      if (stage === 3 && !syncEditorForSelected(selectedDefinition(), false)) return false;
       currentStage = stage;
       wizard.hidden = false;
       setLegacyVisibility(false);
@@ -104,8 +106,8 @@
       });
       moveFields(stage);
       if (stage === 3) {
-        if (sampleFile && selectedDefinition() && !options.getEditorDraft()) openEditorForSelected();
         var draft = options.getEditorDraft() || selectedDefinition();
+        get("choice-wizard-stage3-template-name").textContent = draft ? "｜" + draft.name : "";
         var mcBlock = draft && draft.blocks.find(function (entry) { return entry.type === "mc"; });
         var tfBlock = draft && draft.blocks.find(function (entry) { return entry.type === "tf"; });
         get("choice-wizard-mc-numbering").value = mcBlock ? mcBlock.numbering : "column-major";
@@ -667,16 +669,56 @@
       setStatus("choice-wizard-source-status", "請拖拉標示姓名、科目、其他文字及手寫身份區；班別／班號圈格可先畫概略框，亦可留待 AI 建議。", false);
       renderOverlay(); renderZoneList(); renderClickControls(); updateSourceButtons(); updateIdentityConfirmation(false);
     }
-    function openEditorForSelected(forceReset) {
-      var definition = selectedDefinition();
-      if (!definition || !sampleFile) return;
-      if (!forceReset && options.getEditorDraft()) return;
+    function openEditorForSelected(forceReset, definition) {
+      definition = definition || selectedDefinition();
+      if (!definition) return;
+      var context = typeof options.getEditorContext === "function" ? options.getEditorContext() : null;
+      if (!forceReset && context && context.templateId === definition.id && context.sampleFile === sampleFile && options.getEditorDraft()) return;
       get("choice-wizard-builder").hidden = true;
       get("choice-wizard-position-status").textContent = definition.source === "builtin"
         ? "內置範本會以自訂副本編輯；內置範本保持不變。"
         : "範本只保存圈位及遮罩設定，不包括樣本、答案或學生資料。";
       get("choice-wizard-editor-slot").append(editorPanel);
       options.openEditor(definition, sampleFile);
+    }
+    function editorTransition(definition) {
+      var context = typeof options.getEditorContext === "function" ? options.getEditorContext() : null;
+      return api.editorTransition(context && context.templateId, context && context.sampleFile,
+        definition && definition.id, sampleFile, Boolean(options.getEditorDraft()));
+    }
+    function confirmEditorReplacement(definition) {
+      if (definition && pendingEditorReplacementId === definition.id) return true;
+      if (editorTransition(definition) !== "reopen" || typeof options.hasEditorUnsavedChanges !== "function" ||
+          !options.hasEditorUnsavedChanges()) return true;
+      return root.confirm("第三步有未儲存的範本修改，改用新範本會放棄這些修改。要繼續嗎？");
+    }
+    function syncEditorForSelected(definition, replacementConfirmed) {
+      if (!definition) return true;
+      var transition = editorTransition(definition);
+      if (transition === "preserve") { pendingEditorReplacementId = ""; return true; }
+      if (transition === "reload-sample") {
+        pendingEditorReplacementId = "";
+        if (typeof options.loadEditorSample === "function") options.loadEditorSample(sampleFile);
+        else openEditorForSelected(true, definition);
+        return true;
+      }
+      var alreadyConfirmed = replacementConfirmed || pendingEditorReplacementId === definition.id;
+      if (transition === "reopen" && !alreadyConfirmed && !confirmEditorReplacement(definition)) return false;
+      pendingEditorReplacementId = "";
+      openEditorForSelected(true, definition);
+      return true;
+    }
+    function selectTemplate(definition, selectionOptions, syncEditorNow) {
+      var transition = definition ? editorTransition(definition) : "open";
+      if (!definition || !confirmEditorReplacement(definition)) {
+        if (definition) setStatus("choice-wizard-source-status", "已取消切換；原有範本草稿仍保留。", false);
+        return false;
+      }
+      if (!options.onSelectTemplate(definition, selectionOptions)) return false;
+      pendingEditorReplacementId = transition === "reopen" ? definition.id : "";
+      selectedTemplate = definition;
+      updateTemplateOrderWarning(definition);
+      return syncEditorNow === false ? true : syncEditorForSelected(definition, transition === "reopen");
     }
     function updateCountStatus() {
       var definition = options.getEditorDraft() || selectedDefinition();
@@ -713,10 +755,8 @@
           mcNumbering: numberingFor("mc"), tfNumbering: numberingFor("tf"),
           confirmNoIdentityArea: get("choice-wizard-no-identity").checked });
         if (mcColumns && rowInputs.length && get("choice-wizard-rows").value === "") throw new Error("請設定每欄題數。");
-        selectedTemplate = definition;
-        if (!options.onSelectTemplate(definition)) return;
+        if (!selectTemplate(definition)) return;
         get("choice-wizard-template").value = "";
-        openEditorForSelected(true);
         renderStage(3);
         setStatus("choice-wizard-position-status", "已建立待調整範本；按「儲存為自訂範本」後才可繼續。", false);
       } catch (error) {
@@ -1183,8 +1223,7 @@
       var definition = templateFromSelect();
       if (!definition) { setStatus("choice-wizard-source-status", "請選擇一個選擇題範本。", true); return; }
       if (!sampleFile) { setStatus("choice-wizard-source-status", "請載入樣本 PDF，供第三步調整位置及第四步點選答案。", true); return; }
-      selectedTemplate = definition;
-      if (!options.onSelectTemplate(definition)) return;
+      if (!selectTemplate(definition)) return;
       renderStage(3);
     }
 
@@ -1198,22 +1237,23 @@
     }
 
     get("choice-wizard-select-choice").addEventListener("click", function () { renderStage(2); populateTemplates(); });
+    get("template-editor-name").addEventListener("input", function () {
+      if (currentStage === 3) get("choice-wizard-stage3-template-name").textContent = "｜" + this.value;
+    });
     get("choice-wizard-select-dictation").addEventListener("click", function () { showLegacy("dictation"); });
     get("choice-wizard-use-existing").addEventListener("click", function () {
-      selectedTemplate = templateFromSelect();
-      if (!selectedTemplate) { setStatus("choice-wizard-source-status", "請選擇一個範本。", true); return; }
-      updateTemplateOrderWarning(selectedTemplate);
+      var definition = templateFromSelect();
+      if (!definition) { setStatus("choice-wizard-source-status", "請選擇一個範本。", true); return; }
+      if (!selectTemplate(definition, null, false)) return;
       createMode = false; get("choice-wizard-builder").hidden = true;
-      if (!options.onSelectTemplate(selectedTemplate)) return;
       updateSourceButtons();
-      setStatus("choice-wizard-source-status", "已選取「" + selectedTemplate.name + "」；載入樣本後繼續。", false);
+      setStatus("choice-wizard-source-status", "已選取「" + definition.name + "」；載入樣本後繼續。", false);
     });
     get("choice-wizard-start-create").addEventListener("click", beginCreate);
     get("choice-wizard-direct-use").addEventListener("click", function () {
       var definition = templateFromSelect();
       if (!definition) { setStatus("choice-wizard-source-status", "請選擇一個範本。", true); return; }
-      updateTemplateOrderWarning(definition);
-      if (!options.onSelectTemplate(definition)) return;
+      if (!selectTemplate(definition, null, false)) return;
       showLegacy("choice", definition);
     });
     get("choice-wizard-template").addEventListener("change", function () {
@@ -1223,11 +1263,10 @@
       var result = options.createReorderedTemplateCopy(pendingOrderTemplate);
       if (!result.ok) { setStatus("choice-wizard-source-status", result.message, true); return; }
       var hadReadResults = typeof options.hasChoiceReadings === "function" && options.hasChoiceReadings();
-      if (!options.onSelectTemplate(result.template, { preserveAnswers: true })) {
+      if (!selectTemplate(result.template, { preserveAnswers: true }, false)) {
         setStatus("choice-wizard-source-status", "已建立修正版副本，但本次沒有更換目前範本；仍使用原範本。", false);
         return;
       }
-      selectedTemplate = result.template;
       get("choice-wizard-template").value = result.template.id;
       updateTemplateOrderWarning(result.template);
       updateSourceButtons();
@@ -1418,9 +1457,8 @@
       onTemplateSaved: function (definition) { selectedTemplate = definition; populateTemplates(); updateTemplateOrderWarning(definition); },
       onTemplateImported: function (definition) {
         if (!definition || definition.kind !== "choice") return;
-        updateTemplateOrderWarning(definition);
-        selectedTemplate = definition; createMode = false; populateTemplates();
-        if (!options.onSelectTemplate(definition)) return;
+        if (!selectTemplate(definition, null, false)) return;
+        createMode = false; populateTemplates();
         get("choice-wizard-template").value = definition.id;
         updateTemplateOrderWarning(definition);
         setStatus("choice-wizard-source-status", "範本已匯入。已直接前往第四步；載入樣本頁後可點選圈格，也可用整批輸入。", false);

@@ -172,7 +172,7 @@
       </section>
 
       <section class="choice-wizard-panel panel" data-wizard-panel="3" aria-labelledby="choice-wizard-step-3" hidden>
-        <p class="eyebrow">第三步</p><h2 id="choice-wizard-step-3">題數及位置</h2>
+        <p class="eyebrow">第三步</p><h2 id="choice-wizard-step-3">題數及位置 <span id="choice-wizard-stage3-template-name" class="muted"></span></h2>
         <p class="muted">題數會按欄或按行自動分配。可在 PR #69 範本編輯器拖拉圈位、調整選項間距及行距，並測試樣本讀圈。</p>
         <div id="choice-wizard-count-slot" class="choice-wizard-count-slot"></div>
         <div class="choice-wizard-numbering-row">
@@ -291,25 +291,50 @@
           </div>
           <p id="template-editor-copy-note" class="muted small"></p>
           <p class="privacy-note">樣本 PDF 只在記憶體短暫處理；不會上載、保存或寫入範本。調整只會修改圈位及既有範本設定。</p>
-          <div class="template-editor-controls">
+          <div class="template-editor-sample-controls">
             <label class="button file-button" for="template-editor-pdf-file">載入本機答題紙 PDF<input id="template-editor-pdf-file" type="file" accept="application/pdf,.pdf"></label>
             <label class="field template-editor-page-field"><span>樣本頁碼</span><input id="template-editor-page-number" type="number" min="1" step="1" value="1" disabled></label>
+          </div>
+          <div class="template-editor-controls" id="template-editor-controls">
+            <div class="template-editor-controls-header">
+              <button class="button compact template-editor-controls-toggle" id="template-editor-controls-toggle" type="button" aria-expanded="false" aria-controls="template-editor-controls-main">展開常用工具</button>
+              <span class="template-editor-row-scope" id="template-editor-row-scope" hidden>行距：全部組</span>
+            </div>
+            <div class="template-editor-controls-main" id="template-editor-controls-main">
             <label class="field template-editor-group-field"><span>選擇要調整的組</span><select id="template-editor-group" disabled></select></label>
             <label class="field template-editor-spacing-field"><span>選項間距</span><input id="template-editor-option-spacing" type="number" min="0.0001" max="1" step="0.001" disabled></label>
             <label class="field template-editor-spacing-field"><span>行距</span><input id="template-editor-row-spacing" type="number" min="0.0001" max="1" step="0.001" disabled></label>
-            <label id="template-editor-all-columns-wrap" class="inline-check" hidden><input id="template-editor-all-columns" type="checkbox"><span>全部選擇題欄同時套用</span></label>
-            <label id="template-editor-row-all-wrap" class="inline-check" hidden><input id="template-editor-row-all" type="checkbox"><span>全部選擇題組同時套用行距</span></label>
-            <button class="button" id="template-editor-row-all-apply" type="button" disabled>把所選組的行距套用到全部組</button>
             <div class="template-editor-view-toggle" role="group" aria-label="樣本頁檢視大小">
-              <button class="button compact" id="template-editor-view-fit" type="button" aria-pressed="true">整頁</button>
+              <button class="button compact" id="template-editor-view-fit" type="button" aria-pressed="false">整頁</button>
               <button class="button compact" id="template-editor-view-width" type="button" aria-pressed="false">闊度</button>
-              <button class="button compact" id="template-editor-view-selected" type="button" aria-pressed="false">放大所選組</button>
+              <button class="button compact" id="template-editor-view-selected" type="button" aria-pressed="true">放大所選組</button>
+              <button class="button compact" id="template-editor-zoom-out" type="button" aria-label="縮細所選組">縮細</button>
+              <button class="button compact" id="template-editor-zoom-in" type="button" aria-label="放大所選組">放大</button>
             </div>
             <div class="template-editor-actions">
               <button class="button" id="template-editor-undo" type="button" disabled>撤銷</button>
-              <button class="button" id="template-editor-reset" type="button" disabled>重設為原範本</button>
               <button class="button primary" id="template-editor-test" type="button" disabled>以樣本測試讀圈</button>
             </div>
+            </div>
+          </div>
+          <p id="template-editor-instructions" class="muted small">載入一頁答題紙作底圖。選擇圈位組後，在底圖上按住拖拉可移動；聚焦底圖後可用方向鍵微調，Shift 加方向鍵每次移動 0.005。</p>
+          <div class="template-editor-frame" id="template-editor-frame">
+            <canvas id="template-editor-canvas" hidden></canvas>
+            <svg id="template-editor-overlay" viewBox="0 0 1 1" role="img" aria-label="答題紙範本圈位疊圖" tabindex="0"></svg>
+            <p id="template-editor-empty" class="empty-state">請載入本機答題紙 PDF。</p>
+          </div>
+          <p id="template-editor-page-status" class="status-message" role="status"></p>
+          <section class="template-editor-result" aria-labelledby="template-editor-result-heading">
+            <h4 id="template-editor-result-heading">樣本讀圈結果</h4>
+            <p id="template-editor-result" class="muted small">測試後會顯示班別、學號、首十題答案及待覆核數。</p>
+          </section>
+          <section class="template-editor-advanced-controls" aria-labelledby="template-editor-advanced-heading">
+            <h4 id="template-editor-advanced-heading">其他範本設定</h4>
+            <div class="template-editor-advanced-grid">
+              <label id="template-editor-all-columns-wrap" class="inline-check" hidden><input id="template-editor-all-columns" type="checkbox"><span>全部選擇題欄同時套用</span></label>
+              <label id="template-editor-row-all-wrap" class="inline-check" hidden><input id="template-editor-row-all" type="checkbox"><span>全部選擇題組同時套用行距</span></label>
+              <button class="button" id="template-editor-row-all-apply" type="button" disabled>把所選組的行距套用到全部組</button>
+              <button class="button" id="template-editor-reset" type="button" disabled>重設為原範本</button>
             <section class="template-editor-auto-align" aria-labelledby="template-editor-auto-align-heading">
               <div class="template-editor-auto-align-heading">
                 <h4 id="template-editor-auto-align-heading">本機自動對位</h4>
@@ -324,17 +349,7 @@
               </div>
               <p id="template-editor-auto-align-preview" class="template-editor-auto-align-preview" role="status" aria-live="polite">自動對位只會讀取本機樣本頁；預覽確認後才修改草稿。</p>
             </section>
-          </div>
-          <p id="template-editor-instructions" class="muted small">載入一頁答題紙作底圖。選擇圈位組後，在底圖上按住拖拉可移動；聚焦底圖後可用方向鍵微調，Shift 加方向鍵每次移動 0.005。</p>
-          <div class="template-editor-frame" id="template-editor-frame">
-            <canvas id="template-editor-canvas" hidden></canvas>
-            <svg id="template-editor-overlay" viewBox="0 0 1 1" role="img" aria-label="答題紙範本圈位疊圖" tabindex="0"></svg>
-            <p id="template-editor-empty" class="empty-state">請載入本機答題紙 PDF。</p>
-          </div>
-          <p id="template-editor-page-status" class="status-message" role="status"></p>
-          <section class="template-editor-result" aria-labelledby="template-editor-result-heading">
-            <h4 id="template-editor-result-heading">樣本讀圈結果</h4>
-            <p id="template-editor-result" class="muted small">測試後會顯示班別、學號、首十題答案及待覆核數。</p>
+            </div>
           </section>
           <div class="template-editor-save-row">
             <label class="field"><span>自訂範本名稱</span><input id="template-editor-name" type="text" maxlength="100" autocomplete="off"></label>

@@ -2868,6 +2868,8 @@
     getTemplates: function () { return templates.BUILTIN_TEMPLATES.concat(customTemplates); },
     getSelectedTemplate: function () { return state.template || templateById(state.templateId); },
     getEditorDraft: function () { return templateEditorUI.getDraft(); },
+    getEditorContext: function () { return templateEditorUI.getContext(); },
+    hasEditorUnsavedChanges: function () { return templateEditorUI.hasUnsavedChanges(); },
     isTemplateSaved: function (id) { return Boolean(findTemplateById(id)); },
     getAiSettings: function () {
       return { ready: aiReady() && !aiMemory.busy, provider: aiMemory.provider,
@@ -2949,6 +2951,7 @@
       templateEditorUI.open(definition);
       templateEditorUI.loadSample(sampleFile);
     },
+    loadEditorSample: function (sampleFile) { templateEditorUI.loadSample(sampleFile); },
     onSelectTemplate: function (definition, selectionOptions) {
       if (!definition || definition.kind !== "choice") return false;
       var preserveAnswers = Boolean(selectionOptions && selectionOptions.preserveAnswers);
