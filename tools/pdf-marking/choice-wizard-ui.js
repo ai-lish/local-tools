@@ -1565,10 +1565,15 @@
     get("choice-home-create-template").addEventListener("click", openTemplateBuilder);
     get("choice-home-create-template-step").addEventListener("click", openTemplateBuilder);
     get("choice-home-lookup").addEventListener("click", function () {
-      renderStage(6);
-      var details = get("export-preview-details");
+      renderStage(7);
+      var details = get("choice-appeal-details");
       details.open = true;
-      window.requestAnimationFrame(function () { details.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    });
+    get("choice-review-home").addEventListener("click", renderHome);
+    get("choice-lookup-home").addEventListener("click", renderHome);
+    get("choice-review-open-lookup").addEventListener("click", function () {
+      renderStage(7);
+      get("choice-appeal-details").open = true;
     });
     get("template-editor-name").addEventListener("input", function () {
       if (currentStage === 3) get("choice-wizard-stage3-template-name").textContent = "｜" + this.value;
@@ -1763,6 +1768,7 @@
       selectedTemplate = options.getSelectedTemplate();
       renderStage(5);
     });
+    get("choice-wizard-next-to-export").addEventListener("click", function () { renderStage(6); });
     get("choice-wizard-back-to-answers").addEventListener("click", function () { renderStage(4); });
     get("choice-wizard-back-to-category").addEventListener("click", function () {
       if (options.hasLoadedPdf() && !root.confirm("返回第一步會保留範本及答案，但離開目前批改畫面。要繼續嗎？")) return;
@@ -1799,6 +1805,14 @@
         openEditorForSelected(false, definition);
         renderStage(3);
       },
+      openCurrentTemplateEditor: function (sample) {
+        var definition = selectedTemplate || options.getSelectedTemplate();
+        if (!definition || definition.kind !== "choice" || !sample) return;
+        if (!selectTemplate(definition, null, false)) return;
+        sampleFile = sample;
+        openEditorForSelected(true, definition);
+        renderStage(3);
+      },
       onTemplateSaved: function (definition) { selectedTemplate = definition; populateTemplates(); updateTemplateOrderWarning(definition); },
       onTemplateImported: function (definition) {
         if (!definition || definition.kind !== "choice") return;
@@ -1808,6 +1822,10 @@
         updateTemplateOrderWarning(definition);
         renderStage(4);
         setStatus("choice-wizard-answer-status", "範本已匯入；可在此設定答案。", false);
+      },
+      openReviewItem: function (pageNumber, key) {
+        renderStage(5);
+        if (typeof options.onOpenReviewItem === "function") options.onOpenReviewItem(pageNumber, key);
       },
       onEditorClosed: function () { if (editorPanel.parentNode !== editorHome) editorHome.insertBefore(editorPanel, editorNext); },
       refreshAiSettings: updateAiButton,

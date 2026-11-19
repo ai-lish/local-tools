@@ -133,6 +133,12 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/pdf-marking/choice-review-table.js",
+      "destination": "tools/pdf-marking/choice-review-table.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/pdf-marking/review.js",
       "destination": "tools/pdf-marking/review.js",
       "publicMode": "cli-source",
@@ -1559,7 +1565,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.19.14",
+      "version": "2026.11.19.17",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1584,6 +1590,7 @@
         "tools/pdf-marking/template-editor-ui.js",
         "tools/pdf-marking/choice-wizard.js",
         "tools/pdf-marking/choice-wizard-ui.js",
+        "tools/pdf-marking/choice-review-table.js",
         "tools/pdf-marking/review.js",
         "tools/pdf-marking/demo.js",
         "tools/pdf-marking/model.js",
@@ -1794,7 +1801,7 @@
     {
       "id": "pdf-marking",
       "title": "PDF 閱卷及批改工具",
-      "version": "2026.11.19.14",
+      "version": "2026.11.19.17",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -1811,6 +1818,7 @@
         "tools/pdf-marking/template-editor-ui.js",
         "tools/pdf-marking/choice-wizard.js",
         "tools/pdf-marking/choice-wizard-ui.js",
+        "tools/pdf-marking/choice-review-table.js",
         "tools/pdf-marking/review.js",
         "tools/pdf-marking/demo.js",
         "tools/pdf-marking/model.js",
@@ -2011,7 +2019,7 @@
     {
       "id": "pdf-marking-choice",
       "title": "批改 PDF（選擇題）",
-      "version": "2026.11.19.14",
+      "version": "2026.11.19.17",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -2028,6 +2036,7 @@
         "tools/pdf-marking/template-editor-ui.js",
         "tools/pdf-marking/choice-wizard.js",
         "tools/pdf-marking/choice-wizard-ui.js",
+        "tools/pdf-marking/choice-review-table.js",
         "tools/pdf-marking/review.js",
         "tools/pdf-marking/demo.js",
         "tools/pdf-marking/model.js",

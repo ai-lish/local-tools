@@ -11,6 +11,7 @@
   var aiReview = window.PdfMarkingAiReview;
   var templateStore = window.PdfMarkingTemplateStore;
   var choiceWizard = window.PdfMarkingChoiceWizard;
+  var choiceReviewTable = window.PdfMarkingChoiceReviewTable;
   var DEFAULT_DICTATION_ANSWER = "應當一無掛慮，只要凡事藉著禱告、祈求，和感謝，將你們所要的告訴神。";
   var ANSWER_KEY_EXCLUDED_FLAG = model.ANSWER_KEY_EXCLUDED_FLAG;
   var DEFAULT_TEMPLATE = templates.BUILTIN_TEMPLATES[0];
@@ -25,7 +26,7 @@
   var state = {
     mode: initialTemplate.kind, step: 1, templateId: initialTemplate.id, template: initialTemplate,
     choiceWizardActive: true, choiceWizardStage: 1,
-    pdfBytes: null, pdfDoc: null, pdfFingerprint: "", pageCount: 0, currentPage: 1,
+    pdfBytes: null, pdfDoc: null, pdfFingerprint: "", pdfFilename: "", pageCount: 0, currentPage: 1,
     choicePages: {}, dictationPages: {}, legacyDictationPages: {}, excludedAnswerPage: 0, activeMark: "wrongCircle", renderToken: 0,
     focusKey: "", demo: false,
     dictationSegment: 1, dictationSegments: {},
@@ -38,6 +39,9 @@
     filter: "all", groupKey: "", renderToken: 0, crop: null };
   var focusBrowseState = { active: false, pageNumber: 0, questionKey: "", returnPage: 0 };
   var appealClassOptionsKey = "";
+  var choiceReviewUndo = choiceReviewTable.createUndoStack(20);
+  var choiceReviewMode = "focus";
+  var choiceReviewSort = "pending";
   // API credentials and AI suggestions intentionally live outside serializable grading state.
   var aiMemory = { enabled: false, provider: "gemini", model: "gemini-3.8-flash", credential: "", busy: false };
   var aiChoiceResults = Object.create(null);
@@ -63,7 +67,9 @@
     templateOrderRepair: byId("template-order-repair"),
     templateFile: byId("template-file"), exportTemplate: byId("export-template"), deleteTemplate: byId("delete-template"),
     demoBanner: byId("demo-banner"), endDemo: byId("end-demo"), reviewStepStatus: byId("review-step-status"),
-    focusTitle: byId("focus-title"), focusReason: byId("focus-reason"), focusPreview: byId("focus-preview"),
+    focusTitle: byId("focus-title"), focusFailureReason: byId("focus-failure-reason"), focusPageTable: byId("focus-page-table"),
+    focusFixTemplate: byId("focus-fix-template"),
+    focusReason: byId("focus-reason"), focusPreview: byId("focus-preview"),
     focusAnswerKeys: byId("focus-answer-keys"), focusConfirm: byId("focus-confirm"), focusProgress: byId("focus-progress"),
     focusPageReread: byId("focus-page-reread"), focusBrowseStart: byId("focus-browse-start"),
     focusBrowsePrev: byId("focus-browse-prev"), focusBrowseNext: byId("focus-browse-next"),
@@ -75,6 +81,7 @@
     choiceReviews: byId("choice-reviews"), choiceAlignment: byId("choice-alignment"), choiceClass: byId("choice-class"),
     choiceStudentId: byId("choice-student-id"), choiceStage: byId("choice-stage"), reviewItems: byId("review-items"),
     pageFlags: byId("page-flags"), pageFlagsSummary: byId("page-flags-summary"),
+    pageFailureItems: byId("page-failure-items"), pageFailureSummary: byId("page-failure-summary"),
     reviewQueueSummary: byId("review-queue-summary"), choiceIdentityReviewDetails: byId("choice-identity-review-details"),
     choiceIdentityReviewSummary: byId("choice-identity-review-summary"), choiceHandwritePending: byId("choice-handwrite-pending"),
     choiceHandwritePendingText: byId("choice-handwrite-pending-text"), choiceHandwriteNext: byId("choice-handwrite-next"),
@@ -90,7 +97,9 @@
     appealReadouts: byId("appeal-readouts"), appealReviewRecord: byId("appeal-review-record"),
     appealPrevQuestion: byId("appeal-prev-question"), appealNextQuestion: byId("appeal-next-question"),
     appealGroupSummary: byId("appeal-group-summary"), appealQuestionFilter: byId("appeal-question-filter"),
-    appealQuestionPosition: byId("appeal-question-position"),
+    appealQuestionPosition: byId("appeal-question-position"), appealTotalScore: byId("appeal-total-score"),
+    appealFilterChips: byId("appeal-question-filter-chips"),
+    appealStandardAnswerOverlay: byId("appeal-standard-answer-overlay"),
     dictationSegment: byId("dictation-segment"), dictationStyle: byId("dictation-style"),
     dictationAnswer: byId("dictation-answer"), firstRow: byId("dictation-first-row"),
     dictationBaseEnabled: byId("dictation-base-enabled"), dictationCalibration: byId("dictation-calibration"),
@@ -128,9 +137,29 @@
     exportPreviewTable: byId("export-preview-table"), exportPreviewNote: byId("export-preview-note"),
     exportSortClass: byId("export-sort-class"), exportSortPage: byId("export-sort-page"),
     choiceClassSizeField: byId("choice-class-size-field"), choiceClassSize: byId("choice-class-size"),
+    choiceExportSummary: byId("choice-export-summary"), choiceExportCompleteChip: byId("choice-export-complete-chip"),
+    choiceExportMissingChip: byId("choice-export-missing-chip"), choiceExportEditedChip: byId("choice-export-edited-chip"),
+    choiceExportRosterActions: byId("choice-export-roster-actions"), choiceExportOutstandingDetails: byId("choice-export-outstanding-details"),
+    choiceExportOutstandingList: byId("choice-export-outstanding-list"),
     copyChoiceRoster: byId("copy-choice-roster"), copyFallbackWrap: byId("copy-fallback-wrap"),
     copyFallback: byId("copy-fallback"), copyFallbackLabel: byId("copy-fallback-label"),
-    downloadProgress: byId("download-progress"), progressFile: byId("progress-file"), exportStatus: byId("export-status")
+    downloadProgress: byId("download-progress"), progressFile: byId("progress-file"), exportStatus: byId("export-status"),
+    choiceReviewFileName: byId("choice-review-file-name"), choiceReviewPagesDone: byId("choice-review-pages-done"),
+    choiceReviewPendingCount: byId("choice-review-pending-count"), choiceReviewPdfFile: byId("choice-review-pdf-file"),
+    choiceReviewSelectPdf: byId("choice-review-select-pdf"), choiceReviewTableSort: byId("choice-review-table-sort"),
+    choiceReviewFocusMode: byId("choice-review-focus-mode"), choiceReviewTableMode: byId("choice-review-table-mode"),
+    choiceReviewUndoButton: byId("choice-review-undo"), choiceReviewAutoAdvance: byId("choice-review-auto-advance"),
+    choiceReviewTablePanel: byId("choice-review-table-panel"), choiceReviewTable: byId("choice-review-table"),
+    choiceReviewTableScroll: byId("choice-review-table-scroll"), choiceReviewTableStatus: byId("choice-review-table-status"),
+    choiceReviewSummaryChips: byId("choice-review-summary-chips"), choiceReviewMore: byId("choice-review-more"),
+    choiceReviewMoreAiSlot: byId("choice-review-more-ai-slot"), choiceReviewMoreDiagnosticsSlot: byId("choice-review-more-diagnostics-slot"),
+    choiceReviewShowDiagnostics: byId("choice-review-show-diagnostics"),
+    choiceReviewReadControlsSlot: byId("choice-review-read-controls-slot"),
+    choiceWizardLookupSlot: byId("choice-wizard-lookup-slot"),
+    choiceLookupPdfFile: byId("choice-lookup-pdf-file"), choiceLookupProgressFile: byId("choice-lookup-progress-file"),
+    choiceLookupLoadStatus: byId("choice-lookup-load-status"),
+    choicePageZoomDialog: byId("choice-page-zoom-dialog"), choicePageZoomTitle: byId("choice-page-zoom-title"),
+    choicePageZoomContent: byId("choice-page-zoom-content")
   };
 
   if (window.pdfjsLib) {
@@ -543,6 +572,7 @@
       var adopt = document.createElement("button"); adopt.type = "button"; adopt.className = "button";
       adopt.textContent = "採用 AI 建議（仍須確認）";
       adopt.addEventListener("click", function () {
+        invalidateChoiceReviewUndoPages([current.pageNumber]);
         var question = state.choicePages[current.pageNumber] && state.choicePages[current.pageNumber].questions.find(function (entry) {
           return entry.type === current.type && entry.number === current.number;
         });
@@ -737,7 +767,7 @@
 
   function keepChoiceWizardReviewSurfaceVisible() {
     if (!state.choiceWizardActive || state.choiceWizardStage !== 5) return;
-    els.step2.hidden = false;
+    els.step2.hidden = true;
     els.step3.hidden = false;
   }
 
@@ -876,7 +906,7 @@
     var loaded = Boolean(state.pdfDoc);
     var dictationReady = state.dictationAnswer.length > 0;
     els.clearPdf.disabled = !loaded;
-    els.readOmr.disabled = !loaded;
+    els.readOmr.disabled = !loaded || (state.choiceWizardActive && state.choiceWizardStage === 5 && !choiceSettings().valid);
     els.startDictation.disabled = !loaded;
     els.choicePage.disabled = !loaded;
     els.dictationPage.disabled = !loaded;
@@ -900,6 +930,8 @@
     renderExportPreview();
     updateAiControls();
     renderAppealControls();
+    renderChoiceReviewHeader();
+    renderChoiceExportSummary();
   }
 
   function updatePageSelectors() {
@@ -957,8 +989,9 @@
         overlay.append(button);
       });
     });
-    if (pageRecord.pageFailure || state.focusKey === "page:" + String(state.currentPage) ||
-        Array.isArray(pageRecord.pageFlags) && pageRecord.pageFlags.indexOf(omr.FORCED_READ_REVIEW_FLAG) >= 0) {
+    var showDiagnostics = !state.choiceWizardActive || state.choiceWizardStage !== 5 || els.choiceReviewShowDiagnostics.checked;
+    if (showDiagnostics && (pageRecord.pageFailure || state.focusKey === "page:" + String(state.currentPage) ||
+        Array.isArray(pageRecord.pageFlags) && pageRecord.pageFlags.indexOf(omr.FORCED_READ_REVIEW_FLAG) >= 0)) {
       var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("class", "alignment-diagnostic-overlay");
       svg.setAttribute("viewBox", "0 0 " + viewport.width + " " + viewport.height);
@@ -1051,9 +1084,11 @@
     if (els.appealQuestionDetail) els.appealQuestionDetail.hidden = true;
     if (els.appealCropCanvas) { els.appealCropCanvas.width = 0; els.appealCropCanvas.height = 0; }
     if (els.appealCropOverlay) { els.appealCropOverlay.replaceChildren(); els.appealCropOverlay.hidden = true; }
+    if (els.appealStandardAnswerOverlay) { els.appealStandardAnswerOverlay.replaceChildren(); els.appealStandardAnswerOverlay.hidden = false; }
     if (els.appealClass) els.appealClass.value = "";
     if (els.appealStudentId) els.appealStudentId.value = "";
     if (els.appealPage) els.appealPage.value = "";
+    if (els.appealTotalScore) els.appealTotalScore.textContent = "總分 —";
     if (els.appealStatus && message) els.appealStatus.textContent = message;
   }
 
@@ -1087,6 +1122,8 @@
     allButton.className = "appeal-group-button"; allButton.setAttribute("aria-pressed", appealState.groupKey ? "false" : "true");
     var totalEarned = summaries.reduce(function (sum, group) { return sum + (Number(group.earned) || 0); }, 0);
     var totalMaximum = summaries.reduce(function (sum, group) { return sum + (Number(group.maximum) || 0); }, 0);
+    if (els.appealTotalScore) els.appealTotalScore.textContent = "總分 " +
+      (available ? formatNumber(totalEarned) + " / " + formatNumber(totalMaximum) : "暫不計分");
     var allCounts = summaries.reduce(function (result, group) {
       result.correct += group.counts.correct; result.wrong += group.counts.wrong;
       result.blank += group.counts.blank; result.pending += group.counts.pending;
@@ -1122,6 +1159,11 @@
 
   function renderAppealQuestionBrowser(preferredKey) {
     appealState.filter = els.appealQuestionFilter.value || "all";
+    document.querySelectorAll("[data-appeal-filter]").forEach(function (button) {
+      var selected = button.dataset.appealFilter === appealState.filter;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
     appealState.filteredQuestions = review.filterAppealQuestions(appealState.questions, appealState.filter, appealState.groupKey);
     renderAppealGroupSummary();
     els.appealQuestionList.replaceChildren();
@@ -1285,6 +1327,26 @@
         var title = document.createElementNS("http://www.w3.org/2000/svg", "title"); title.textContent = "選項 " + entry.item.choices[index].option;
         circle.append(title); els.appealCropOverlay.append(circle);
       });
+      if (els.appealStandardAnswerOverlay) {
+        els.appealStandardAnswerOverlay.setAttribute("viewBox", "0 0 " + cropWidth + " " + cropHeight);
+        els.appealStandardAnswerOverlay.setAttribute("preserveAspectRatio", "none");
+        els.appealStandardAnswerOverlay.replaceChildren();
+        var correctOption = entry.item.choices.findIndex(function (choice) { return choice.option === entry.key; });
+        if (correctOption >= 0 && centers[correctOption]) {
+          var correctCenter = centers[correctOption];
+          var correctCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          correctCircle.setAttribute("cx", String(correctCenter.x - bounds.left));
+          correctCircle.setAttribute("cy", String(correctCenter.y - bounds.top));
+          correctCircle.setAttribute("r", String(radius * 1.2));
+          correctCircle.setAttribute("fill", "rgba(24,133,83,0.16)");
+          correctCircle.setAttribute("stroke", "#188553");
+          correctCircle.setAttribute("stroke-width", String(Math.max(3, radius * 0.26)));
+          var correctTitle = document.createElementNS("http://www.w3.org/2000/svg", "title");
+          correctTitle.textContent = "標準答案「" + entry.key + "」（本機顯示）";
+          correctCircle.append(correctTitle); els.appealStandardAnswerOverlay.append(correctCircle);
+        }
+        els.appealStandardAnswerOverlay.hidden = false;
+      }
       els.appealCropOverlay.hidden = !els.appealShowReadZones.checked;
       appealState.crop = { pageNumber: appealState.pageNumber, questionKey: questionKey, bounds: bounds };
     } catch (error) {
@@ -1397,11 +1459,27 @@
   function renderFocusInkStats(entry, entries) {
     var currentKey = entry ? entry.key : "";
     var stats = review.questionInkStats(entries, currentKey);
-    if (!stats.count) { els.focusInkStats.textContent = "本頁讀圈深淺：沒有可用讀數。"; return; }
+    if (!stats.count) { els.focusInkStats.textContent = "本頁中位數 —"; return; }
     function percent(value) { return value == null ? "未記錄" : Math.round(value * 100) + "%"; }
-    els.focusInkStats.textContent = "本頁每題最深選項：中位數 " + percent(stats.median) + "；範圍 " +
-      percent(stats.minimum) + "–" + percent(stats.maximum) + (entry ? "。本題最深／第二深：" +
-        percent(stats.darkest) + "／" + percent(stats.secondDarkest) : "。");
+    els.focusInkStats.textContent = "本頁中位數 " + percent(stats.median);
+  }
+
+  function shortPageFailureReason(page, diagnostic) {
+    var thresholds = page && page.thresholds || {};
+    if (thresholds.allPale) return "全頁填色太淡";
+    var reasons = diagnostic && Array.isArray(diagnostic.reasons) ? diagnostic.reasons : [];
+    var pageFlags = page && Array.isArray(page.pageFlags) ? page.pageFlags : [];
+    var reasonText = reasons.concat(pageFlags).map(function (reason) { return String(reason || ""); }).join("；");
+    if (/空白頁|方向錯誤/.test(reasonText)) return "可能是空白頁";
+    var failedChecks = (diagnostic && Array.isArray(diagnostic.checks) ? diagnostic.checks : [])
+      .filter(function (check) { return check && check.passed === false; })
+      .map(function (check) { return check.id; });
+    if (failedChecks.some(function (id) { return id === "shift-x" || id === "shift-y" || id === "grid-score"; }) ||
+        reasons.some(function (reason) { return /整頁移位超出|圈格定位分數/.test(String(reason || "")); })) return "圈位偏移";
+    if (failedChecks.indexOf("group-gap-ink") >= 0 || /題組間隙|題組位置|分組位置不符/.test(reasonText)) return "題組位置不符";
+    if (failedChecks.indexOf("multi-deep") >= 0 || reasons.some(function (reason) { return /多於一個深圈/.test(String(reason || "")); })) return "多題有多個深圈";
+    if (/整頁定位失敗/.test(reasonText)) return "整頁定位失敗";
+    return "整頁定位失敗";
   }
 
   function renderFocusControls(queue) {
@@ -1429,6 +1507,9 @@
     els.focusBrowseNext.disabled = !pageEntries.length || !hasBrowseAnchor || browseIndex >= pageEntries.length - 1;
     els.focusBrowseReturn.hidden = !browsing;
     els.focusPageReread.hidden = !pageFailureItem;
+    els.focusPageTable.hidden = !pageFailureItem || !state.choiceWizardActive || state.choiceWizardStage !== 5;
+    els.focusFixTemplate.hidden = !pageFailureItem || !state.choiceWizardActive || state.choiceWizardStage !== 5;
+    els.focusFailureReason.hidden = !pageFailureItem;
     els.focusConfirm.hidden = pageFailureItem;
     els.focusConfirm.disabled = !current || pageFailureItem;
     els.focusConfirm.classList.toggle("primary", Boolean(current));
@@ -1436,6 +1517,7 @@
     renderFocusInkStats(browsing || current && current.kind !== "page" ? shown : null, statsEntries);
     if (shown && shown.kind === "page") {
       els.focusTitle.textContent = "第 " + shown.pageNumber + " 頁 · 整頁定位失敗";
+      els.focusFailureReason.textContent = shortPageFailureReason(state.choicePages[shown.pageNumber], shown.diagnostic);
       var diagnostics = shown.diagnostic || {};
       var diagnosticReasons = diagnostics.reasons || [];
       var groupLines = (diagnostics.groups || []).map(function (group) {
@@ -1465,7 +1547,9 @@
     var pendingNow = question.status === "review" && !question.reviewed;
     var browsingNonPending = Boolean(browsing && !pendingNow);
     var titlePrefix = browsing ? (browsingNonPending ? "瀏覽中：非待覆核題目 · " : "瀏覽中：待覆核題目 · ") : "";
-    els.focusTitle.textContent = titlePrefix + "第 " + shown.pageNumber + " 頁 · " + (shown.type === "mc" ? "選擇題" : "是非題") +
+    var identityPage = state.choicePages[shown.pageNumber] || {};
+    var identityLabel = [identityPage.classValue, identityPage.studentId].filter(Boolean).join(" ") || "班別／學號待確認";
+    els.focusTitle.textContent = titlePrefix + "第 " + shown.pageNumber + " 頁 · " + identityLabel + " · " + (shown.type === "mc" ? "選擇題" : "是非題") +
       "第 " + String(shown.number).padStart(2, "0") + " 題";
     var readings = (shown.item ? shown.item.choices : []).map(function (choice, index) {
       var value = Array.isArray(question.values) ? Number(question.values[index]) : NaN;
@@ -1475,12 +1559,20 @@
     els.focusReason.textContent = "讀圈結果：「" + (selected || "空白") + "」；選項填色：" + (readings || "未記錄") + "；" +
       (question.reason || "請對照整頁確認答案。") + (browseNote ? "\n" + browseNote : "");
     var answerOptions = shown.item ? shown.item.choices.map(function (bubble) { return bubble.option; }) : [];
-    answerOptions.concat(["空白"]).forEach(function (option) {
+    answerOptions.concat(["空白"]).forEach(function (option, optionIndex) {
       var button = document.createElement("button"); button.type = "button"; button.className = "answer-choice";
       var isSelected = option === "空白" ? !selected : selected.indexOf(option) >= 0;
       button.textContent = option; button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+      if (option !== "空白") {
+        var fill = Array.isArray(question.values) ? Number(question.values[optionIndex]) : NaN;
+        var percentLabel = document.createElement("small");
+        percentLabel.textContent = Number.isFinite(fill) ? Math.round(fill * 100) + "%" : "—";
+        button.append(percentLabel);
+        button.setAttribute("aria-label", option + "，填色 " + percentLabel.textContent);
+      }
       if (isSelected) button.classList.add("selected");
       button.addEventListener("click", function () {
+        invalidateChoiceReviewUndoPages([shown.pageNumber]);
         var page = state.choicePages[shown.pageNumber];
         if (!question || !Array.isArray(page.questions)) return;
         if (!page.questions.includes(question)) page.questions.push(question);
@@ -1499,20 +1591,27 @@
   function renderReviewList(page) {
     var queue = review.buildReviewQueue(state.choicePages, state.pageCount);
     if (!queue.some(function (entry) { return entry.key === state.focusKey; })) state.focusKey = queue.length ? queue[0].key : "";
-    els.reviewItems.replaceChildren(); els.pageFlags.replaceChildren();
-    els.reviewQueueSummary.textContent = "跨頁待覆核題目（" + queue.length + "）";
-    if (!queue.length) {
+    els.reviewItems.replaceChildren(); els.pageFailureItems.replaceChildren(); els.pageFlags.replaceChildren();
+    var questions = queue.filter(function (entry) { return entry.kind !== "page"; });
+    var failures = queue.filter(function (entry) { return entry.kind === "page"; });
+    els.reviewQueueSummary.textContent = "待處理題目（" + questions.length + "）";
+    els.pageFailureSummary.textContent = "整頁待處理（" + failures.length + "）";
+    if (!questions.length) {
       var message = document.createElement("p"); message.className = "muted small";
-      message.textContent = !page ? "載入 PDF 並開始讀圈後，清單會列出待覆核題目。" : "沒有待覆核題目。請仍檢查整頁警告。";
+      message.textContent = !page ? "開始讀圈後，待處理題目會列在這裏。" : "沒有待處理題目。";
       els.reviewItems.append(message);
-    } else queue.forEach(function (entry) {
+    }
+    if (!failures.length) {
+      var noFailure = document.createElement("p"); noFailure.className = "muted small";
+      noFailure.textContent = "沒有整頁定位失敗。"; els.pageFailureItems.append(noFailure);
+    }
+    questions.forEach(function (entry) {
       var button = document.createElement("button"); button.type = "button"; button.className = "review-item";
       button.setAttribute("aria-current", entry.key === state.focusKey ? "true" : "false");
       var label = document.createElement("span");
-      label.textContent = entry.kind === "page" ? "第 " + entry.pageNumber + " 頁 · 整頁" :
-        "第 " + entry.pageNumber + " 頁 · " + (entry.type === "mc" ? "選擇題" : "是非題") + "第 " + String(entry.number).padStart(2, "0") + " 題";
+      label.textContent = "第 " + entry.pageNumber + " 頁 · " + (entry.type === "mc" ? "選擇題" : "是非題") + "第 " + String(entry.number).padStart(2, "0") + " 題";
       var detail = document.createElement("span"); detail.className = "item-value";
-      detail.textContent = entry.kind === "page" ? "定位檢查失敗 · 按此查看診斷" : (entry.answer || "空白") + " · " + entry.reason;
+      detail.textContent = (entry.answer || "空白") + " · " + entry.reason;
       button.append(label, detail);
       button.addEventListener("click", function () {
         focusBrowseState.active = false;
@@ -1520,6 +1619,17 @@
         renderCurrentMode();
       });
       els.reviewItems.append(button);
+    });
+    failures.forEach(function (entry) {
+      var button = document.createElement("button"); button.type = "button"; button.className = "review-item page-failure-item";
+      button.setAttribute("aria-current", entry.key === state.focusKey ? "true" : "false");
+      var label = document.createElement("span"); label.textContent = "第 " + entry.pageNumber + " 頁 · 整頁定位失敗";
+      var detail = document.createElement("span"); detail.className = "item-value"; detail.textContent = "按此查看原因及整頁答題紙";
+      button.append(label, detail);
+      button.addEventListener("click", function () {
+        focusBrowseState.active = false; state.focusKey = entry.key; state.currentPage = entry.pageNumber; renderCurrentMode();
+      });
+      els.pageFailureItems.append(button);
     });
     var warningGroups = review.groupPageWarnings(state.choicePages, state.pageCount);
     var warningCount = warningGroups.reduce(function (count, group) { return count + group.entries.length; }, 0);
@@ -1668,6 +1778,7 @@
     var suggestion = identityAdoption(pageNumber, source);
     var page = state.choicePages[pageNumber];
     if (!suggestion || !page) return;
+    invalidateChoiceReviewUndoPages([pageNumber]);
     if (Object.prototype.hasOwnProperty.call(suggestion, "classValue")) {
       page.classValue = suggestion.classValue;
       page.classWasEdited = false;
@@ -1689,6 +1800,7 @@
   function confirmAdoptedIdentity(pageNumber) {
     var page = state.choicePages[pageNumber];
     if (!page || !aiIdentityPendingConfirmation[pageNumber]) return;
+    invalidateChoiceReviewUndoPages([pageNumber]);
     page.classWasEdited = true;
     page.studentIdWasEdited = true;
     if (page.metadata) {
@@ -1954,6 +2066,460 @@
     }
   }
 
+  function choiceReviewItems() {
+    var settings = choiceSettings();
+    return geometry.expandChoiceTemplate(state.template, { mcCount: settings.mcCount, tfCount: settings.tfCount }).items;
+  }
+
+  function renderChoiceReviewHeader() {
+    if (state.mode !== "choice") {
+      if (els.choiceReviewFileName) els.choiceReviewFileName.hidden = true;
+      if (els.choiceReviewSelectPdf) els.choiceReviewSelectPdf.hidden = true;
+      els.readOmr.hidden = true;
+      return;
+    }
+    if (els.choiceReviewFileName) {
+      els.choiceReviewFileName.textContent = state.pdfDoc
+        ? (state.pdfFilename || "已載入 PDF") + " · " + state.pageCount + " 頁" : "尚未載入 PDF";
+      els.choiceReviewFileName.hidden = !state.pdfDoc;
+    }
+    if (els.choiceReviewSelectPdf) els.choiceReviewSelectPdf.hidden = Boolean(state.pdfDoc);
+    els.readOmr.hidden = !state.pdfDoc;
+    var settings = choiceSettings();
+    var totalPages = Math.max(0, state.pageCount - answerKeyExcludedPages().length);
+    var summary = model.choiceReviewSummary(state.choicePages, state.pageCount, settings.mcCount, settings.tfCount);
+    var donePages = Math.max(0, totalPages - summary.pagesPending);
+    var queue = review.buildReviewQueue(state.choicePages, state.pageCount);
+    var missingIdentity = summary.identityPages;
+    if (els.choiceReviewPagesDone) els.choiceReviewPagesDone.textContent = "已完成 " + donePages + " / " + totalPages + " 頁";
+    if (els.choiceReviewPendingCount) els.choiceReviewPendingCount.textContent = "待處理 " + (queue.length + missingIdentity);
+    if (els.choiceReviewReadControlsSlot) {
+      els.readOmr.disabled = !state.pdfDoc || !settings.valid;
+      els.readOmr.textContent = Object.keys(state.choicePages).length ? "重新讀圈" : "自動讀圈";
+    }
+  }
+
+  function choicePagePending(page, settings) {
+    if (!page || page.pageFailure || review.hasForcedReadPending(page)) return true;
+    var items = choiceReviewItems();
+    return items.some(function (item) {
+      var question = (page.questions || []).find(function (entry) { return entry.type === item.type && entry.number === item.number; });
+      return !question || question.status === "review" && !question.reviewed;
+    });
+  }
+
+  function renderChoiceExportSummary() {
+    if (!els.choiceExportSummary) return;
+    var isChoice = state.mode === "choice";
+    els.choiceExportSummary.hidden = !isChoice;
+    els.choiceExportRosterActions.hidden = !isChoice;
+    if (!isChoice) { els.choiceExportOutstandingDetails.hidden = true; return; }
+    var settings = choiceSettings();
+    var excluded = new Set(answerKeyExcludedPages());
+    var confirmedPages = 0;
+    var validIds = new Set();
+    var manualQuestions = 0;
+    var outstanding = [];
+    for (var pageNumber = 1; pageNumber <= state.pageCount; pageNumber += 1) {
+      if (excluded.has(pageNumber)) continue;
+      var page = state.choicePages[pageNumber];
+      if (page && !choicePagePending(page, settings) && model.choiceIdentityConfirmed(page)) confirmedPages += 1;
+      if (page && model.choiceIdentityConfirmed(page)) {
+        var id = String(page.studentId || "").trim();
+        if (/^\d+$/.test(id) && (!Number(els.choiceClassSize.value) || Number(id) <= Number(els.choiceClassSize.value))) validIds.add(id);
+      }
+      (page && page.questions || []).forEach(function (question) {
+        if (question && (question.status === "manual" || question.focusDraftEdited)) manualQuestions += 1;
+      });
+    }
+    var classSize = Math.max(0, Math.floor(Number(els.choiceClassSize.value) || 0));
+    var missing = classSize ? Math.max(0, classSize - validIds.size) : 0;
+    els.choiceExportCompleteChip.textContent = "已確認 " + confirmedPages + " / " + (state.pageCount - excluded.size) + " 頁";
+    els.choiceExportMissingChip.textContent = classSize ? "尚欠 " + missing + " 個學號" : "未設定全班人數";
+    els.choiceExportEditedChip.textContent = "老師修改 " + manualQuestions + " 題";
+
+    outstanding = review.buildReviewQueue(state.choicePages, state.pageCount).map(function (entry) {
+      return { pageNumber: entry.pageNumber, key: entry.key,
+        label: entry.kind === "page" ? "第 " + entry.pageNumber + " 頁 · 整頁定位失敗" :
+          "第 " + entry.pageNumber + " 頁 · " + (entry.type === "mc" ? "選擇題" : "是非題") + "第 " + entry.number + " 題",
+        kind: entry.kind };
+    });
+    for (var identityPage = 1; identityPage <= state.pageCount; identityPage += 1) {
+      if (!excluded.has(identityPage) && state.choicePages[identityPage] && !model.choiceIdentityConfirmed(state.choicePages[identityPage])) {
+        outstanding.push({ pageNumber: identityPage, key: "identity", label: "第 " + identityPage + " 頁 · 班別／學號待確認", kind: "identity" });
+      }
+    }
+    els.choiceExportOutstandingList.replaceChildren();
+    outstanding.forEach(function (entry) {
+      var button = document.createElement("button"); button.type = "button"; button.className = "choice-export-outstanding-item";
+      button.textContent = entry.label;
+      button.addEventListener("click", function () {
+        if (choiceWizardUI) choiceWizardUI.openReviewItem(entry.pageNumber, entry.key);
+        else { state.currentPage = entry.pageNumber; setStep(3); renderCurrentMode(); }
+      });
+      els.choiceExportOutstandingList.append(button);
+    });
+    els.choiceExportOutstandingDetails.hidden = outstanding.length === 0;
+    els.copyChoiceRoster.hidden = false;
+    els.copyChoiceRoster.disabled = !state.pdfDoc || !settings.valid || !Object.keys(state.choicePages).length;
+  }
+
+  function renderChoiceReviewTable() {
+    if (!els.choiceReviewTable) return;
+    var head = els.choiceReviewTable.tHead;
+    var body = els.choiceReviewTable.tBodies[0];
+    head.replaceChildren(); body.replaceChildren();
+    var settings = choiceSettings();
+    if (!state.pdfDoc || !settings.valid || !state.pageCount) {
+      var message = document.createElement("p"); message.className = "muted small";
+      message.textContent = !state.pdfDoc ? "請先載入 PDF。" : !settings.valid ? "請先完成答案設定，表格才可按題目列出。" : "沒有可輸入的頁面。";
+      var row = document.createElement("tr"); var cell = document.createElement("td"); cell.colSpan = 4; cell.append(message); row.append(cell); body.append(row);
+      return;
+    }
+    var items = choiceReviewItems();
+    var headers = ["頁碼", "班別", "學號"].concat(items.map(function (item) {
+      return (item.type === "mc" ? "選擇題 " : "是非題 ") + item.number;
+    }), ["分數"]);
+    var headerRow = document.createElement("tr");
+    headers.forEach(function (label, index) {
+      var th = document.createElement("th"); th.textContent = label;
+      if (index === 0) th.className = "choice-table-page-column";
+      if (index === 2) th.className = "choice-table-student-column";
+      headerRow.append(th);
+    });
+    head.append(headerRow);
+    var pages = [];
+    for (var pageNumber = 1; pageNumber <= state.pageCount; pageNumber += 1) {
+      if (isAnswerKeyExcludedPage(pageNumber)) continue;
+      var page = state.choicePages[pageNumber];
+      pages.push({ pageNumber: pageNumber, page: page, pending: choicePagePending(page, settings), failure: Boolean(page && page.pageFailure) });
+    }
+    if (choiceReviewSort === "page") pages.sort(function (left, right) { return left.pageNumber - right.pageNumber; });
+    else pages.sort(function (left, right) {
+      var priority = function (entry) { return entry.failure ? 0 : entry.pending ? 1 : !entry.page ? 2 : 3; };
+      return priority(left) - priority(right) || left.pageNumber - right.pageNumber;
+    });
+    if (els.choiceReviewTableSort) els.choiceReviewTableSort.textContent = choiceReviewSort === "page" ? "優先待處理" : "按頁碼排序";
+    pages.forEach(function (entry, rowIndex) {
+      var row = document.createElement("tr"); row.dataset.reviewRow = String(rowIndex);
+      if (entry.failure) row.classList.add("is-page-failure");
+      else if (!entry.page) row.classList.add("is-unread");
+      else if (entry.pending) row.classList.add("is-pending");
+      var pageCell = document.createElement("td"); pageCell.textContent = String(entry.pageNumber); pageCell.className = "choice-table-page-column"; row.append(pageCell);
+      function textInput(column, value, kind, label) {
+        var td = document.createElement("td");
+        if (column === 2) td.className = "choice-table-student-column";
+        var input = document.createElement("input"); input.type = "text"; input.value = value || "";
+        input.dataset.reviewRow = String(rowIndex); input.dataset.reviewColumn = String(column); input.dataset.reviewCell = kind;
+        input.dataset.pageNumber = String(entry.pageNumber);
+        input.setAttribute("aria-label", "第 " + entry.pageNumber + " 頁 " + label);
+        if (kind === "class") input.maxLength = 8;
+        if (kind === "student") { input.maxLength = 8; input.inputMode = "numeric"; }
+        td.append(input); row.append(td);
+      }
+      textInput(1, entry.page && entry.page.classValue, "class", "班別");
+      textInput(2, entry.page && entry.page.studentId, "student", "學號");
+      items.forEach(function (item, questionIndex) {
+        var column = questionIndex + 3;
+        var response = entry.page && (entry.page.questions || []).find(function (question) {
+          return question.type === item.type && question.number === item.number;
+        });
+        var td = document.createElement("td");
+        var input = document.createElement("input"); input.type = "text"; input.autocomplete = "off";
+        input.className = "choice-review-answer-input"; input.value = response && response.answer || "";
+        input.dataset.reviewRow = String(rowIndex); input.dataset.reviewColumn = String(column); input.dataset.reviewCell = "answer";
+        input.dataset.pageNumber = String(entry.pageNumber); input.dataset.questionType = item.type; input.dataset.questionNumber = String(item.number);
+        input.setAttribute("aria-label", "第 " + entry.pageNumber + " 頁 " + headers[column] + " 作答");
+        input.title = response && response.status === "manual" && !response.answer
+          ? "已確認為空白作答（人手確認）"
+          : "選項 " + item.choices.map(function (choice) { return choice.option; }).join("／") + "；留空即空白";
+        input.dataset.allowed = item.choices.map(function (choice) { return choice.option; }).join("");
+        input.dataset.lastValid = input.value;
+        td.append(input); row.append(td);
+      });
+      var scoreCell = document.createElement("td"); scoreCell.dataset.scorePage = String(entry.pageNumber);
+      var score = entry.page && !entry.page.pageFailure && !review.hasForcedReadPending(entry.page)
+        ? model.scoreQuestions({ answers: model.choiceAnswersForSettings(entry.page, "mc", settings.mcCount),
+          tfAnswers: model.choiceAnswersForSettings(entry.page, "tf", settings.tfCount) }, settings.mcKey, settings.tfKey,
+          settings.mcPoints, settings.tfPoints) : null;
+      scoreCell.textContent = score ? formatNumber(score.earned) + " / " + formatNumber(score.maximum) : "—";
+      row.append(scoreCell); body.append(row);
+    });
+  }
+
+  function updateChoiceReviewUndoButton() {
+    if (els.choiceReviewUndoButton) els.choiceReviewUndoButton.disabled = !choiceReviewUndo.canUndo();
+  }
+
+  function clearChoiceReviewUndo() {
+    choiceReviewUndo.clear();
+    updateChoiceReviewUndoButton();
+  }
+
+  function invalidateChoiceReviewUndoPages(pageNumbers) {
+    choiceReviewUndo.invalidatePages(pageNumbers);
+    updateChoiceReviewUndoButton();
+  }
+
+  function blankChoicePageForEntry(pageNumber) {
+    var page = state.choicePages[pageNumber] || cleanChoicePage({});
+    if (!Array.isArray(page.questions)) page.questions = [];
+    return page;
+  }
+
+  function applyChoiceReviewTableValue(pageNumber, column, value) {
+    var settings = choiceSettings();
+    var items = choiceReviewItems();
+    var page = blankChoicePageForEntry(pageNumber);
+    if (page.pageFailure) page = choiceReviewTable.prepareFailedPageForTable(page, items, omr.FORCED_READ_REVIEW_FLAG);
+    if (column === 1 || column === 2) {
+      if (column === 1) {
+        page.classValue = String(value == null ? "" : value).slice(0, 8); page.classWasEdited = true;
+        if (page.metadata && page.metadata.grade) page.metadata.grade.status = "manual";
+        if (page.metadata && page.metadata.form) page.metadata.form.status = "manual";
+      } else {
+        page.studentId = String(value == null ? "" : value).slice(0, 8); page.studentIdWasEdited = true;
+        if (page.metadata) (page.metadata.idDigits || []).forEach(function (digit) { digit.status = "manual"; });
+      }
+      state.choicePages[pageNumber] = page;
+      return { ok: true };
+    }
+    var itemIndex = column - 3;
+    var item = items[itemIndex];
+    if (!item) return { ok: false, message: "此欄不可編輯。" };
+    var normalized = choiceReviewTable.normalizeAnswerCell(value, item.choices.map(function (choice) { return choice.option; }));
+    if (!normalized.ok) return { ok: false, message: "只可輸入此題選項（" + item.choices.map(function (choice) { return choice.option; }).join("／") + "）或留空。" };
+    var response = page.questions.find(function (question) { return question.type === item.type && question.number === item.number; });
+    if (!response) {
+      response = { type: item.type, number: item.number, answer: "", status: "blank", reason: "", reviewed: true, values: [] };
+      page.questions.push(response);
+    }
+    response.answer = normalized.value; response.status = "manual"; response.reason = ""; response.reviewed = true; response.focusDraftEdited = false;
+    if (page.pageFlags && page.pageFlags.indexOf(omr.FORCED_READ_REVIEW_FLAG) >= 0 && !review.hasForcedReadPending(page)) {
+      page.pageFlags = page.pageFlags.filter(function (flag) { return flag !== omr.FORCED_READ_REVIEW_FLAG; });
+    }
+    state.choicePages[pageNumber] = page;
+    return { ok: true, value: normalized.value };
+  }
+
+  function afterChoiceReviewTableEdit(pageNumber) {
+    refreshChoiceIdentityWarnings();
+    renderChoiceReviewHeader();
+    renderChoiceExportSummary();
+    updateControls();
+    renderReviewList(currentChoicePage());
+    var row = Array.from(els.choiceReviewTable.tBodies[0].rows).find(function (candidate) {
+      return Number(candidate.querySelector("td").textContent) === Number(pageNumber);
+    });
+    var page = state.choicePages[pageNumber];
+    if (row) {
+      row.classList.toggle("is-page-failure", Boolean(page && page.pageFailure));
+      row.classList.toggle("is-unread", !page);
+      row.classList.toggle("is-pending", Boolean(page && !page.pageFailure && choicePagePending(page, choiceSettings())));
+      var scoreCell = row.querySelector("[data-score-page]");
+      var settings = choiceSettings();
+      var score = page && !page.pageFailure && !review.hasForcedReadPending(page)
+        ? model.scoreQuestions({ answers: model.choiceAnswersForSettings(page, "mc", settings.mcCount),
+          tfAnswers: model.choiceAnswersForSettings(page, "tf", settings.tfCount) }, settings.mcKey, settings.tfKey,
+          settings.mcPoints, settings.tfPoints) : null;
+      if (scoreCell) scoreCell.textContent = score ? formatNumber(score.earned) + " / " + formatNumber(score.maximum) : "—";
+    }
+    updateStepper();
+  }
+
+  function undoChoiceReviewEdit() {
+    var snapshot = choiceReviewUndo.undo();
+    if (!snapshot) return;
+    state.choicePages = choiceReviewTable.restorePages(state.choicePages, snapshot);
+    updateChoiceReviewUndoButton();
+    refreshChoiceIdentityWarnings();
+    renderCurrentMode(); updateControls();
+  }
+
+  function focusChoiceReviewCell(row, column) {
+    var target = els.choiceReviewTable.querySelector('[data-review-row="' + row + '"][data-review-column="' + column + '"]');
+    if (target) { target.focus(); if (target.select) target.select(); }
+  }
+
+  function showChoiceReviewTable(pageNumber) {
+    choiceReviewMode = "table";
+    els.choiceReviewFocusMode.classList.remove("active"); els.choiceReviewFocusMode.setAttribute("aria-pressed", "false");
+    els.choiceReviewTableMode.classList.add("active"); els.choiceReviewTableMode.setAttribute("aria-pressed", "true");
+    document.querySelector(".focus-grid").hidden = true; els.choiceReviewTablePanel.hidden = false;
+    renderChoiceReviewTable();
+    if (!pageNumber) return;
+    var row = Array.from(els.choiceReviewTable.tBodies[0].rows).find(function (candidate) {
+      return Number(candidate.cells[0].textContent) === Number(pageNumber);
+    });
+    var firstAnswer = row && row.querySelector('[data-review-cell="answer"]');
+    if (firstAnswer) { firstAnswer.focus(); firstAnswer.select(); }
+  }
+
+  function choiceReviewCellError(cell, message) {
+    els.choiceReviewTableStatus.textContent = "第 " + (Number(cell.dataset.reviewRow) + 1) + " 列第 " + (Number(cell.dataset.reviewColumn) + 1) + " 欄：" + message;
+    els.choiceReviewTableStatus.classList.add("is-error");
+  }
+
+  function commitChoiceReviewTableCell(cell, value) {
+    var pageNumber = Number(cell.dataset.pageNumber) || Number(cell.closest("tr") && cell.closest("tr").querySelector("td") && cell.closest("tr").querySelector("td").textContent);
+    var column = Number(cell.dataset.reviewColumn);
+    var snapshot = choiceReviewTable.snapshotPages(state.choicePages, [pageNumber]);
+    var result = applyChoiceReviewTableValue(pageNumber, column, value);
+    if (!result.ok) { choiceReviewCellError(cell, result.message); return false; }
+    if (cell.dataset.reviewUndoAdded !== "true") {
+      choiceReviewUndo.push(snapshot); updateChoiceReviewUndoButton();
+    }
+    cell.dataset.reviewUndoAdded = "true";
+    if (cell.dataset.reviewCell === "answer") cell.value = result.value;
+    if (cell.dataset.reviewCell === "answer" && result.value === "") {
+      cell.title = "已確認為空白作答（人手確認）";
+      els.choiceReviewTableStatus.textContent = "已確認第 " + pageNumber + " 頁此題為空白作答；此頁所有題目確認前不會計分。";
+    } else {
+      if (cell.dataset.reviewCell === "answer") cell.removeAttribute("title");
+      els.choiceReviewTableStatus.textContent = "已更新第 " + pageNumber + " 頁。";
+    }
+    els.choiceReviewTableStatus.classList.remove("is-error");
+    afterChoiceReviewTableEdit(pageNumber);
+    return true;
+  }
+
+  function handleChoiceReviewTablePaste(event) {
+    var cell = event.target.closest("[data-review-row][data-review-column]");
+    if (!cell || !event.clipboardData) return;
+    event.preventDefault();
+    var parsed = choiceReviewTable.parseTsvPaste(event.clipboardData.getData("text/plain"), {
+      startRow: Number(cell.dataset.reviewRow), startColumn: Number(cell.dataset.reviewColumn),
+      rowCount: els.choiceReviewTable.tBodies[0].rows.length,
+      columnCount: els.choiceReviewTable.tHead.rows[0].cells.length
+    });
+    var errors = parsed.errors.slice(); var appliedPages = new Set(); var accepted = [];
+    var candidatePages = parsed.updates.map(function (update) {
+      var row = els.choiceReviewTable.tBodies[0].rows[update.row];
+      var target = row && row.querySelector('[data-review-column="' + update.column + '"]');
+      return target && target.dataset.reviewCell !== "score"
+        ? Number(target.dataset.pageNumber) || Number(row.cells[0].textContent) : null;
+    }).filter(function (pageNumber) { return Number.isInteger(pageNumber) && pageNumber > 0; });
+    var pageSnapshots = choiceReviewTable.snapshotPages(state.choicePages, candidatePages);
+    parsed.updates.forEach(function (update) {
+      var row = els.choiceReviewTable.tBodies[0].rows[update.row];
+      var target = row && row.querySelector('[data-review-column="' + update.column + '"]');
+      if (!target || target.dataset.reviewCell === "score") {
+        errors.push({ row: update.row + 1, column: update.column + 1, message: "此欄不可編輯" }); return;
+      }
+      var pageNumber = Number(target.dataset.pageNumber) || Number(row.cells[0].textContent);
+      var result = applyChoiceReviewTableValue(pageNumber, update.column, update.value);
+      if (!result.ok) { errors.push({ row: update.row + 1, column: update.column + 1, message: result.message }); return; }
+      accepted.push({ target: target, value: result.value == null ? String(update.value) : result.value, pageNumber: pageNumber });
+      appliedPages.add(pageNumber);
+    });
+    if (accepted.length) {
+      var snapshot = { pageStates: {} };
+      appliedPages.forEach(function (pageNumber) {
+        snapshot.pageStates[String(pageNumber)] = pageSnapshots.pageStates[String(pageNumber)];
+      });
+      choiceReviewUndo.push(snapshot); updateChoiceReviewUndoButton();
+      accepted.forEach(function (entry) { entry.target.value = entry.value; entry.target.dataset.reviewUndoAdded = "true"; });
+      afterChoiceReviewTableEdit(Array.from(appliedPages)[0]);
+      renderChoiceReviewTable();
+    }
+    if (errors.length) {
+      els.choiceReviewTableStatus.textContent = errors.map(function (error) {
+        return "第 " + error.row + " 列第 " + error.column + " 欄：" + error.message;
+      }).join("；");
+      els.choiceReviewTableStatus.classList.add("is-error");
+    } else {
+      els.choiceReviewTableStatus.textContent = accepted.length + " 個儲存格已貼上。";
+      els.choiceReviewTableStatus.classList.remove("is-error");
+    }
+  }
+
+  function reviewTableNextPosition(row, column, direction) {
+    var cells = Array.from(els.choiceReviewTable.querySelectorAll("[data-review-row][data-review-column]"));
+    var currentIndex = cells.findIndex(function (cell) {
+      return Number(cell.dataset.reviewRow) === row && Number(cell.dataset.reviewColumn) === column;
+    });
+    var nextIndex = currentIndex + direction;
+    return nextIndex >= 0 && nextIndex < cells.length
+      ? { row: Number(cells[nextIndex].dataset.reviewRow), column: Number(cells[nextIndex].dataset.reviewColumn) }
+      : null;
+  }
+
+  function focusReviewTableCellAt(row, column) {
+    var direct = els.choiceReviewTable.querySelector('[data-review-row="' + row + '"][data-review-column="' + column + '"]');
+    if (direct) { direct.focus(); direct.select(); return; }
+    var cells = Array.from(els.choiceReviewTable.querySelectorAll("[data-review-row][data-review-column]"));
+    var next = cells.find(function (cell) { return Number(cell.dataset.reviewRow) === row && Number(cell.dataset.reviewColumn) > column; });
+    if (next) { next.focus(); next.select(); }
+  }
+
+  function handleChoiceReviewTableInput(event) {
+    var cell = event.target.closest("[data-review-row][data-review-column]");
+    if (!cell) return;
+    var pageNumber = Number(cell.dataset.pageNumber) || Number(cell.closest("tr").cells[0].textContent);
+    var column = Number(cell.dataset.reviewColumn);
+    var value = cell.value;
+    if (cell.dataset.reviewCell === "answer") {
+      var normalized = choiceReviewTable.normalizeAnswerCell(value, Array.from(cell.dataset.allowed || ""));
+      if (!normalized.ok) {
+        cell.value = cell.dataset.lastValid || "";
+        choiceReviewCellError(cell, "只可輸入選項 " + Array.from(cell.dataset.allowed || "").join("／") + " 或留空。");
+        return;
+      }
+      value = normalized.value;
+    }
+    var snapshot = choiceReviewTable.snapshotPages(state.choicePages, [pageNumber]);
+    var result = applyChoiceReviewTableValue(pageNumber, column, value);
+    if (!result.ok) { choiceReviewCellError(cell, result.message); return; }
+    if (cell.dataset.reviewUndoAdded !== "true") {
+      choiceReviewUndo.push(snapshot); updateChoiceReviewUndoButton(); cell.dataset.reviewUndoAdded = "true";
+    }
+    if (cell.dataset.reviewCell === "answer") {
+      cell.value = result.value; cell.dataset.lastValid = result.value;
+    }
+    if (cell.dataset.reviewCell === "answer" && result.value === "") {
+      cell.title = "已確認為空白作答（人手確認）";
+      els.choiceReviewTableStatus.textContent = "已確認第 " + pageNumber + " 頁此題為空白作答；此頁所有題目確認前不會計分。";
+    } else {
+      if (cell.dataset.reviewCell === "answer") cell.removeAttribute("title");
+      els.choiceReviewTableStatus.textContent = "已更新第 " + pageNumber + " 頁。";
+    }
+    els.choiceReviewTableStatus.classList.remove("is-error");
+    afterChoiceReviewTableEdit(pageNumber);
+    if (els.choiceReviewAutoAdvance.checked && event.inputType === "insertText" && value.length === 1 && cell.dataset.reviewCell === "answer") {
+      var next = reviewTableNextPosition(Number(cell.dataset.reviewRow), column, 1);
+      if (next) focusReviewTableCellAt(next.row, next.column);
+    }
+  }
+
+  function handleChoiceReviewTableKeydown(event) {
+    var cell = event.target.closest("[data-review-row][data-review-column]");
+    if (!cell) return;
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+      event.preventDefault(); undoChoiceReviewEdit(); return;
+    }
+    var row = Number(cell.dataset.reviewRow); var column = Number(cell.dataset.reviewColumn);
+    var direction = 0; var vertical = false;
+    if (event.key === "Tab") direction = event.shiftKey ? -1 : 1;
+    else if (event.key === "Enter" || event.key === "ArrowDown") { direction = 1; vertical = true; }
+    else if (event.key === "ArrowUp") { direction = -1; vertical = true; }
+    else if (event.key === "ArrowRight" && cell.selectionStart === cell.value.length) direction = 1;
+    else if (event.key === "ArrowLeft" && cell.selectionStart === 0) direction = -1;
+    else if ((event.key === "Backspace" || event.key === "Delete") && !cell.value) {
+      event.preventDefault(); commitChoiceReviewTableCell(cell, ""); return;
+    }
+    if (!direction) return;
+    event.preventDefault();
+    var next;
+    if (vertical) next = { row: row + direction, column: column };
+    else next = reviewTableNextPosition(row, column, direction);
+    if (next) focusReviewTableCellAt(next.row, next.column);
+  }
+
+  function handleChoiceReviewTableFocusOut(event) {
+    var cell = event.target.closest("[data-review-row][data-review-column]");
+    if (cell) cell.dataset.reviewUndoAdded = "false";
+  }
+
   function renderChoiceSummary(page) {
     var score = currentChoiceScore(page);
     els.choiceScore.textContent = score ? formatNumber(score.earned) + " / " + formatNumber(score.maximum) : "—";
@@ -1969,6 +2535,8 @@
     if (els.choiceClass.value !== classValue) els.choiceClass.value = classValue;
     if (els.choiceStudentId.value !== studentId) els.choiceStudentId.value = studentId;
     renderReviewList(page);
+    renderChoiceReviewHeader();
+    renderChoiceReviewTable();
   }
 
   async function renderChoicePage() {
@@ -2323,7 +2891,8 @@
       var pdf = await window.pdfjsLib.getDocument({ data: bytes.slice(), isEvalSupported: false }).promise;
       var digest = await window.crypto.subtle.digest("SHA-256", bytes);
       var fingerprint = Array.from(new Uint8Array(digest)).map(function (value) { return value.toString(16).padStart(2, "0"); }).join("");
-      state.pdfBytes = bytes; state.pdfDoc = pdf; state.pdfFingerprint = fingerprint; state.pageCount = pdf.numPages; state.currentPage = 1;
+      state.pdfBytes = bytes; state.pdfDoc = pdf; state.pdfFingerprint = fingerprint; state.pdfFilename = String(file.name || "本機 PDF");
+      state.pageCount = pdf.numPages; state.currentPage = 1; clearChoiceReviewUndo();
       state.excludedAnswerPage = 0;
       resetAppealLookup("完成讀圈或載入進度及同一 PDF 後即可查詢。");
       if (choiceWizardUI) choiceWizardUI.refreshAnswerSourceAvailability();
@@ -2351,7 +2920,7 @@
       updatePageSelectors(); renderCurrentMode(); setStep(2); keepChoiceWizardReviewSurfaceVisible();
       setStatus("");
     } catch (error) {
-      state.pdfBytes = null; state.pdfDoc = null; state.pdfFingerprint = ""; state.pageCount = 0;
+      state.pdfBytes = null; state.pdfDoc = null; state.pdfFingerprint = ""; state.pdfFilename = ""; state.pageCount = 0;
       setStatus("PDF 無法開啟。請確認檔案完整、未加密，並使用 PDF 格式。", els.fileStatus);
     }
   }
@@ -2364,6 +2933,7 @@
       els.omrStatus.textContent = "讀圈前請修正設定：" + settings.message;
       return;
     }
+    clearChoiceReviewUndo();
     var excludedPageNumbers = answerKeyExcludedPages();
     state.choicePages = {};
     resetAppealLookup("正在讀圈；完成後即可查詢。");
@@ -2425,6 +2995,7 @@
     var index = queue.findIndex(function (entry) { return entry.key === state.focusKey; });
     if (index < 0) return;
     var current = queue[index];
+    invalidateChoiceReviewUndoPages([current.pageNumber]);
     focusBrowseState.active = false;
     state.currentPage = current.pageNumber;
     review.confirmQuestion(current.question);
@@ -2443,6 +3014,7 @@
   async function rereadFailedPageForReview() {
     var page = currentChoicePage();
     if (!page || !page.pageFailure || !state.pdfDoc) return;
+    clearChoiceReviewUndo();
     els.focusPageReread.disabled = true;
     try {
       var settings = choiceSettings();
@@ -2471,6 +3043,7 @@
     var page = currentChoicePage(); if (!page) return;
     var response = page.questions.find(function (question) { return question.type === type && question.number === number; });
     if (!response) return;
+    invalidateChoiceReviewUndoPages([state.currentPage]);
     var values = new Set(Array.from(response.answer || ""));
     if (values.has(option)) values.delete(option); else values.add(option);
     response.answer = Array.from(values).sort().join("");
@@ -2875,6 +3448,7 @@
       templates.BUILTIN_TEMPLATES.find(function (definition) { return definition.kind === original.mode; });
     if (!targetTemplate) throw new Error("進度檔使用的自訂範本未在本機找到；請先匯入該範本 JSON。");
     if (targetTemplate.kind !== original.mode) throw new Error("進度檔的範本類型與批改模式不相符。");
+    clearChoiceReviewUndo();
     state.templateId = targetTemplate.id; state.template = targetTemplate; state.mode = targetTemplate.kind;
     configureTemplateMode();
     if (original.mode === "choice") {
@@ -2999,12 +3573,14 @@
   }
 
   async function loadProgress(file) {
-    if (!file || !state.pdfDoc) { setStatus("請先選擇 PDF，再載入進度 JSON。"); return; }
+    if (!file || !state.pdfDoc) { setStatus("請先選擇 PDF，再載入進度 JSON。"); return false; }
     try {
       var data = JSON.parse(await file.text());
       await applyProgress(data);
+      return true;
     } catch (error) {
       setStatus(error && error.message ? error.message : "進度 JSON 無法載入。");
+      return false;
     }
   }
 
@@ -3049,6 +3625,7 @@
   function placeAiSettingsForWizard(stage) {
     if (stage === 2) byId("choice-wizard-ai-settings-slot").append(aiSettingsPanel);
     else if (stage === 4) byId("choice-answer-ai-settings-slot").append(aiSettingsPanel);
+    else if (stage === 5) els.choiceReviewMoreAiSlot.append(aiSettingsPanel);
     else if (aiSettingsPanel.parentNode !== aiSettingsHome) aiSettingsHome.insertBefore(aiSettingsPanel, aiSettingsNext);
   }
   var legacyStepHome = els.step2.parentNode;
@@ -3056,6 +3633,17 @@
   var exportPanel = document.querySelector(".export-panel");
   var exportPanelHome = exportPanel.parentNode;
   var exportPanelNext = exportPanel.nextSibling;
+  var readOmrHome = els.readOmr.parentNode;
+  var readOmrNext = els.readOmr.nextSibling;
+  var omrStatusHome = els.omrStatus.parentNode;
+  var omrStatusNext = els.omrStatus.nextSibling;
+  var focusReasonHome = els.focusReason.parentNode;
+  var focusReasonNext = els.focusReason.nextSibling;
+  var choiceAiActions = document.querySelector(".ai-review-actions");
+  var choiceAiActionsHome = choiceAiActions.parentNode;
+  var choiceAiActionsNext = choiceAiActions.nextSibling;
+  var appealDetailsHome = els.appealDetails.parentNode;
+  var appealDetailsNext = els.appealDetails.nextSibling;
   function moveLegacyStepsToWizard() {
     var slot = byId("choice-wizard-grade-slot");
     slot.append(els.step2, els.step3);
@@ -3066,9 +3654,30 @@
   }
   function moveExportPanelToWizard() {
     byId("choice-wizard-export-slot").append(exportPanel);
+    exportPanel.hidden = false;
   }
-  function restoreExportPanel() {
+  function restoreExportPanel(hidden) {
     exportPanelHome.insertBefore(exportPanel, exportPanelNext);
+    exportPanel.hidden = Boolean(hidden);
+  }
+  function moveChoiceReviewControlsToWizard(stage) {
+    if (stage === 5) {
+      els.choiceReviewReadControlsSlot.append(els.readOmr, els.omrStatus);
+      els.choiceReviewMoreDiagnosticsSlot.append(els.focusReason);
+      els.choiceReviewMoreAiSlot.append(choiceAiActions);
+    } else {
+      if (els.readOmr.parentNode !== readOmrHome) readOmrHome.insertBefore(els.readOmr, readOmrNext);
+      if (els.omrStatus.parentNode !== omrStatusHome) omrStatusHome.insertBefore(els.omrStatus, omrStatusNext);
+      if (els.focusReason.parentNode !== focusReasonHome) focusReasonHome.insertBefore(els.focusReason, focusReasonNext);
+      if (choiceAiActions.parentNode !== choiceAiActionsHome) choiceAiActionsHome.insertBefore(choiceAiActions, choiceAiActionsNext);
+    }
+    if (stage === 7) {
+      byId("choice-wizard-lookup-slot").append(els.appealDetails);
+      els.appealDetails.hidden = false;
+    } else {
+      if (els.appealDetails.parentNode !== appealDetailsHome) appealDetailsHome.insertBefore(els.appealDetails, appealDetailsNext);
+      els.appealDetails.hidden = stage === 5 || stage === 6;
+    }
   }
 
   var templateEditorUI = window.PdfMarkingTemplateEditorUI.create({
@@ -3122,6 +3731,7 @@
     getExcludedAnswerPage: function () { return state.excludedAnswerPage; },
     setAnswerPageExcluded: function (pageNumber, excluded) {
       if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > state.pageCount) return;
+      clearChoiceReviewUndo();
       if (excluded) {
         Object.keys(state.choicePages).forEach(function (key) {
           state.choicePages[key] = model.setAnswerKeyExcludedFlag(state.choicePages[key], false);
@@ -3190,6 +3800,12 @@
     setNumbering: function (type, numbering) { return templateEditorUI.setNumbering(type, numbering); },
     hasLoadedPdf: function () { return Boolean(state.pdfDoc); },
     hasChoiceReadings: function () { return Object.keys(state.choicePages).length > 0; },
+    onOpenReviewItem: function (pageNumber, key) {
+      state.currentPage = Number(pageNumber) || 1;
+      if (key && key !== "identity") state.focusKey = key;
+      if (key === "identity") els.choiceIdentityReviewDetails.open = true;
+      renderCurrentMode();
+    },
     openEditor: function (definition, sampleFile) {
       templateEditorUI.open(definition);
       templateEditorUI.loadSample(sampleFile);
@@ -3202,6 +3818,7 @@
       var hasWork = Object.keys(state.choicePages).length > 0;
       if (changed && state.pdfDoc && hasWork && !window.confirm("更換範本會清除目前選擇題讀圈結果；PDF 仍會保留。要繼續嗎？")) return false;
       if (changed && state.pdfDoc && hasWork) {
+        clearChoiceReviewUndo();
         state.choicePages = {}; syncAnswerKeyExcludedPage(); state.focusKey = "";
         if (preserveAnswers) els.omrStatus.textContent = "範本已更換，請重新讀圈。";
       }
@@ -3223,12 +3840,21 @@
       placeAiSettingsForWizard(stage);
       state.choiceWizardActive = true;
       state.choiceWizardStage = stage;
-      if (stage >= 5) {
+      els.step3.classList.toggle("choice-wizard-review-step", stage === 5);
+      moveChoiceReviewControlsToWizard(stage);
+      if (stage === 5 || stage === 6) {
         moveLegacyStepsToWizard();
-        moveExportPanelToWizard();
+        if (stage === 6) moveExportPanelToWizard(); else restoreExportPanel(true);
         setStep(state.pdfDoc ? 3 : 2);
         if (stage === 6) els.step3.hidden = true;
         else keepChoiceWizardReviewSurfaceVisible();
+        if (stage === 5 && state.pdfDoc && !Object.keys(state.choicePages).length && choiceSettings().valid) {
+          window.requestAnimationFrame(function () { if (state.choiceWizardStage === 5 && !Object.keys(state.choicePages).length) readAllPages(); });
+        }
+      } else if (stage === 7) {
+        restoreExportPanel(true);
+        restoreLegacySteps();
+        setStep(1);
       } else {
         restoreExportPanel();
         restoreLegacySteps();
@@ -3237,6 +3863,8 @@
     },
     onWizardHome: function () {
       placeAiSettingsForWizard(0);
+      moveChoiceReviewControlsToWizard(0);
+      els.step3.classList.remove("choice-wizard-review-step");
       restoreExportPanel();
       restoreLegacySteps();
       state.choiceWizardActive = true;
@@ -3245,6 +3873,8 @@
     },
     onShowLegacy: function (mode, definition) {
       placeAiSettingsForWizard(0);
+      moveChoiceReviewControlsToWizard(0);
+      els.step3.classList.remove("choice-wizard-review-step");
       restoreExportPanel();
       restoreLegacySteps();
       state.choiceWizardActive = false; state.choiceWizardStage = 0;
@@ -3355,7 +3985,8 @@
     resetAppealLookup("完成讀圈或載入進度及同一 PDF 後即可查詢。");
     clearAiSuggestions();
     els.demoBanner.hidden = true;
-    state.pdfBytes = null; state.pdfDoc = null; state.pdfFingerprint = ""; state.pageCount = 0; state.currentPage = 1;
+    state.pdfBytes = null; state.pdfDoc = null; state.pdfFingerprint = ""; state.pdfFilename = ""; state.pageCount = 0; state.currentPage = 1;
+    clearChoiceReviewUndo();
     state.choicePages = {}; state.excludedAnswerPage = 0; state.choiceClassSizeTouched = false; state.dictationPages = {}; state.legacyDictationPages = {}; state.dictationSegments = {}; state.dictationUndo = []; state.focusKey = "";
     els.pdfFile.value = ""; els.fileStatus.textContent = "尚未載入 PDF"; els.pageCount.textContent = ""; els.fileDot.classList.remove("ready");
     els.omrStatus.textContent = "示範已結束；可選擇自己的本機 PDF。";
@@ -3363,6 +3994,29 @@
   }
 
   els.pdfFile.addEventListener("change", function () { loadPdf(els.pdfFile.files[0]); });
+  els.choiceReviewPdfFile.addEventListener("change", async function () {
+    var file = this.files && this.files[0]; this.value = "";
+    if (!file) return;
+    var shouldRead = state.choiceWizardStage === 5;
+    await loadPdf(file);
+    if (shouldRead && state.pdfDoc && choiceSettings().valid) await readAllPages();
+  });
+  els.choiceReviewFileName.addEventListener("click", function () { els.choiceReviewPdfFile.click(); });
+  els.choiceLookupPdfFile.addEventListener("change", async function () {
+    var file = this.files && this.files[0]; this.value = "";
+    if (!file) return;
+    await loadPdf(file);
+    els.choiceLookupLoadStatus.textContent = state.pdfDoc
+      ? "原 PDF 已在本機載入；請載入相符的進度檔。" : "PDF 無法開啟，請檢查檔案。";
+  });
+  els.choiceLookupProgressFile.addEventListener("change", async function () {
+    var file = this.files && this.files[0]; this.value = "";
+    if (!file) return;
+    var loaded = await loadProgress(file);
+    els.choiceLookupLoadStatus.textContent = loaded
+      ? "進度及原 PDF 已在本機載入，可查詢成績。"
+      : "進度未載入；請核對原 PDF 是否相同，並查看匯出狀態訊息。";
+  });
   els.clearPdf.addEventListener("click", function () {
     clearAiSuggestions();
     resetAppealLookup("完成讀圈或載入進度及同一 PDF 後即可查詢。");
@@ -3395,6 +4049,50 @@
   els.appealPrevQuestion.addEventListener("click", function () { moveAppealQuestion(-1); });
   els.appealNextQuestion.addEventListener("click", function () { moveAppealQuestion(1); });
   els.appealQuestionFilter.addEventListener("change", function () { renderAppealQuestionBrowser(); });
+  document.querySelectorAll("[data-appeal-filter]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      els.appealQuestionFilter.value = button.dataset.appealFilter;
+      renderAppealQuestionBrowser();
+    });
+  });
+  els.choiceReviewFocusMode.addEventListener("click", function () {
+    choiceReviewMode = "focus";
+    els.choiceReviewFocusMode.classList.add("active"); els.choiceReviewFocusMode.setAttribute("aria-pressed", "true");
+    els.choiceReviewTableMode.classList.remove("active"); els.choiceReviewTableMode.setAttribute("aria-pressed", "false");
+    els.choiceReviewTablePanel.hidden = true; document.querySelector(".focus-grid").hidden = false;
+  });
+  els.choiceReviewTableMode.addEventListener("click", function () {
+    showChoiceReviewTable();
+  });
+  els.choiceReviewTableSort.addEventListener("click", function () {
+    choiceReviewSort = choiceReviewSort === "page" ? "pending" : "page";
+    renderChoiceReviewTable();
+  });
+  els.choiceReviewUndoButton.addEventListener("click", undoChoiceReviewEdit);
+  els.choiceReviewShowDiagnostics.addEventListener("change", function () { renderCurrentMode(); });
+  els.choiceReviewTable.addEventListener("input", handleChoiceReviewTableInput);
+  els.choiceReviewTable.addEventListener("keydown", handleChoiceReviewTableKeydown);
+  els.choiceReviewTable.addEventListener("focusout", handleChoiceReviewTableFocusOut);
+  els.choiceReviewTable.addEventListener("paste", handleChoiceReviewTablePaste);
+  els.choicePageZoomDialog.addEventListener("click", function (event) {
+    if (event.target === els.choicePageZoomDialog) els.choicePageZoomDialog.close();
+  });
+  byId("choice-page-zoom-close").addEventListener("click", function () { els.choicePageZoomDialog.close(); });
+  els.choiceStage.addEventListener("click", function (event) {
+    if (event.target.closest(".bubble-hit")) return;
+    var canvas = els.choiceStage.querySelector("canvas");
+    if (!canvas || !(event.target === canvas || event.target.closest(".pdf-overlay"))) return;
+    els.choicePageZoomTitle.textContent = "第 " + state.currentPage + " 頁 · " + (currentChoicePage() && currentChoicePage().classValue || "") + " " + (currentChoicePage() && currentChoicePage().studentId || "");
+    els.choicePageZoomContent.replaceChildren();
+    var frame = document.createElement("div"); frame.className = "choice-page-zoom-frame";
+    var copyCanvas = document.createElement("canvas"); copyCanvas.width = canvas.width; copyCanvas.height = canvas.height;
+    copyCanvas.getContext("2d").drawImage(canvas, 0, 0);
+    frame.append(copyCanvas);
+    var overlay = els.choiceStage.querySelector(".pdf-overlay");
+    if (overlay) frame.append(overlay.cloneNode(true));
+    els.choicePageZoomContent.append(frame);
+    els.choicePageZoomDialog.showModal();
+  });
   els.startDictation.addEventListener("click", function () { if (state.pdfDoc) { setStep(3); renderCurrentMode(); } });
   els.useTemplate.addEventListener("click", useSelectedTemplate);
   els.editTemplateLayout.addEventListener("click", function () {
@@ -3464,6 +4162,12 @@
   els.stepPills.forEach(function (pill) { pill.addEventListener("click", function () { setStep(Number(pill.dataset.step)); renderCurrentMode(); }); });
   els.focusConfirm.addEventListener("click", confirmFocusedQuestion);
   els.focusPageReread.addEventListener("click", rereadFailedPageForReview);
+  els.focusPageTable.addEventListener("click", function () { showChoiceReviewTable(state.currentPage); });
+  els.focusFixTemplate.addEventListener("click", function () {
+    if (!state.pdfBytes || !choiceWizardUI) return;
+    var sample = new File([state.pdfBytes], state.pdfFilename || "本機答題紙.pdf", { type: "application/pdf" });
+    choiceWizardUI.openCurrentTemplateEditor(sample);
+  });
   els.focusBrowseStart.addEventListener("click", startFocusBrowse);
   els.focusBrowsePrev.addEventListener("click", function () { moveFocusBrowse(-1); });
   els.focusBrowseNext.addEventListener("click", function () { moveFocusBrowse(1); });
@@ -3495,6 +4199,7 @@
   [els.choiceClass, els.choiceStudentId].forEach(function (input, index) {
     input.addEventListener("input", function () {
       var page = currentChoicePage(); if (!page) return;
+      invalidateChoiceReviewUndoPages([state.currentPage]);
       if (index === 0) {
         page.classValue = input.value; page.classWasEdited = true;
         if (page.metadata.grade) page.metadata.grade.status = "manual";
@@ -3714,7 +4419,9 @@
   els.exportXlsx.addEventListener("click", exportXlsx);
   els.exportSortClass.addEventListener("click", function () { state.exportSort = "class-student"; renderExportPreview(); });
   els.exportSortPage.addEventListener("click", function () { state.exportSort = "page"; renderExportPreview(); });
-  els.choiceClassSize.addEventListener("input", function () { state.choiceClassSizeTouched = true; renderExportPreview(); });
+  els.choiceClassSize.addEventListener("input", function () {
+    state.choiceClassSizeTouched = true; renderExportPreview(); renderChoiceExportSummary();
+  });
   els.downloadProgress.addEventListener("click", function () {
     var progress = currentProgress();
     createDownload(downloadName("pdf-marking-progress.json"), new Blob([JSON.stringify(progress, null, 2)], { type: "application/json;charset=utf-8" }));

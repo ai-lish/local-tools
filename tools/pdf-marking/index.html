@@ -26,6 +26,7 @@
   <script defer src="choice-wizard.js"></script>
   <script defer src="answer-highlight.js"></script>
   <script defer src="choice-wizard-ui.js"></script>
+  <script defer src="choice-review-table.js"></script>
   <script defer src="app.js"></script>
   <script defer src="drive-config.js"></script>
   <script defer src="drive-sync.js"></script>
@@ -288,14 +289,28 @@
       </section>
 
       <section class="choice-wizard-panel panel" data-wizard-panel="5" aria-labelledby="choice-wizard-step-5" hidden>
-        <p class="eyebrow">第三步</p><h2 id="choice-wizard-step-5">覆核</h2>
-        <div class="wizard-navigation choice-wizard-grade-navigation"><button class="button" id="choice-wizard-back-to-answers" type="button">返回修改答案</button><button class="button" id="choice-wizard-back-to-category" type="button">返回範本</button></div>
+        <div class="section-title choice-review-title"><div><p class="eyebrow">第三步</p><h2 id="choice-wizard-step-5">覆核及輸入</h2></div><button class="button compact" id="choice-review-home" type="button">返回主頁</button></div>
+        <div class="choice-review-header">
+          <div class="choice-review-file"><button class="choice-review-file-name" id="choice-review-file-name" type="button" hidden></button><label id="choice-review-select-pdf" class="button primary file-button">選擇全班 PDF<input id="choice-review-pdf-file" type="file" accept="application/pdf,.pdf"></label></div>
+          <div class="choice-review-chips"><span class="chip" id="choice-review-pages-done">已完成 0 頁</span><span class="chip warn" id="choice-review-pending-count">待處理 0</span></div>
+        </div>
+        <div class="choice-review-controls">
+          <div class="choice-review-layout-switch" role="group" aria-label="覆核輸入方式"><button class="button compact active" id="choice-review-focus-mode" type="button" aria-pressed="true">逐題覆核</button><button class="button compact" id="choice-review-table-mode" type="button" aria-pressed="false">表格輸入</button><button class="button compact" id="choice-review-undo" type="button" disabled>復原輸入（Ctrl／⌘+Z）</button></div>
+        </div>
+        <div class="wizard-navigation choice-wizard-grade-navigation"><button class="button" id="choice-wizard-back-to-answers" type="button">返回修改答案</button><button class="button" id="choice-wizard-back-to-category" type="button">返回範本</button><button class="button" id="choice-review-open-lookup" type="button">成績查詢</button><button class="button primary" id="choice-wizard-next-to-export" type="button">下一步：匯出</button></div>
         <div id="choice-wizard-grade-slot" class="choice-wizard-grade-slot"></div>
       </section>
 
       <section class="choice-wizard-panel panel" data-wizard-panel="6" aria-labelledby="choice-wizard-step-6" hidden>
         <div class="section-title"><div><p class="eyebrow">第四步</p><h2 id="choice-wizard-step-6">匯出</h2></div><button class="button compact" id="choice-wizard-back-to-review" type="button">返回覆核</button></div>
         <div id="choice-wizard-export-slot"></div>
+      </section>
+
+      <section class="choice-wizard-panel panel" data-wizard-panel="7" aria-labelledby="choice-wizard-step-7" hidden>
+        <div class="section-title"><div><p class="eyebrow">獨立畫面</p><h2 id="choice-wizard-step-7">成績查詢</h2></div><button class="button compact" id="choice-lookup-home" type="button">返回主頁</button></div>
+        <p class="privacy-note">只在本機查閱已讀圈頁面。題目截圖即時從原 PDF 重繪，不含姓名區，不會寫入進度或匯出檔。載入進度時，請先選回建立進度時使用的同一份 PDF。</p>
+        <div class="choice-lookup-load-actions"><label class="button file-button">載入原 PDF<input id="choice-lookup-pdf-file" type="file" accept="application/pdf,.pdf"></label><label class="button file-button">載入進度檔<input id="choice-lookup-progress-file" type="file" accept="application/json,.json"></label><span id="choice-lookup-load-status" class="muted" role="status">完成讀圈或載入進度及同一 PDF 後即可查詢。</span></div>
+        <div id="choice-wizard-lookup-slot"></div>
       </section>
     </section>
 
@@ -480,6 +495,21 @@
 
       <section id="choice-mode" class="mode-panel">
         <section class="panel review-panel">
+          <div id="choice-review-summary-chips" class="choice-review-summary-chips" aria-live="polite"></div>
+          <div class="choice-review-more-grid">
+            <details id="choice-review-more" class="choice-review-more">
+              <summary>更多：AI 覆核、診斷及其他警告</summary>
+              <div id="choice-review-more-ai-slot"></div>
+              <div id="choice-review-more-diagnostics-slot"><label class="inline-check"><input id="choice-review-show-diagnostics" type="checkbox"><span>顯示定位診斷疊圖</span></label><label class="inline-check"><input id="choice-review-auto-advance" type="checkbox" checked><span>表格輸入單一答案後跳至右格</span></label></div>
+              <div id="choice-review-read-controls-slot" class="toolbar-row"></div>
+              <div id="choice-review-more-warnings-slot">
+                <details id="page-flags-details" class="review-fold">
+                  <summary id="page-flags-summary">其他頁面警告（0）</summary>
+                  <div class="review-fold-scroll"><div id="page-flags" class="page-flags"></div></div>
+                </details>
+              </div>
+            </details>
+          </div>
           <div class="review-summary">
             <div class="metric"><span>本頁分數</span><strong id="choice-score">—</strong></div>
             <div class="metric"><span>本頁待覆核</span><strong id="choice-reviews">—</strong></div>
@@ -491,9 +521,13 @@
           </div>
           <div class="focus-grid">
             <aside class="review-list">
+              <details id="page-failure-details" class="review-fold" open>
+                <summary id="page-failure-summary">整頁待處理（0）</summary>
+                <div class="review-fold-scroll"><div id="page-failure-items" class="review-items"></div></div>
+              </details>
               <details id="review-queue-details" class="review-fold" open>
-                <summary id="review-queue-summary">跨頁待覆核題目（0）</summary>
-                <p class="muted small">選取題目後可放大查看；按確認再移到下一題。</p>
+                <summary id="review-queue-summary">待處理題目（0）</summary>
+                <p class="muted small">按題目查看讀圈，再確認或修正。</p>
                 <div class="review-fold-scroll" id="review-queue-scroll">
                   <div id="review-items" class="review-items"><p class="muted">載入並讀圈後，清單會顯示待覆核題目。</p></div>
                 </div>
@@ -513,13 +547,9 @@
                   </section>
                 </div>
               </details>
-              <details id="page-flags-details" class="review-fold">
-                <summary id="page-flags-summary">頁面警告（0）</summary>
-                <div class="review-fold-scroll"><div id="page-flags" class="page-flags"></div></div>
-              </details>
             </aside>
             <section class="focus-card" aria-label="專注覆核">
-              <div class="focus-heading"><div><p class="eyebrow">目前覆核</p><h3 id="focus-title">尚未選取題目</h3></div><span id="focus-progress" class="hint-pill">0 題</span></div>
+              <div class="focus-heading"><div><p class="eyebrow">目前覆核</p><h3 id="focus-title">尚未選取題目</h3><span id="focus-failure-reason" class="chip warn" hidden></span></div><span id="focus-progress" class="hint-pill">0 題</span></div>
               <p id="focus-reason" class="muted">先自動讀圈，待覆核題目會在這裏放大顯示。</p>
               <div id="focus-page-navigation" class="focus-page-navigation" aria-label="本頁題目瀏覽">
                 <button class="button compact" id="focus-browse-start" type="button" disabled>瀏覽同一學生所有題目</button>
@@ -527,15 +557,15 @@
                 <button class="button compact" id="focus-browse-next" type="button" disabled>同一學生：下一題</button>
                 <button class="button compact" id="focus-browse-return" type="button" hidden>返回待覆核題目</button>
               </div>
-              <p id="focus-ink-stats" class="focus-ink-stats muted small" aria-live="polite"></p>
               <div id="focus-preview" class="focus-preview"><p class="empty-state">放大題目圈格會顯示在這裏。</p></div>
+              <p id="focus-ink-stats" class="focus-ink-stats muted small" aria-live="polite"></p>
               <div class="toolbar-row ai-review-actions">
                 <button class="button" id="ai-review-choice-current" type="button" disabled>AI 覆核此題</button>
                 <button class="button" id="ai-review-choice-all" type="button" disabled>AI 覆核全部待覆核題</button>
               </div>
               <div id="ai-review-choice-suggestion" class="ai-review-result" hidden></div>
               <div id="focus-answer-keys" class="focus-answer-keys" role="group" aria-label="選擇作答"></div>
-              <button class="button" id="focus-page-reread" type="button" hidden>仍然讀取此頁（需逐題確認）</button>
+              <div class="focus-page-failure-actions"><button class="button" id="focus-page-reread" type="button" hidden>逐題確認</button><button class="button" id="focus-page-table" type="button" hidden>表格輸入</button><button class="button" id="focus-fix-template" type="button" hidden>修正範本</button></div>
               <button class="button primary focus-confirm" id="focus-confirm" type="button" disabled>確認並下一題（Enter）</button>
             </section>
             <section class="document-card">
@@ -548,6 +578,13 @@
               <div id="choice-stage" class="pdf-stage"><p class="empty-state">載入 PDF 後，整頁答題紙會顯示在這裏。</p></div>
             </section>
           </div>
+          <section id="choice-review-table-panel" class="choice-review-table-panel" hidden aria-label="逐頁表格輸入">
+            <div class="choice-review-table-toolbar"><p class="muted small">可直接輸入選項；貼上 Excel／TSV 時，先選中起始儲存格。未讀取、整頁失敗及待覆核列會排在前面並標示狀態。</p><button class="button compact" id="choice-review-table-sort" type="button">按頁碼排序</button></div>
+            <p id="choice-review-table-status" class="status-message" role="status" aria-live="polite"></p>
+            <div id="choice-review-table-scroll" class="choice-review-table-scroll" tabindex="0">
+              <table id="choice-review-table" class="choice-review-table"><thead></thead><tbody></tbody></table>
+            </div>
+          </section>
         </section>
         <details id="choice-appeal-details" class="panel choice-appeal-details">
           <summary>成績查詢（同學查詢答案時用）</summary>
@@ -555,6 +592,7 @@
           <div class="appeal-lookup-fields">
             <label class="field"><span>班別</span><select id="appeal-class" disabled><option value="">請先讀圈</option></select></label>
             <label class="field"><span>學號</span><input id="appeal-student-id" type="text" maxlength="12" autocomplete="off" disabled></label>
+            <span id="appeal-total-score" class="chip" aria-live="polite">總分 —</span>
             <button class="button primary" id="appeal-search" type="button" disabled>查找學生頁</button>
             <label class="field"><span>直接選頁碼</span><select id="appeal-page" disabled><option value="">請先讀圈</option></select></label>
           </div>
@@ -563,23 +601,30 @@
           <div class="appeal-question-layout">
             <div class="appeal-question-sidebar">
               <div id="appeal-group-summary" class="appeal-group-summary" aria-label="題組分數"></div>
-              <label class="field appeal-question-filter"><span>題目狀態</span><select id="appeal-question-filter">
-                <option value="all">全部題目</option><option value="correct">答對</option><option value="wrong">答錯</option>
-                <option value="blank">未作答</option><option value="pending">待覆核</option><option value="teacher-modified">老師曾修改</option>
-              </select></label>
-              <p id="appeal-question-position" class="muted small" aria-live="polite">第 0 / 0 題</p>
+              <div id="appeal-question-filter-chips" class="appeal-question-filter-chips" role="group" aria-label="題目篩選">
+                <button class="button compact active" type="button" data-appeal-filter="all" aria-pressed="true">全部</button>
+                <button class="button compact" type="button" data-appeal-filter="correct" aria-pressed="false">答對</button>
+                <button class="button compact" type="button" data-appeal-filter="wrong" aria-pressed="false">答錯</button>
+                <button class="button compact" type="button" data-appeal-filter="blank" aria-pressed="false">未作答</button>
+              </div>
+              <details class="appeal-extra-filters"><summary>更多篩選</summary><div class="appeal-question-filter-chips">
+                <button class="button compact" type="button" data-appeal-filter="pending" aria-pressed="false">待覆核</button>
+                <button class="button compact" type="button" data-appeal-filter="teacher-modified" aria-pressed="false">老師曾修改</button>
+              </div></details>
+              <select id="appeal-question-filter" class="visually-hidden" aria-label="題目狀態"><option value="all">全部題目</option><option value="correct">答對</option><option value="wrong">答錯</option><option value="blank">未作答</option><option value="pending">待覆核</option><option value="teacher-modified">老師曾修改</option></select>
               <div id="appeal-question-list" class="appeal-question-list" aria-label="該頁題目"></div>
             </div>
             <section id="appeal-question-detail" class="appeal-question-detail" aria-label="題目原圖及讀圈資料" hidden>
               <div class="appeal-detail-heading">
                 <h4 id="appeal-detail-title"></h4>
+                <span id="appeal-question-position" class="muted small" aria-live="polite">第 0 / 0 題</span>
+                <button class="button compact" id="appeal-prev-question" type="button">上一題</button><button class="button compact" id="appeal-next-question" type="button">下一題</button>
                 <label class="inline-check"><input id="appeal-show-read-zones" type="checkbox"><span>顯示讀圈位置</span></label>
               </div>
               <p id="appeal-detail-status" class="muted small"></p>
-              <div class="appeal-crop-frame"><canvas id="appeal-crop-canvas" aria-label="原 PDF 題目截圖"></canvas><svg id="appeal-crop-overlay" aria-label="讀圈位置疊圖" role="img" hidden></svg></div>
+              <div class="appeal-crop-frame"><canvas id="appeal-crop-canvas" aria-label="原 PDF 題目截圖"></canvas><svg id="appeal-crop-overlay" aria-label="讀圈位置疊圖" role="img" hidden></svg><svg id="appeal-standard-answer-overlay" aria-label="標準答案位置（本機顯示）" role="img"></svg></div>
               <ul id="appeal-readouts" class="appeal-readouts"></ul>
               <p id="appeal-review-record" class="muted small"></p>
-              <div class="toolbar-row"><button class="button compact" id="appeal-prev-question" type="button">上一題</button><button class="button compact" id="appeal-next-question" type="button">下一題</button></div>
             </section>
           </div>
         </details>
@@ -677,6 +722,18 @@
 
       <section id="export-panel" class="panel export-panel">
         <div class="section-title"><div><p class="eyebrow">本機下載</p><h3>匯出及進度</h3></div><span class="hint-pill">檔案下載到你選擇的位置</span></div>
+        <div id="choice-export-summary" class="choice-export-summary" hidden aria-live="polite">
+          <span class="chip" id="choice-export-complete-chip">已確認 0 頁</span>
+          <span class="chip warn" id="choice-export-missing-chip">尚欠 0 個學號</span>
+          <span class="chip" id="choice-export-edited-chip">老師修改 0 題</span>
+        </div>
+        <div id="choice-export-roster-actions" class="choice-export-roster-actions" hidden>
+          <label id="choice-class-size-field" class="field inline"><span>全班人數</span><input id="choice-class-size" type="number" min="0" max="10000" step="1" value="0" inputmode="numeric"></label>
+          <button class="button primary" id="copy-choice-roster" type="button" hidden disabled>複製作答（按學號）</button>
+        </div>
+        <details id="choice-export-outstanding-details" class="choice-export-outstanding" hidden>
+          <summary>尚待處理項目</summary><div id="choice-export-outstanding-list"></div>
+        </details>
         <div class="toolbar-row export-actions">
           <button class="button" id="export-pdf" type="button" disabled>下載已批改 PDF</button>
           <button class="button" id="export-csv" type="button" disabled>下載分數 CSV</button>
@@ -693,10 +750,6 @@
               <button class="button compact active" id="export-sort-class" type="button" aria-pressed="true">按班別、學號</button>
               <button class="button compact" id="export-sort-page" type="button" aria-pressed="false">按頁碼</button>
             </div>
-            <label id="choice-class-size-field" class="field inline" hidden>
-              <span>全班人數</span><input id="choice-class-size" type="number" min="0" max="10000" step="1" value="0" inputmode="numeric">
-            </label>
-            <button class="button compact" id="copy-choice-roster" type="button" hidden disabled>複製作答（按學號）</button>
           </div>
           <p class="muted small" id="export-preview-note">載入 PDF 並讀取／批改後，這裏會顯示與 CSV 相同的資料列。核對提示只供畫面辨識，不會加入匯出內容。</p>
           <div class="export-preview-scroll">
@@ -715,6 +768,10 @@
     </section>
     <footer>預設只在本機處理；只有輸入 API key 並按下 AI 覆核時，才會把去識別裁切圖送往所選服務 · 建議桌面瀏覽器</footer>
   </main>
+  <dialog id="choice-page-zoom-dialog" class="choice-page-zoom-dialog" aria-label="答題紙放大預覽">
+    <div class="choice-page-zoom-heading"><strong id="choice-page-zoom-title">答題紙預覽</strong><button class="button compact" id="choice-page-zoom-close" type="button">關閉</button></div>
+    <div id="choice-page-zoom-content" class="choice-page-zoom-content"></div>
+  </dialog>
 <script>
 window.addEventListener("load", function () {
   if (window.pdfjsLib && window.PDFLib && window.LT_PDF_WORKER_SRC) return;
