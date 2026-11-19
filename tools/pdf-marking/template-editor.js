@@ -2,6 +2,46 @@
   "use strict";
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function splitTemplateName(value) {
+    var source = String(value || "").trim();
+    var marker = source.indexOf("｜");
+    if (marker < 0) return { name: source, device: "", version: "" };
+    var name = source.slice(0, marker).trim();
+    var remainder = source.slice(marker + 1);
+    var versionMarker = remainder.indexOf("／");
+    if (versionMarker < 0) {
+      var trailing = remainder.trim();
+      return /^v\d+(?:\.\d+)?$/i.test(trailing)
+        ? { name: name, device: "", version: trailing }
+        : { name: name, device: trailing, version: "" };
+    }
+    return { name: name, device: remainder.slice(0, versionMarker).trim(), version: remainder.slice(versionMarker + 1).trim() };
+  }
+  function composeTemplateName(name, device, version, maxLength) {
+    var title = String(name || "").trim();
+    var equipment = String(device || "").trim();
+    var release = String(version || "").trim();
+    if (!title) return "";
+    if (equipment && release) return title + "｜" + equipment + "／" + release;
+    if (equipment) return title + "｜" + equipment;
+    if (release) return title + "｜" + release;
+    return title;
+  }
+  function nextTemplateVersion(value) {
+    var match = String(value || "").trim().match(/^(.*?)(\d+)$/);
+    if (match) return match[1] + (Number(match[2]) + 1);
+    return "v2";
+  }
+  function templateExportFilename(name, id) {
+    function slug(value) {
+      return String(value || "").normalize("NFKD").replace(/[^a-z0-9._-]+/gi, "-")
+        .replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 32).toLowerCase();
+    }
+    var parts = splitTemplateName(name);
+    var displaySlug = [slug(parts.name), slug(parts.device), slug(parts.version)].filter(Boolean).join("-");
+    var safeId = String(id || "").replace(/[^a-z0-9._-]/gi, "-").replace(/-+/g, "-").slice(0, 40) || "custom";
+    return "pdf-marking-template-" + (displaySlug || "template") + "-" + safeId + ".json";
+  }
   function rowValues(rows) {
     if (!rows || typeof rows !== "object") return [];
     if (rows.mode === "list") return Array.isArray(rows.groups) ? rows.groups.reduce(function (all, group) {
@@ -763,6 +803,10 @@
 
   var api = {
     clone: clone,
+    splitTemplateName: splitTemplateName,
+    composeTemplateName: composeTemplateName,
+    nextTemplateVersion: nextTemplateVersion,
+    templateExportFilename: templateExportFilename,
     rowValues: rowValues,
     listGroups: listGroups,
     listMasks: listMasks,

@@ -26,7 +26,8 @@
       "template-editor-auto-align-scope", "template-editor-auto-align", "template-editor-auto-align-apply",
       "template-editor-auto-align-cancel", "template-editor-auto-align-preview",
       "template-editor-frame", "template-editor-canvas", "template-editor-overlay", "template-editor-empty", "template-editor-page-status",
-      "template-editor-result", "template-editor-name", "template-editor-save", "template-editor-export", "template-editor-status"
+      "template-editor-result", "template-editor-name", "template-editor-device", "template-editor-version",
+      "template-editor-save", "template-editor-export", "template-editor-status"
     ].forEach(function (id) { elements[id] = document.getElementById(id); });
 
     var session = null;
@@ -149,8 +150,17 @@
       updateZoomControls();
     }
     function isDirty() {
-      return Boolean(session && (JSON.stringify(session.draft) !== JSON.stringify(session.resetDraft) ||
-        elements["template-editor-name"].value !== session.resetDraft.name));
+      return Boolean(session && JSON.stringify(session.draft) !== JSON.stringify(session.resetDraft));
+    }
+    function fillMetadataFields(value) {
+      var parts = editor.splitTemplateName(value);
+      elements["template-editor-name"].value = parts.name;
+      elements["template-editor-device"].value = parts.device;
+      elements["template-editor-version"].value = parts.version;
+    }
+    function composedName() {
+      return editor.composeTemplateName(elements["template-editor-name"].value,
+        elements["template-editor-device"].value, elements["template-editor-version"].value);
     }
     function pushUndo(definition) {
       undoStack.push(clone(definition));
@@ -165,7 +175,7 @@
     function updateValidation() {
       if (!session) return;
       var validation = templates.validateTemplate(session.draft);
-      var name = elements["template-editor-name"].value.trim();
+      var name = composedName();
       var nameValid = name.length > 0 && name.length <= 100;
       elements["template-editor-save"].disabled = !validation.ok || !nameValid;
       if (!validation.ok) setStatus("目前位置未能通過範本驗證：" + validation.errors.join(" "), true);
@@ -335,19 +345,19 @@
         if (!question) return;
         item.choices.forEach(function (bubble, index) {
           var point = geometry.mapBubble(bubble, width, height, detected.calibration, question.localOffsets && question.localOffsets[index]);
-          drawCircle(svg, point, Math.max(2, radius * 0.72), "#d21f2b", "template-editor-detected",
+          drawCircle(svg, point, Math.max(2, radius * 0.72), "#00834a", "template-editor-detected",
             "讀圈實際位置：" + item.type + " 第 " + item.number + " 題 " + bubble.option);
         });
       });
       [expanded.classGrade, expanded.classForm].forEach(function (field) {
         field.forEach(function (bubble) {
           drawCircle(svg, geometry.mapBubble(bubble, width, height, detected.metadataCalibration), Math.max(2, radius * 0.72),
-            "#d21f2b", "template-editor-detected", "讀圈實際位置：" + bubble.type + " " + bubble.option);
+            "#00834a", "template-editor-detected", "讀圈實際位置：" + bubble.type + " " + bubble.option);
         });
       });
       expanded.studentNumber.forEach(function (column) { column.forEach(function (bubble) {
         drawCircle(svg, geometry.mapBubble(bubble, width, height, detected.metadataCalibration), Math.max(2, radius * 0.72),
-          "#d21f2b", "template-editor-detected", "讀圈實際位置：學號 " + bubble.option);
+          "#00834a", "template-editor-detected", "讀圈實際位置：學號 " + bubble.option);
       }); });
     }
     function clearSample(preserveViewMode) {
@@ -444,6 +454,8 @@
     }
     async function loadSample(file) {
       if (!file) return;
+      var requestedPage = arguments.length > 1 ? Number(arguments[1]) : 1;
+      var previewAlignment = Boolean(arguments[2]);
       clearSample(true);
       var loadToken = sampleLoadToken;
       editorSampleFile = file;
@@ -468,9 +480,14 @@
         sampleDocument = document;
         elements["template-editor-page-number"].min = "1";
         elements["template-editor-page-number"].max = String(sampleDocument.numPages);
-        elements["template-editor-page-number"].value = "1";
+        elements["template-editor-page-number"].value = String(Math.max(1,
+          Math.min(sampleDocument.numPages, Number.isInteger(requestedPage) ? requestedPage : 1)));
         elements["template-editor-page-number"].disabled = false;
         await renderSamplePage(true);
+        if (previewAlignment && samplePage) {
+          elements["template-editor-auto-align-scope"].value = "all";
+          autoAlign();
+        }
       } catch (error) {
         if (loadToken !== sampleLoadToken) return;
         clearSample();
@@ -516,7 +533,7 @@
           mcCount, tfCount, fit.calibration, fit.metadataCalibration, expanded);
         renderReadout(detectedResult);
         renderOverlay();
-        setStatus("樣本讀圈完成；紅色小圈顯示讀圈使用的實際位置。", false);
+        setStatus("樣本讀圈完成；綠點顯示讀圈使用的實際位置。", false);
       } catch (error) {
         detectedResult = null;
         elements["template-editor-result"].textContent = "讀圈測試失敗；請檢查樣本頁及圈位。";
@@ -591,7 +608,7 @@
       }
       pushUndo(before);
       session.draft = candidate;
-      elements["template-editor-name"].value = candidate.name;
+      fillMetadataFields(candidate.name);
       autoAlignPreview = null;
       resetTest(); renderControls();
       setStatus("已把自動對位結果寫入草稿；正在重新執行樣本讀圈測試。", false);
@@ -599,18 +616,19 @@
     }
     function updateName() {
       if (!session) return;
-      session.draft.name = elements["template-editor-name"].value;
+      session.draft.name = composedName();
       updateValidation();
     }
     function saveDraft() {
       if (!session) return;
-      session.draft.name = elements["template-editor-name"].value.trim();
+      session.draft.name = composedName();
       var result = editor.saveValidated(session.draft, templates, options.onSave);
       if (result && result.ok) {
         session.draft = clone(result.template || session.draft);
         session.selectedTemplateId = session.draft.id;
         session.resetDraft = clone(session.draft);
-        elements["template-editor-name"].value = session.draft.name;
+        session.saveAsNewVersion = false;
+        fillMetadataFields(session.draft.name);
         undoStack = [];
         renderControls();
         setStatus("自訂範本已儲存在這部電腦的瀏覽器。" + (result.message ? " " + result.message : ""), false);
@@ -621,7 +639,7 @@
     }
     function exportDraft() {
       if (!session) return;
-      session.draft.name = elements["template-editor-name"].value.trim();
+      session.draft.name = composedName();
       var check = templates.validateTemplate(session.draft);
       if (!check.ok) { setStatus("範本未能匯出：" + check.errors.join(" "), true); return; }
       try { options.onExport(session.draft); setStatus("範本 JSON 已下載；檔案只含範本設定。", false); }
@@ -637,8 +655,9 @@
       elements["template-editor-overlay"].replaceChildren();
       if (typeof options.onClose === "function") options.onClose();
     }
-    function open(selected) {
+    function open(selected, openOptions) {
       if (!selected || selected.kind !== "choice") return false;
+      var settings = openOptions || {};
       clearSample();
       var draft = clone(selected); var isBuiltin = selected.source === "builtin";
       if (isBuiltin) {
@@ -647,8 +666,16 @@
         draft.source = "custom";
         draft.name = (selected.name.slice(0, 88) + "（自訂副本）").slice(0, 100);
       }
+      var metadata = editor.splitTemplateName(draft.name);
+      var saveAsNewVersion = Boolean(settings.saveAsNewVersion);
+      if (saveAsNewVersion && !isBuiltin) {
+        draft.id = "custom:layout-" + selected.id.replace(/^custom:/, "").replace(/[^a-z0-9._-]/gi, "-").slice(0, 32) +
+          "-v" + Date.now().toString(36);
+        draft.source = "custom";
+        metadata.version = editor.nextTemplateVersion(metadata.version);
+      }
       session = { draft: draft, resetDraft: clone(draft), original: clone(selected), copiedBuiltin: isBuiltin,
-        selectedTemplateId: selected.id };
+        selectedTemplateId: selected.id, saveAsNewVersion: saveAsNewVersion };
       undoStack = []; detectedResult = null; autoAlignPreview = null; controlEdit = null;
       selectedZoom = null;
       viewMode = "selected";
@@ -659,8 +686,15 @@
       elements["template-editor-panel"].hidden = false;
       elements["template-editor-copy-note"].textContent = isBuiltin
         ? "已建立「" + draft.name + "」自訂副本；內置範本保持不變。"
-        : "正在編輯自訂範本「" + selected.name + "」；尚未儲存前，既有範本不會改動。";
-      elements["template-editor-name"].value = draft.name;
+        : saveAsNewVersion
+          ? "修正稿會另存為新版本「" + metadata.version + "」；原有範本及其讀圈結果會保留。"
+          : "正在編輯自訂範本「" + selected.name + "」；尚未儲存前，既有範本不會改動。";
+      elements["template-editor-name"].value = metadata.name;
+      elements["template-editor-device"].value = metadata.device;
+      elements["template-editor-version"].value = metadata.version || (saveAsNewVersion ? "v2" : isBuiltin ? "v1" : "");
+      session.draft.name = editor.composeTemplateName(elements["template-editor-name"].value,
+        elements["template-editor-device"].value, elements["template-editor-version"].value);
+      session.resetDraft = clone(session.draft);
       elements["template-editor-group"].value = "";
       elements["template-editor-all-columns"].checked = false;
       setStatus("所有圈位均符合範本座標範圍。", false);
@@ -700,7 +734,7 @@
       if (!session || !undoStack.length) return;
       session.draft = undoStack.pop();
       autoAlignPreview = null;
-      elements["template-editor-name"].value = session.draft.name;
+      fillMetadataFields(session.draft.name);
       resetTest(); setStatus("已撤銷上一步調整。", false);
       renderControls();
     }
@@ -708,7 +742,7 @@
       if (!session) return;
       pushUndo(session.draft);
       session.draft = clone(session.resetDraft);
-      elements["template-editor-name"].value = session.draft.name;
+      fillMetadataFields(session.draft.name);
       resetTest(); setStatus("已重設為開始編輯時的原範本位置。", false);
       renderControls();
     }
@@ -885,7 +919,9 @@
       autoAlignPreview = null; renderAutoAlignPreview(); renderOverlay(); renderControls();
       setStatus("已取消自動對位預覽；草稿沒有修改。", false);
     });
-    elements["template-editor-name"].addEventListener("input", updateName);
+    ["template-editor-name", "template-editor-device", "template-editor-version"].forEach(function (id) {
+      elements[id].addEventListener("input", updateName);
+    });
     elements["template-editor-save"].addEventListener("click", saveDraft);
     elements["template-editor-export"].addEventListener("click", exportDraft);
     elements["template-editor-close"].addEventListener("click", close);

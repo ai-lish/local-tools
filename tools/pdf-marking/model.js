@@ -558,6 +558,18 @@
     return { pages: clean, dropped: dropped };
   }
 
+  function mergeSelectedChoiceReread(currentPages, rereadPages, selectedPageNumbers) {
+    var merged = Object.assign({}, currentPages || {});
+    var replacedPages = [];
+    Array.from(new Set(selectedPageNumbers || [])).forEach(function (pageNumber) {
+      if (!Number.isInteger(pageNumber) || pageNumber < 1 || !rereadPages ||
+          !Object.prototype.hasOwnProperty.call(rereadPages, pageNumber)) return;
+      merged[pageNumber] = rereadPages[pageNumber];
+      replacedPages.push(pageNumber);
+    });
+    return { pages: merged, replacedPages: replacedPages };
+  }
+
   function choiceAnswersForSettings(page, type, count) {
     var byNumber = new Map();
     (page && Array.isArray(page.questions) ? page.questions : []).forEach(function (question) {
@@ -953,6 +965,7 @@
     buildXlsx: buildXlsx,
     toggleDictationMark: toggleDictationMark,
     choiceAnswersForSettings: choiceAnswersForSettings,
+    mergeSelectedChoiceReread: mergeSelectedChoiceReread,
     choiceIdentityConfirmed: choiceIdentityConfirmed,
     choiceIdentityWarnings: choiceIdentityWarnings,
     choiceReviewSummary: choiceReviewSummary,

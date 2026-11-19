@@ -29,6 +29,7 @@
     var mcPointsLabel = get("mc-points").closest("label");
     var tfPointsLabel = get("tf-points").closest("label");
     var currentStage = 1;
+    var studioStep = 1;
     var selectedTemplate = null;
     var pendingEditorReplacementId = "";
     var pendingOrderTemplate = null;
@@ -126,6 +127,9 @@
       currentStage = stage;
       home.hidden = true;
       wizard.hidden = false;
+      get("choice-wizard-studio-stepper").hidden = stage !== 2 && stage !== 3;
+      if (stage === 2) renderStudioStep(studioStep);
+      if (stage === 3) { studioStep = 3; renderStudioStep(3); }
       setLegacyVisibility(false);
       document.querySelectorAll("[data-wizard-panel]").forEach(function (panel) {
         panel.hidden = Number(panel.dataset.wizardPanel) !== stage;
@@ -142,7 +146,7 @@
       moveFields(stage);
       updateAnswerInputVisibility();
       if (stage === 1) populateTemplates();
-      if (stage === 2) updateSourceButtons();
+      if (stage === 2) { populateStudioTemplateSelect(); updateSourceButtons(); }
       if (stage === 3) {
         var draft = options.getEditorDraft() || selectedDefinition();
         get("choice-wizard-stage3-template-name").textContent = draft ? "｜" + draft.name : "";
@@ -246,9 +250,45 @@
     function updateSourceButtons() {
       var loaded = Boolean(sampleFile);
       get("choice-wizard-next-from-source").disabled = !loaded || !templateFromSelect();
-      get("choice-wizard-build-template").disabled = !loaded || !createMode;
+      get("choice-wizard-build-template").disabled = !loaded || !createMode || zones.length === 0;
       get("choice-wizard-page").disabled = !loaded;
       get("choice-wizard-start-create").disabled = !loaded;
+    }
+    function renderStudioStep(step) {
+      studioStep = step;
+      var sample = get("choice-wizard-studio-sample");
+      var builder = get("choice-wizard-builder");
+      var frame = get("choice-wizard-frame");
+      var sampleSlot = get("template-studio-sample-preview-slot");
+      var clickSlot = get("template-studio-click-preview-slot");
+      var nav = get("choice-wizard-studio-stepper");
+      sample.hidden = step !== 1;
+      builder.hidden = step !== 2;
+      if (step === 1) sampleSlot.append(frame);
+      else if (step === 2) clickSlot.append(frame);
+      nav.querySelectorAll("[data-studio-step]").forEach(function (button) {
+        var current = Number(button.dataset.studioStep) === step;
+        button.classList.toggle("current", current);
+        button.classList.toggle("complete", Number(button.dataset.studioStep) < step);
+        if (current) button.setAttribute("aria-current", "step"); else button.removeAttribute("aria-current");
+      });
+      updateSourceButtons();
+    }
+    function populateStudioTemplateSelect() {
+      var select = get("choice-wizard-template-studio-select");
+      if (!select) return;
+      var selectedId = get("choice-wizard-template").value || (selectedTemplate && selectedTemplate.id) || "";
+      select.replaceChildren();
+      allChoiceTemplates().forEach(function (definition) {
+        var option = document.createElement("option");
+        option.value = definition.id;
+        option.textContent = definition.name + (definition.source === "custom" ? "（自訂）" : "（內置）");
+        select.append(option);
+      });
+      if (Array.from(select.options).some(function (option) { return option.value === selectedId; })) select.value = selectedId;
+      else if (select.options.length) select.selectedIndex = 0;
+      get("choice-wizard-template").value = select.value;
+      selectedTemplate = templateFromSelect();
     }
     function isPrivacyIdentityZone(zone) { return api.isLayoutPrivacyZone(zone); }
     function isIdentityGridZone(zone) { return api.isIdentityGridZone(zone); }
@@ -401,6 +441,7 @@
       });
       get("choice-wizard-delete-zone").disabled = !selectedZoneId;
       updateIdentityConfirmation(false);
+      updateSourceButtons();
     }
     function renderOverlay() {
       var overlay = get("choice-wizard-overlay");
@@ -507,6 +548,8 @@
       get("choice-wizard-click-add-column").hidden = inProgress || !baseClickCalibration;
       get("choice-wizard-click-cancel").hidden = !inProgress;
       get("choice-wizard-click-complete").hidden = !inProgress || clickMode.stage !== "settings";
+      get("choice-wizard-click-undo").disabled = !(inProgress && clickMode.points.length) &&
+        !zones.some(function (zone) { return zone.clickCalibrated; });
       get("choice-wizard-click-anchor-wrap").hidden = !inProgress || clickMode.kind !== "first" || clickMode.stage !== "anchor";
       get("choice-wizard-click-start-wrap").hidden = !inProgress || clickMode.kind !== "additional";
       get("choice-wizard-click-group-wrap").hidden = !inProgress || clickMode.kind !== "first" || clickMode.stage !== "settings";
@@ -517,8 +560,8 @@
         !Number(get("choice-wizard-click-group-size").value) || Number(get("choice-wizard-click-count").value) <= Number(get("choice-wizard-click-group-size").value) || Boolean(clickMode.gapChosen);
       get("choice-wizard-click-status").textContent = message || (inProgress
         ? "請按提示在樣本頁點圈。點不到清晰圈心時會保留點擊位置，可拖動微調。"
-        : baseClickCalibration ? "第一欄已完成；可繼續拉框混用，或按「再加一欄」沿用同一間距。"
-          : "選擇題答案欄可沿用拖拉畫框，亦可按「點圈建立」量度圈心及行距。");
+        : baseClickCalibration ? "第一欄已完成；可按「再加一欄」沿用同一間距，或打開「更多設定」調整其他區域。"
+          : "開始後按提示在樣本頁點圈；點不到清晰圈心時會保留點擊位置，可拖動微調。");
       renderOverlay();
     }
     function clickCalibrationInput() {
@@ -567,8 +610,9 @@
       } else {
         get("choice-wizard-click-anchor-number").value = "2";
         get("choice-wizard-click-group-size").value = "5";
-        clickMode = { kind: "first", stage: "options", points: [], startQuestionNumber: 1, optionLabels: clickOptionLabels() };
-        renderClickControls("第一步：依次點第一題的 " + clickMode.optionLabels.join("、") + " 圈。");
+        var firstNumber = Math.max(1, Number(get("choice-wizard-first-number").value) || 1);
+        clickMode = { kind: "first", stage: "options", points: [], startQuestionNumber: firstNumber, optionLabels: clickOptionLabels() };
+        renderClickControls("第一步：依次點第 " + firstNumber + " 題的 " + clickMode.optionLabels.join("、") + " 圈。");
       }
     }
     function acceptClickPoint(point) {
@@ -607,8 +651,33 @@
         zones.push(zone); selectedZoneId = zone.id;
         if (!baseClickCalibration) baseClickCalibration = calibration;
         clickMode = null;
-        renderZoneList(); renderClickControls("點圈答案欄已加入；範本尚未建立，可繼續新增其他區域或點「建立範本並調整位置」。");
+        renderZoneList(); renderClickControls("已加入答案欄；確認圈位後可按「下一步：核對及儲存」。");
+        updateSourceButtons();
       } catch (error) { get("choice-wizard-click-status").textContent = error.message || "點圈校準無法完成。"; }
+    }
+    function undoClickStep() {
+      if (clickMode && clickMode.points.length) {
+        var removed = clickMode.points.pop();
+        clickMode.calibration = null;
+        if (clickMode.kind === "additional") clickMode.stage = "additional";
+        else if (removed.role === "gap") { clickMode.gapChosen = false; clickMode.stage = "settings"; }
+        else if (removed.role === "anchor") clickMode.stage = "anchor";
+        else clickMode.stage = "options";
+        renderClickControls("已撤銷上一個定位點，請按提示重設。");
+        refreshClickPreview();
+        return;
+      }
+      var lastIndex = -1;
+      for (var index = zones.length - 1; index >= 0; index -= 1) {
+        if (zones[index].clickCalibrated) { lastIndex = index; break; }
+      }
+      if (lastIndex >= 0) {
+        zones.splice(lastIndex, 1);
+        baseClickCalibration = zones.slice().reverse().find(function (zone) { return zone.clickCalibrated; })?.clickCalibrationInfo || null;
+        selectedZoneId = "";
+        renderOverlay(); renderZoneList(); renderClickControls("已撤銷上一個點圈答案欄。");
+        updateSourceButtons();
+      }
     }
     function cancelClickCalibration() {
       clickMode = null;
@@ -766,11 +835,17 @@
         get("choice-wizard-no-identity").checked = false; get("choice-wizard-identities-complete").checked = false;
         clearPreparedAiImage(); clearAiSuggestions();
       }
-      get("choice-wizard-builder").hidden = false;
-      setStatus("choice-wizard-source-status", "請拖拉標示姓名、科目、其他文字及手寫身份區；班別／班號圈格可先畫概略框，亦可留待 AI 建議。", false);
-      renderOverlay(); renderZoneList(); renderClickControls(); updateSourceButtons(); updateIdentityConfirmation(false);
+      get("choice-wizard-zone-type").value = "answer-mc";
+      get("choice-wizard-click-count").value = String(Math.max(1, Number(get("choice-wizard-rows").value) || 20));
+      get("choice-wizard-first-number").value = String(Math.max(1, Number(get("choice-wizard-first-number").value) || 1));
+      get("choice-wizard-template-studio-select").value = get("choice-wizard-template").value;
+      renderStudioStep(2);
+      setStatus("choice-wizard-source-status", "樣本已載入；現在按提示依次點圈。", false);
+      renderOverlay(); renderZoneList(); updateIdentityConfirmation(false);
+      if (!clickMode && !zones.some(function (zone) { return zone.clickCalibrated; })) startClickCalibration(false);
+      else renderClickControls();
     }
-    function openEditorForSelected(forceReset, definition) {
+    function openEditorForSelected(forceReset, definition, editorOptions) {
       definition = definition || selectedDefinition();
       if (!definition) return;
       get("choice-wizard-builder").hidden = true;
@@ -780,7 +855,7 @@
       get("choice-wizard-position-status").textContent = definition.source === "builtin"
         ? "內置範本會以自訂副本編輯；內置範本保持不變。"
         : "範本只保存圈位及遮罩設定，不包括樣本、答案或學生資料。";
-      options.openEditor(definition, sampleFile);
+      options.openEditor(definition, sampleFile, editorOptions || null);
     }
     function editorTransition(definition) {
       var context = typeof options.getEditorContext === "function" ? options.getEditorContext() : null;
@@ -856,10 +931,12 @@
           mcNumbering: numberingFor("mc"), tfNumbering: numberingFor("tf"),
           confirmNoIdentityArea: get("choice-wizard-no-identity").checked });
         if (mcColumns && rowInputs.length && get("choice-wizard-rows").value === "") throw new Error("請設定每欄題數。");
-        if (!selectTemplate(definition)) return;
+        if (!selectTemplate(definition, null, false)) return;
+        studioStep = 3;
+        openEditorForSelected(true, definition, { pageNumber: Number(get("choice-wizard-page").value) || 1 });
         get("choice-wizard-template").value = "";
         renderStage(3);
-        setStatus("choice-wizard-position-status", "已建立待調整範本；按「儲存為自訂範本」後才可繼續。", false);
+        setStatus("choice-wizard-position-status", "已建立範本草稿；請測試讀圈，完成後按「儲存」。", false);
       } catch (error) {
         setStatus("choice-wizard-builder-status", error.message || "範本設定不正確。", true);
       }
@@ -1531,16 +1608,20 @@
       var definition = templateFromSelect();
       if (!definition) { setStatus("choice-wizard-source-status", "請選擇一個選擇題範本。", true); return; }
       if (!sampleFile) { setStatus("choice-wizard-source-status", "請載入樣本 PDF，供第三步調整位置及第四步點選答案。", true); return; }
+      var transition = editorTransition(definition);
+      var preserveCurrentDraft = transition === "preserve" || transition === "reload-sample";
       if (!selectTemplate(definition)) return;
+      studioStep = 3;
+      openEditorForSelected(!preserveCurrentDraft, definition, { pageNumber: Number(get("choice-wizard-page").value) || 1, autoAlign: true });
       renderStage(3);
     }
 
     function returnToSampleBuilder() {
       if (createMode && zones.length) {
-        get("choice-wizard-builder").hidden = false;
         updateSourceButtons(); renderOverlay(); renderZoneList();
         setStatus("choice-wizard-source-status", "已保留原有範圍；可繼續調整後重新建立範本。", false);
       }
+      studioStep = createMode && zones.length ? 2 : 1;
       renderStage(2);
     }
 
@@ -1559,6 +1640,8 @@
     function openTemplateBuilder() {
       selectedTemplate = templateFromSelect();
       createMode = false;
+      studioStep = 1;
+      populateStudioTemplateSelect();
       renderStage(2);
       setStatus("choice-wizard-source-status", "載入樣本 PDF 後，可建立新範本或編輯已選範本。", false);
     }
@@ -1575,8 +1658,12 @@
       renderStage(7);
       get("choice-appeal-details").open = true;
     });
-    get("template-editor-name").addEventListener("input", function () {
-      if (currentStage === 3) get("choice-wizard-stage3-template-name").textContent = "｜" + this.value;
+    ["template-editor-name", "template-editor-device", "template-editor-version"].forEach(function (id) {
+      get(id).addEventListener("input", function () {
+        if (currentStage === 3) get("choice-wizard-stage3-template-name").textContent =
+          "｜" + window.PdfMarkingTemplateEditor.composeTemplateName(
+            get("template-editor-name").value, get("template-editor-device").value, get("template-editor-version").value);
+      });
     });
     get("choice-wizard-select-dictation").addEventListener("click", function () { showLegacy("dictation"); });
     get("choice-wizard-use-existing").addEventListener("click", function () {
@@ -1589,6 +1676,14 @@
     });
     get("choice-wizard-start-create").addEventListener("click", beginCreate);
     get("choice-wizard-template").addEventListener("change", function () {
+      selectedTemplate = templateFromSelect();
+      renderTemplateCards();
+      updateTemplateOrderWarning(selectedTemplate);
+      if (get("choice-wizard-template-studio-select")) get("choice-wizard-template-studio-select").value = this.value;
+      updateSourceButtons();
+    });
+    get("choice-wizard-template-studio-select").addEventListener("change", function () {
+      get("choice-wizard-template").value = this.value;
       selectedTemplate = templateFromSelect();
       renderTemplateCards();
       updateTemplateOrderWarning(selectedTemplate);
@@ -1615,8 +1710,6 @@
     get("choice-wizard-template-file").addEventListener("change", function () {
       if (this.files[0]) options.importTemplate(this.files[0], this);
     });
-    get("choice-wizard-save-template").addEventListener("click", function () { options.saveTemplate(); });
-    get("choice-wizard-export-template").addEventListener("click", function () { options.exportTemplate(); });
     get("choice-wizard-ai-prepare").addEventListener("click", prepareAiLayout);
     get("choice-wizard-ai-confirm").addEventListener("click", confirmAiLayout);
     get("choice-wizard-ai-cancel").addEventListener("click", function () {
@@ -1712,6 +1805,7 @@
     get("choice-wizard-options").addEventListener("change", function () { renderClickControls(); });
     get("choice-wizard-click-start").addEventListener("click", function () { startClickCalibration(false); });
     get("choice-wizard-click-add-column").addEventListener("click", function () { startClickCalibration(true); });
+    get("choice-wizard-click-undo").addEventListener("click", undoClickStep);
     get("choice-wizard-click-complete").addEventListener("click", completeClickCalibration);
     get("choice-wizard-click-cancel").addEventListener("click", cancelClickCalibration);
     get("choice-wizard-click-measure-gap").addEventListener("click", function () {
@@ -1729,9 +1823,18 @@
       .forEach(function (id) { get(id).addEventListener("input", function () {
         if (id === "choice-wizard-click-anchor-number" && clickMode) clickMode.anchorQuestionNumber = Number(this.value);
         if (id === "choice-wizard-click-start-number" && clickMode) clickMode.startQuestionNumber = Number(this.value);
+        if (id === "choice-wizard-click-count" && clickMode) get("choice-wizard-rows").value = this.value;
         renderClickControls();
         refreshClickPreview();
       }); });
+    get("choice-wizard-rows").addEventListener("input", function () {
+      get("choice-wizard-click-count").value = this.value;
+      renderClickControls(); refreshClickPreview();
+    });
+    get("choice-wizard-first-number").addEventListener("input", function () {
+      if (clickMode && clickMode.kind === "first") clickMode.startQuestionNumber = Math.max(1, Number(this.value) || 1);
+      renderClickControls(); refreshClickPreview();
+    });
     var zoneOverlay = get("choice-wizard-overlay");
     zoneOverlay.addEventListener("pointerdown", pointerDown);
     zoneOverlay.addEventListener("pointermove", pointerMove);
@@ -1740,7 +1843,7 @@
     get("choice-wizard-next-to-answers").addEventListener("click", function () {
       var draft = options.getEditorDraft();
       if (!draft || !templates.validateTemplate(draft).ok) { setStatus("choice-wizard-position-status", "目前範本未通過驗證。", true); return; }
-      if (!options.isTemplateSaved(draft.id)) { setStatus("choice-wizard-position-status", "請先按「儲存為自訂範本」；範本不會包含樣本或答案。", true); return; }
+      if (!options.isTemplateSaved(draft.id)) { setStatus("choice-wizard-position-status", "請先按上方「儲存」；範本不會包含樣本或答案。", true); return; }
       selectedTemplate = options.getSelectedTemplate();
       renderStage(4);
     });
@@ -1788,6 +1891,19 @@
         } else if (target === 4 && selectedTemplate && selectedTemplate.kind === "choice") renderStage(6);
       });
     });
+    get("choice-wizard-studio-stepper").querySelectorAll("[data-studio-step]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var target = Number(button.dataset.studioStep);
+        if (target === 1) {
+          if (currentStage === 3 && options.hasEditorUnsavedChanges() &&
+              !root.confirm("第三步有未儲存的範本修改。返回樣本不會儲存這些修改，要繼續嗎？")) return;
+          if (currentStage === 3) options.closeEditor();
+          studioStep = 1; renderStage(2);
+        } else if (target === 2 && createMode) {
+          studioStep = 2; renderStage(2);
+        }
+      });
+    });
     document.querySelectorAll("[data-wizard-back]").forEach(function (button) {
       button.addEventListener("click", function () {
         var target = Number(button.dataset.wizardBack);
@@ -1805,15 +1921,25 @@
         openEditorForSelected(false, definition);
         renderStage(3);
       },
-      openCurrentTemplateEditor: function (sample) {
+      openCurrentTemplateEditor: function (sample, pageNumber) {
         var definition = selectedTemplate || options.getSelectedTemplate();
         if (!definition || definition.kind !== "choice" || !sample) return;
         if (!selectTemplate(definition, null, false)) return;
         sampleFile = sample;
-        openEditorForSelected(true, definition);
+        studioStep = 3;
+        openEditorForSelected(true, definition, {
+          pageNumber: Number(pageNumber) || 1, autoAlign: true, saveAsNewVersion: true
+        });
         renderStage(3);
       },
-      onTemplateSaved: function (definition) { selectedTemplate = definition; populateTemplates(); updateTemplateOrderWarning(definition); },
+      onTemplateSaved: function (definition, correctionReturn) {
+        selectedTemplate = definition; populateTemplates(); updateTemplateOrderWarning(definition);
+        if (correctionReturn) {
+          studioStep = 3;
+          renderStage(5);
+          if (typeof options.onTemplateCorrectionSaved === "function") options.onTemplateCorrectionSaved(correctionReturn);
+        }
+      },
       onTemplateImported: function (definition) {
         if (!definition || definition.kind !== "choice") return;
         if (!selectTemplate(definition, null, false)) return;

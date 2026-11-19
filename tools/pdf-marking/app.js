@@ -19,6 +19,9 @@
   var customTemplates = storedTemplateState.templates;
   var preferredTemplateId = storedTemplateState.selectedTemplateId;
   var pendingColumnOrderTemplate = null;
+  var pendingTemplateCorrection = null;
+  var templateRereadSelection = [];
+  var templateRereadVisible = false;
   function findTemplateById(id) {
     return templates.BUILTIN_TEMPLATES.concat(customTemplates).find(function (definition) { return definition.id === id; }) || null;
   }
@@ -1508,7 +1511,12 @@
     els.focusBrowseReturn.hidden = !browsing;
     els.focusPageReread.hidden = !pageFailureItem;
     els.focusPageTable.hidden = !pageFailureItem || !state.choiceWizardActive || state.choiceWizardStage !== 5;
-    els.focusFixTemplate.hidden = !pageFailureItem || !state.choiceWizardActive || state.choiceWizardStage !== 5;
+    var currentPageRecord = state.choicePages[state.currentPage];
+    var pendingQuestionCount = currentPageRecord && Array.isArray(currentPageRecord.questions)
+      ? currentPageRecord.questions.filter(function (question) { return question.status === "review" && !question.reviewed; }).length : 0;
+    els.focusFixTemplate.hidden = !(state.choiceWizardActive && state.choiceWizardStage === 5 &&
+      (pageFailureItem || pendingQuestionCount >= 5));
+    els.focusFixTemplate.textContent = "用此頁修正範本";
     els.focusFailureReason.hidden = !pageFailureItem;
     els.focusConfirm.hidden = pageFailureItem;
     els.focusConfirm.disabled = !current || pageFailureItem;
@@ -3039,6 +3047,120 @@
     }
   }
 
+  function renderTemplateRereadSelection() {
+    var list = byId("template-reread-page-list");
+    var panel = byId("template-reread-panel");
+    if (!list || !panel) return;
+    list.replaceChildren();
+    templateRereadSelection = Array.from(new Set(templateRereadSelection))
+      .filter(function (pageNumber) { return Number.isInteger(pageNumber) && pageNumber >= 1 && pageNumber <= state.pageCount; })
+      .sort(function (a, b) { return a - b; });
+    templateRereadSelection.forEach(function (pageNumber) {
+      var row = document.createElement("div"); row.className = "template-reread-page";
+      var label = document.createElement("span");
+      var page = state.choicePages[pageNumber];
+      label.textContent = "第 " + pageNumber + " 頁" + (page && page.pageFailure ? " · 整頁定位失敗" : "");
+      var remove = document.createElement("button"); remove.type = "button"; remove.className = "button compact";
+      remove.textContent = "移除"; remove.setAttribute("aria-label", "移除第 " + pageNumber + " 頁");
+      remove.addEventListener("click", function () {
+        templateRereadSelection = templateRereadSelection.filter(function (entry) { return entry !== pageNumber; });
+        renderTemplateRereadSelection();
+      });
+      row.append(label, remove); list.append(row);
+    });
+    byId("template-reread-run").disabled = templateRereadSelection.length === 0;
+    if (templateRereadVisible) panel.hidden = false;
+  }
+
+  function showTemplateRereadPanel(pageNumbers) {
+    templateRereadVisible = true;
+    templateRereadSelection = Array.isArray(pageNumbers) ? pageNumbers.slice() : [];
+    byId("template-reread-status").textContent = templateRereadSelection.length
+      ? "已選 " + templateRereadSelection.length + " 頁；其他頁的讀圈結果及人手修改會保留。"
+      : "請加入要重讀的頁碼。";
+    byId("template-reread-panel").hidden = false;
+    renderTemplateRereadSelection();
+  }
+
+  async function rereadSelectedTemplatePages() {
+    var selected = templateRereadSelection.slice().sort(function (a, b) { return a - b; });
+    if (!state.pdfDoc || !state.template || !selected.length) {
+      byId("template-reread-status").textContent = "請選擇至少一頁並確認仍載入原 PDF。";
+      return;
+    }
+    var manualPages = selected.filter(function (pageNumber) {
+      var page = state.choicePages[pageNumber];
+      return page && review.hasManualEdits({ 1: page });
+    });
+    if (manualPages.length && !window.confirm("所選頁已有手動修改，第 " + manualPages.join("、") +
+        " 頁的讀圈結果將由新範本取代。其他頁及其人手修改會保留。要繼續嗎？")) return;
+    var settings = choiceSettings();
+    if (!settings.valid) {
+      byId("template-reread-status").textContent = "請先修正讀圈設定：" + settings.message;
+      return;
+    }
+    var runButton = byId("template-reread-run");
+    runButton.disabled = true;
+    invalidateChoiceReviewUndoPages(selected);
+    var rereadPages = {};
+    var completed = [];
+    var alignmentFailed = [];
+    var failed = [];
+    try {
+      for (var index = 0; index < selected.length; index += 1) {
+        var pageNumber = selected[index];
+        if (isAnswerKeyExcludedPage(pageNumber)) { failed.push(pageNumber); continue; }
+        byId("template-reread-status").textContent = "正在以新範本重讀第 " + pageNumber + " 頁（" + (index + 1) + " / " + selected.length + "）…";
+        var rendered = null;
+        try {
+          rendered = await renderPdfToCanvas(pageNumber, 2.2);
+          var expanded = geometry.expandChoiceTemplate(state.template, settings);
+          var fit = omr.gridFit(rendered.data.data, rendered.canvas.width, rendered.canvas.height, expanded);
+          var detected = omr.detectPage(rendered.data.data, rendered.canvas.width, rendered.canvas.height,
+            settings.mcCount, settings.tfCount, fit.calibration, fit.metadataCalibration, expanded);
+          var identityRequirements = window.PdfMarkingChoiceWizard.identityRequirements(state.template, detected.identityRequirements);
+          rereadPages[pageNumber] = {
+            questions: detected.questions,
+            classValue: detected.classValue,
+            studentId: detected.studentId,
+            metadata: detected.metadata,
+            identityRequirements: identityRequirements,
+            calibration: detected.calibration,
+            metadataCalibration: detected.metadataCalibration,
+            thresholds: detected.thresholds,
+            alignmentDiagnostics: detected.alignmentDiagnostics,
+            pageFlags: detected.pageFlags,
+            pageFailure: detected.pageFailure,
+            classWasEdited: false,
+            studentIdWasEdited: false
+          };
+          if (detected.pageFailure) alignmentFailed.push(pageNumber);
+          else completed.push(pageNumber);
+        } catch (error) {
+          failed.push(pageNumber);
+        } finally {
+          if (rendered && rendered.canvas) {
+            rendered.canvas.width = 1; rendered.canvas.height = 1;
+          }
+        }
+      }
+      state.choicePages = model.mergeSelectedChoiceReread(state.choicePages, rereadPages, selected).pages;
+      var queue = review.buildReviewQueue(state.choicePages, state.pageCount);
+      state.focusKey = queue.length ? queue[0].key : "";
+      if (queue.length) state.currentPage = queue[0].pageNumber;
+      renderCurrentMode(); updateControls(); updateStepper();
+      var statusParts = [];
+      if (completed.length) statusParts.push("已重讀並成功讀取第 " + completed.join("、") + " 頁");
+      if (alignmentFailed.length) statusParts.push("第 " + alignmentFailed.join("、") + " 頁用新範本仍未能定位，請再修正範本或逐題確認");
+      if (failed.length) statusParts.push("第 " + failed.join("、") + " 頁未能重讀，原有結果保留");
+      if (!statusParts.length) statusParts.push("沒有頁面完成重讀");
+      statusParts.push("其他頁結果及人手修改均已保留");
+      byId("template-reread-status").textContent = statusParts.join("；") + "。";
+    } finally {
+      runButton.disabled = templateRereadSelection.length === 0;
+    }
+  }
+
   function toggleChoiceAnswer(type, number, option) {
     var page = currentChoicePage(); if (!page) return;
     var response = page.questions.find(function (question) { return question.type === type && question.number === number; });
@@ -3610,8 +3732,8 @@
     try {
       var selected = templateById(state.templateId);
       var text = templates.serializeTemplate(selected);
-      var safeId = selected.id.replace(/[^a-z0-9._-]/gi, "-");
-      createDownload(downloadName("pdf-marking-template-" + safeId + ".json"), new Blob([text], { type: "application/json;charset=utf-8" }));
+      var filename = window.PdfMarkingTemplateEditor.templateExportFilename(selected.name, selected.id);
+      createDownload(downloadName(filename), new Blob([text], { type: "application/json;charset=utf-8" }));
       els.templateStatus.textContent = "範本 JSON 已下載；檔案不含批改進度。";
     } catch (error) {
       els.templateStatus.textContent = error.message || "範本無法匯出。";
@@ -3698,15 +3820,18 @@
       templateStore.savePreference(window, definition.id);
       preferredTemplateId = definition.id;
       configureTemplateMode(definition);
-      if (choiceWizardUI) choiceWizardUI.onTemplateSaved(definition);
+      var correctionReturn = pendingTemplateCorrection;
+      pendingTemplateCorrection = null;
+      if (choiceWizardUI) choiceWizardUI.onTemplateSaved(definition, correctionReturn);
       return { ok: true, template: definition, message: saved.message };
     },
     onExport: function (definition) {
       var text = templates.serializeTemplate(definition);
-      var safeId = definition.id.replace(/[^a-z0-9._-]/gi, "-");
-      createDownload(downloadName("pdf-marking-template-" + safeId + ".json"), new Blob([text], { type: "application/json;charset=utf-8" }));
+      var filename = window.PdfMarkingTemplateEditor.templateExportFilename(definition.name, definition.id);
+      createDownload(downloadName(filename), new Blob([text], { type: "application/json;charset=utf-8" }));
     },
     onClose: function () {
+      pendingTemplateCorrection = null;
       if (choiceWizardUI) choiceWizardUI.onEditorClosed();
       renderTemplateList(); updateStepper();
     }
@@ -3722,6 +3847,7 @@
     getEditorDraft: function () { return templateEditorUI.getDraft(); },
     getEditorContext: function () { return templateEditorUI.getContext(); },
     hasEditorUnsavedChanges: function () { return templateEditorUI.hasUnsavedChanges(); },
+    closeEditor: function () { templateEditorUI.close(); },
     isTemplateSaved: function (id) { return Boolean(findTemplateById(id)); },
     getAiSettings: function () {
       return { ready: aiReady() && !aiMemory.busy, provider: aiMemory.provider,
@@ -3806,9 +3932,21 @@
       if (key === "identity") els.choiceIdentityReviewDetails.open = true;
       renderCurrentMode();
     },
-    openEditor: function (definition, sampleFile) {
-      templateEditorUI.open(definition);
-      templateEditorUI.loadSample(sampleFile);
+    openEditor: function (definition, sampleFile, editorOptions) {
+      templateEditorUI.open(definition, editorOptions);
+      templateEditorUI.loadSample(sampleFile, editorOptions && editorOptions.pageNumber, editorOptions && editorOptions.autoAlign);
+    },
+    onTemplateCorrectionSaved: function (correction) {
+      state.currentPage = Number(correction && correction.pageNumber) || state.currentPage;
+      focusBrowseState.active = false;
+      state.focusKey = "page:" + state.currentPage;
+      var failedPages = [];
+      for (var pageNo = 1; pageNo <= state.pageCount; pageNo += 1) {
+        if (!isAnswerKeyExcludedPage(pageNo) && state.choicePages[pageNo] && state.choicePages[pageNo].pageFailure) failedPages.push(pageNo);
+      }
+      if (!failedPages.length && state.currentPage) failedPages.push(state.currentPage);
+      showTemplateRereadPanel(failedPages);
+      renderCurrentMode(); updateControls(); updateStepper();
     },
     loadEditorSample: function (sampleFile) { templateEditorUI.loadSample(sampleFile); },
     onSelectTemplate: function (definition, selectionOptions) {
@@ -4166,8 +4304,29 @@
   els.focusFixTemplate.addEventListener("click", function () {
     if (!state.pdfBytes || !choiceWizardUI) return;
     var sample = new File([state.pdfBytes], state.pdfFilename || "本機答題紙.pdf", { type: "application/pdf" });
-    choiceWizardUI.openCurrentTemplateEditor(sample);
+    pendingTemplateCorrection = { pageNumber: state.currentPage };
+    choiceWizardUI.openCurrentTemplateEditor(sample, state.currentPage);
   });
+  byId("template-reread-close").addEventListener("click", function () {
+    templateRereadVisible = false;
+    byId("template-reread-panel").hidden = true;
+  });
+  byId("template-reread-add-page-button").addEventListener("click", function () {
+    var pageNumber = Number(byId("template-reread-add-page").value);
+    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > state.pageCount) {
+      byId("template-reread-status").textContent = "頁碼須介乎 1 至 " + state.pageCount + "。";
+      return;
+    }
+    if (isAnswerKeyExcludedPage(pageNumber)) {
+      byId("template-reread-status").textContent = "答案卷頁不會重讀。";
+      return;
+    }
+    if (templateRereadSelection.indexOf(pageNumber) < 0) templateRereadSelection.push(pageNumber);
+    byId("template-reread-add-page").value = "";
+    renderTemplateRereadSelection();
+    byId("template-reread-status").textContent = "已加入第 " + pageNumber + " 頁。";
+  });
+  byId("template-reread-run").addEventListener("click", rereadSelectedTemplatePages);
   els.focusBrowseStart.addEventListener("click", startFocusBrowse);
   els.focusBrowsePrev.addEventListener("click", function () { moveFocusBrowse(-1); });
   els.focusBrowseNext.addEventListener("click", function () { moveFocusBrowse(1); });
