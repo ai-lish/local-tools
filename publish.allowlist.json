@@ -1547,7 +1547,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.19.6",
+      "version": "2026.11.19.12",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1780,7 +1780,7 @@
     {
       "id": "pdf-marking",
       "title": "PDF 閱卷及批改工具",
-      "version": "2026.11.19.6",
+      "version": "2026.11.19.12",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -1995,7 +1995,7 @@
     {
       "id": "pdf-marking-choice",
       "title": "批改 PDF（選擇題）",
-      "version": "2026.11.19.6",
+      "version": "2026.11.19.12",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -2192,18 +2192,8 @@
       "offlineRewrites": [
         {
           "file": "tools/pdf-marking/index.html",
-          "from": "</body>",
-          "to": "<script>(function(){document.addEventListener(\"DOMContentLoaded\",function(){var button=document.getElementById(\"choice-wizard-select-choice\");if(button)button.click();});}());</script></body>"
-        },
-        {
-          "file": "tools/pdf-marking/index.html",
-          "from": "<p class=\"muted\">默書會沿用原有批改流程；選擇題可建立新範本或直接使用現有範本。</p>",
-          "to": "<p class=\"muted\">此離線套件只提供選擇題範本建立、讀圈及匯出。</p>"
-        },
-        {
-          "file": "tools/pdf-marking/index.html",
-          "from": "<button class=\"choice-wizard-category\" id=\"choice-wizard-select-dictation\" type=\"button\"><strong>默書</strong><span>進入現有默書標記及批改流程</span></button>",
-          "to": "<button class=\"choice-wizard-category\" id=\"choice-wizard-select-dictation\" type=\"button\" style=\"display:none\" aria-hidden=\"true\" tabindex=\"-1\" disabled><strong>默書</strong><span>此套件只提供選擇題批改</span></button>"
+          "from": "<button class=\"marking-dictation-link\" id=\"choice-wizard-select-dictation\" type=\"button\">默書批改</button>",
+          "to": "<button class=\"marking-dictation-link\" id=\"choice-wizard-select-dictation\" type=\"button\" style=\"display:none\" aria-hidden=\"true\" tabindex=\"-1\" disabled>默書批改</button>"
         },
         {
           "file": "tools/pdf-marking/index.html",

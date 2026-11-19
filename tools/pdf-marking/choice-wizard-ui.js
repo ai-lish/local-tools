@@ -10,6 +10,7 @@
     var omr = options.omr;
     var get = function (id) { return document.getElementById(id); };
     var wizard = get("choice-wizard");
+    var home = get("pdf-marking-home");
     var legacyStepper = get("legacy-stepper");
     var legacySections = [get("step-1"), get("step-2"), get("step-3")];
     var editorPanel = get("template-editor-panel");
@@ -17,10 +18,15 @@
     var editorNext = editorPanel.nextSibling;
     var settingsPanel = get("choice-settings");
     var answerInputs = get("choice-wizard-answer-inputs");
+    var answerCounts = get("choice-wizard-answer-counts");
+    var moreAnswerInputs = get("choice-wizard-more-answer-inputs");
+    var moreSettings = get("choice-wizard-more-settings");
     var mcCountLabel = get("mc-count").closest("label");
     var tfCountLabel = get("tf-count").closest("label");
     var mcKeyLabel = get("mc-key").closest("label");
     var tfKeyLabel = get("tf-key").closest("label");
+    var mcPointsLabel = get("mc-points").closest("label");
+    var tfPointsLabel = get("tf-points").closest("label");
     var currentStage = 1;
     var selectedTemplate = null;
     var pendingEditorReplacementId = "";
@@ -78,6 +84,11 @@
       get("choice-wizard-order-warning-text").textContent = pendingOrderTemplate
         ? "此自訂範本有同一直行的答案欄未按由上而下排列，題號可能錯配。可建立修正版副本；原範本會保留。"
         : "";
+      var card = Array.from(get("choice-wizard-template-cards").children).find(function (item) {
+        return pendingOrderTemplate && item.dataset.templateId === pendingOrderTemplate.id;
+      });
+      if (card) card.append(warning);
+      else get("choice-wizard-template-cards").append(warning);
     }
     function setLegacyVisibility(visible) {
       legacyStepper.hidden = !visible;
@@ -86,25 +97,51 @@
     function moveFields(stage) {
       if (stage === 3) {
         get("choice-wizard-count-slot").append(mcCountLabel, tfCountLabel);
+      } else if (stage === 4) {
+        answerCounts.append(mcCountLabel, tfCountLabel);
       } else settingsPanel.append(mcCountLabel, tfCountLabel);
-      if (stage === 4) answerInputs.append(mcKeyLabel, tfKeyLabel);
-      else settingsPanel.append(mcKeyLabel, tfKeyLabel);
+      if (stage === 4) {
+        var definition = selectedDefinition();
+        var hasMc = Boolean(definition && definition.blocks.some(function (entry) { return entry.type === "mc"; }));
+        var hasTf = Boolean(definition && definition.blocks.some(function (entry) { return entry.type === "tf"; }));
+        if (hasMc) answerInputs.append(mcKeyLabel);
+        if (hasTf && hasMc) moreAnswerInputs.append(tfKeyLabel);
+        else if (hasTf) answerInputs.append(tfKeyLabel);
+        moreSettings.append(mcPointsLabel, tfPointsLabel);
+      } else settingsPanel.append(mcKeyLabel, tfKeyLabel, mcPointsLabel, tfPointsLabel);
+    }
+    function updateAnswerInputVisibility() {
+      var definition = selectedDefinition();
+      ["mc", "tf"].forEach(function (type) {
+        var hasType = Boolean(definition && definition.blocks.some(function (entry) { return entry.type === type; }));
+        var count = Number(get(type === "mc" ? "mc-count" : "tf-count").value) || 0;
+        var label = type === "mc" ? mcKeyLabel : tfKeyLabel;
+        label.hidden = !hasType || (currentStage === 4 && count === 0);
+        (type === "mc" ? mcCountLabel : tfCountLabel).hidden = !hasType;
+      });
     }
     function renderStage(stage) {
       if (stage === 3 && !syncEditorForSelected(selectedDefinition(), false)) return false;
       currentStage = stage;
+      home.hidden = true;
       wizard.hidden = false;
       setLegacyVisibility(false);
       document.querySelectorAll("[data-wizard-panel]").forEach(function (panel) {
         panel.hidden = Number(panel.dataset.wizardPanel) !== stage;
       });
+      var flowStep = stage === 4 ? 2 : stage === 5 ? 3 : stage === 6 ? 4 : stage === 1 ? 1 : 0;
+      get("choice-wizard-stepper").hidden = !flowStep;
       document.querySelectorAll("[data-wizard-step]").forEach(function (pill) {
         var target = Number(pill.dataset.wizardStep);
-        pill.classList.toggle("current", target === stage);
-        pill.classList.toggle("complete", target < stage);
-        if (target === stage) pill.setAttribute("aria-current", "step"); else pill.removeAttribute("aria-current");
+        pill.classList.toggle("current", target === flowStep);
+        pill.classList.toggle("complete", flowStep > 0 && target < flowStep);
+        if (target === flowStep) pill.setAttribute("aria-current", "step"); else pill.removeAttribute("aria-current");
+        pill.disabled = target > 1 && (!selectedTemplate || selectedTemplate.kind !== "choice");
       });
       moveFields(stage);
+      updateAnswerInputVisibility();
+      if (stage === 1) populateTemplates();
+      if (stage === 2) updateSourceButtons();
       if (stage === 3) {
         var draft = options.getEditorDraft() || selectedDefinition();
         get("choice-wizard-stage3-template-name").textContent = draft ? "｜" + draft.name : "";
@@ -116,8 +153,16 @@
         get("choice-wizard-tf-numbering").disabled = !tfBlock;
         updateCountStatus();
       }
-      if (stage === 4) { renderAnswerPage(); updateAnswerSourceAvailability(); }
+      if (stage === 4) { renderSimpleAnswerGrid(); renderAnswerPage(); updateAnswerSourceAvailability(); }
       options.onWizardStage(stage);
+    }
+    function renderHome() {
+      wizard.hidden = true;
+      home.hidden = false;
+      setLegacyVisibility(false);
+      var preferred = allChoiceTemplates().find(function (definition) { return definition.id === options.getPreferredTemplateId(); });
+      get("choice-wizard-last-template").textContent = preferred ? preferred.name : "揀範本開始";
+      options.onWizardHome();
     }
     function showLegacy(mode, definition) {
       if (editorPanel.parentNode !== editorHome) editorHome.insertBefore(editorPanel, editorNext);
@@ -136,18 +181,73 @@
         select.append(option);
       });
       if (Array.from(select.options).some(function (entry) { return entry.value === previous; })) select.value = previous;
+      else if (Array.from(select.options).some(function (entry) { return entry.value === options.getPreferredTemplateId(); })) select.value = options.getPreferredTemplateId();
       else if (options.getSelectedTemplate() && options.getSelectedTemplate().kind === "choice") select.value = options.getSelectedTemplate().id;
       else if (select.options.length) select.selectedIndex = 0;
+      selectedTemplate = templateFromSelect();
+      renderTemplateCards();
       updateTemplateOrderWarning(templateFromSelect());
+    }
+    function renderTemplateCards() {
+      var holder = get("choice-wizard-template-cards");
+      var select = get("choice-wizard-template");
+      var orderWarning = get("choice-wizard-order-warning");
+      // Keep the warning node outside the list while cards are rebuilt; if it
+      // is inside a card, replaceChildren() would remove it from the document.
+      holder.after(orderWarning);
+      holder.replaceChildren();
+      allChoiceTemplates().forEach(function (definition) {
+        var card = document.createElement("article");
+        card.className = "choice-wizard-template-card";
+        card.dataset.templateId = definition.id;
+        var label = document.createElement("label");
+        label.className = "choice-wizard-template-choice";
+        var radio = document.createElement("input");
+        radio.type = "radio"; radio.name = "choice-wizard-template-choice";
+        radio.value = definition.id; radio.checked = select.value === definition.id;
+        radio.setAttribute("aria-label", definition.name);
+        var copy = document.createElement("span");
+        copy.className = "choice-wizard-template-copy";
+        var title = document.createElement("strong"); title.textContent = definition.name;
+        var detail = document.createElement("span");
+        detail.className = "muted small";
+        detail.textContent = definition.blocks.map(function (block) {
+          return (block.type === "mc" ? "選擇題 " : "是非題 ") + block.maxCount + " 題";
+        }).join(" · ");
+        var lastUsed = document.createElement("span");
+        lastUsed.className = options.getPreferredTemplateId() === definition.id ? "chip ok" : "chip";
+        lastUsed.textContent = options.getPreferredTemplateId() === definition.id ? "上次使用" : "可用範本";
+        copy.append(title, detail);
+        label.append(radio, copy, lastUsed);
+        card.append(label);
+        radio.addEventListener("change", function () {
+          if (!this.checked) return;
+          if (!selectTemplate(definition, null, false)) {
+            renderTemplateCards();
+            return;
+          }
+          select.value = definition.id;
+          holder.querySelectorAll(".choice-wizard-template-card").forEach(function (item) {
+            item.classList.toggle("selected", item.dataset.templateId === definition.id);
+            var choice = item.querySelector("input[type=radio]");
+            if (choice) choice.checked = item.dataset.templateId === definition.id;
+          });
+          updateTemplateOrderWarning(definition);
+          updateSourceButtons();
+        });
+        card.classList.toggle("selected", radio.checked);
+        holder.append(card);
+      });
     }
     function templateFromSelect() {
       return allChoiceTemplates().find(function (definition) { return definition.id === get("choice-wizard-template").value; }) || null;
     }
     function updateSourceButtons() {
       var loaded = Boolean(sampleFile);
-      get("choice-wizard-next-from-source").disabled = !loaded || !selectedTemplate;
+      get("choice-wizard-next-from-source").disabled = !loaded || !templateFromSelect();
       get("choice-wizard-build-template").disabled = !loaded || !createMode;
       get("choice-wizard-page").disabled = !loaded;
+      get("choice-wizard-start-create").disabled = !loaded;
     }
     function isPrivacyIdentityZone(zone) { return api.isLayoutPrivacyZone(zone); }
     function isIdentityGridZone(zone) { return api.isIdentityGridZone(zone); }
@@ -672,13 +772,13 @@
     function openEditorForSelected(forceReset, definition) {
       definition = definition || selectedDefinition();
       if (!definition) return;
+      get("choice-wizard-builder").hidden = true;
+      get("choice-wizard-editor-slot").append(editorPanel);
       var context = typeof options.getEditorContext === "function" ? options.getEditorContext() : null;
       if (!forceReset && context && context.templateId === definition.id && context.sampleFile === sampleFile && options.getEditorDraft()) return;
-      get("choice-wizard-builder").hidden = true;
       get("choice-wizard-position-status").textContent = definition.source === "builtin"
         ? "內置範本會以自訂副本編輯；內置範本保持不變。"
         : "範本只保存圈位及遮罩設定，不包括樣本、答案或學生資料。";
-      get("choice-wizard-editor-slot").append(editorPanel);
       options.openEditor(definition, sampleFile);
     }
     function editorTransition(definition) {
@@ -859,21 +959,102 @@
       var block = definition && definition.blocks.find(function (entry) { return entry.type === type; });
       return { count: count, choices: block ? templates.choiceOptionsFor(definition, type, block.options) : (type === "tf" ? ["T", "F"] : ["A", "B", "C", "D"]) };
     }
-    function syncAnswerInput(type) {
-      var settings = selectedOptions(type);
-      var input = get(type === "mc" ? "mc-key" : "tf-key");
-      var result = api.keyArray(input.value, settings.count, settings.choices);
-      get("choice-wizard-answer-overlay").querySelectorAll("[data-answer-type='" + type + "']").forEach(function (button) {
-        var selected = result[Number(button.dataset.question) - 1] === button.dataset.option;
+    function renderSimpleAnswerGrid() {
+      var holder = get("choice-wizard-answer-grid");
+      var definition = selectedDefinition();
+      holder.replaceChildren();
+      if (!definition || definition.kind !== "choice") return;
+      ["mc", "tf"].forEach(function (type) {
+        var settings = selectedOptions(type);
+        if (!settings.count) return;
+        var input = get(type === "mc" ? "mc-key" : "tf-key");
+        var key = api.keyArray(input.value, settings.count, settings.choices);
+        for (var start = 0; start < settings.count; start += 10) {
+          var group = document.createElement("section");
+          group.className = "choice-answer-group";
+          var heading = document.createElement("h3");
+          heading.textContent = (type === "mc" ? "選擇題" : "是非題") + "第 " + (start + 1) + "–" + Math.min(settings.count, start + 10) + " 題";
+          var questions = document.createElement("div");
+          questions.className = "choice-answer-question-grid";
+          for (let number = start + 1; number <= Math.min(settings.count, start + 10); number += 1) {
+            var row = document.createElement("div"); row.className = "choice-answer-question";
+            var label = document.createElement("strong"); label.textContent = String(number);
+            var optionsRow = document.createElement("div"); optionsRow.className = "choice-answer-option-row";
+            settings.choices.forEach(function (choice) {
+              var button = document.createElement("button");
+              button.type = "button"; button.className = "choice-answer-option";
+              button.textContent = choice;
+              button.dataset.answerType = type; button.dataset.question = String(number); button.dataset.option = choice;
+              button.setAttribute("aria-label", (type === "mc" ? "選擇題" : "是非題") + "第 " + number + " 題答案 " + choice);
+              button.setAttribute("aria-pressed", key[number - 1] === choice ? "true" : "false");
+              button.classList.toggle("selected", key[number - 1] === choice);
+              button.addEventListener("click", function () {
+                input.value = toggleAnswerPreservingTail(input.value, settings, number, choice);
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+              });
+              optionsRow.append(button);
+            });
+            row.append(label, optionsRow); questions.append(row);
+          }
+          group.append(heading, questions); holder.append(group);
+        }
+      });
+    }
+    function toggleAnswerPreservingTail(value, settings, number, choice) {
+      var raw = String(value || "");
+      var boundary = 0;
+      var seen = 0;
+      for (var index = 0; index < raw.length;) {
+        var character = String.fromCodePoint(raw.codePointAt(index));
+        index += character.length;
+        if (!/\s/.test(character)) seen += 1;
+        boundary = index;
+        if (seen >= settings.count) break;
+      }
+      if (settings.count === 0) boundary = 0;
+      return api.toggleAnswer(raw, settings.count, settings.choices, number, choice) + raw.slice(boundary);
+    }
+    function updateAnswerButtons(type, settings, input) {
+      var answers = api.keyArray(input.value, settings.count, settings.choices);
+      document.querySelectorAll(".choice-answer-option[data-answer-type='" + type + "'], .choice-wizard-answer-bubble[data-answer-type='" + type + "']").forEach(function (button) {
+        var selected = answers[Number(button.dataset.question) - 1] === button.dataset.option;
         button.classList.toggle("selected", selected);
         button.setAttribute("aria-pressed", selected ? "true" : "false");
       });
+    }
+    function syncAnswerInput(type) {
+      var settings = selectedOptions(type);
+      var input = get(type === "mc" ? "mc-key" : "tf-key");
+      updateAnswerButtons(type, settings, input);
+      updateAnswerStatus();
+    }
+    function updateAnswerCounts() {
+      var definition = selectedDefinition();
+      ["mc", "tf"].forEach(function (type) {
+        var input = get(type === "mc" ? "mc-count" : "tf-count");
+        var block = definition && definition.blocks.find(function (entry) { return entry.type === type; });
+        if (!block) {
+          input.value = "0";
+          return;
+        }
+        var maxCount = Math.max(0, Number(block.maxCount) || 0);
+        input.min = "0";
+        input.max = String(maxCount);
+        var parsed = Number.parseInt(input.value, 10);
+        var count = Number.isInteger(parsed) ? clamp(parsed, 0, maxCount) : 0;
+        input.value = String(count);
+      });
+      updateAnswerInputVisibility();
+      renderSimpleAnswerGrid();
+      renderAnswerPage();
       updateAnswerStatus();
     }
     function updateAnswerStatus() {
       var missing = [];
+      var total = 0;
       ["mc", "tf"].forEach(function (type) {
         var settings = selectedOptions(type); var answers = api.keyArray(get(type === "mc" ? "mc-key" : "tf-key").value, settings.count, settings.choices);
+        total += settings.count;
         var expanded = templates.expandChoiceTemplate(selectedDefinition(), type === "mc"
           ? { mcCount: settings.count, tfCount: Number(get("tf-count").value) || 0 }
           : { mcCount: Number(get("mc-count").value) || 0, tfCount: settings.count });
@@ -884,6 +1065,11 @@
           else if (!questions[index] || !questions[index].choices.some(function (choice) { return choice.option === answer; })) missing.push(title + "（選項不適用）");
         });
       });
+      var count = Math.max(0, total - missing.length);
+      var countChip = get("choice-wizard-answer-count");
+      countChip.textContent = count + " / " + total + " 已設定";
+      countChip.classList.toggle("warn", Boolean(missing.length));
+      countChip.classList.toggle("ok", !missing.length);
       setStatus("choice-wizard-answer-status", missing.length ? "尚未設定：" + missing.slice(0, 12).join("、") + (missing.length > 12 ? "等 " + missing.length + " 題" : "") : "所有題目已設定答案。", Boolean(missing.length));
       get("choice-wizard-next-to-grade").disabled = Boolean(missing.length);
     }
@@ -1206,7 +1392,7 @@
               button.addEventListener("click", function () {
                 var input = get(item.type === "mc" ? "mc-key" : "tf-key");
                 var settings = selectedOptions(item.type);
-                input.value = api.toggleAnswer(input.value, settings.count, settings.choices, item.number, choice.option);
+                input.value = toggleAnswerPreservingTail(input.value, settings, item.number, choice.option);
                 input.dispatchEvent(new Event("input", { bubbles: true }));
                 syncAnswerInput(item.type);
               });
@@ -1236,7 +1422,32 @@
       renderStage(2);
     }
 
-    get("choice-wizard-select-choice").addEventListener("click", function () { renderStage(2); populateTemplates(); });
+    get("choice-wizard-select-choice").addEventListener("click", function (event) {
+      event.preventDefault();
+      var preferred = allChoiceTemplates().find(function (definition) { return definition.id === options.getPreferredTemplateId(); });
+      if (preferred) {
+        get("choice-wizard-template").value = preferred.id;
+        if (!selectTemplate(preferred, null, false)) return;
+        renderStage(4);
+      } else {
+        renderStage(1); populateTemplates();
+      }
+    });
+    get("choice-home-change-template").addEventListener("click", function () { renderStage(1); populateTemplates(); });
+    function openTemplateBuilder() {
+      selectedTemplate = templateFromSelect();
+      createMode = false;
+      renderStage(2);
+      setStatus("choice-wizard-source-status", "載入樣本 PDF 後，可建立新範本或編輯已選範本。", false);
+    }
+    get("choice-home-create-template").addEventListener("click", openTemplateBuilder);
+    get("choice-home-create-template-step").addEventListener("click", openTemplateBuilder);
+    get("choice-home-lookup").addEventListener("click", function () {
+      renderStage(6);
+      var details = get("export-preview-details");
+      details.open = true;
+      window.requestAnimationFrame(function () { details.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    });
     get("template-editor-name").addEventListener("input", function () {
       if (currentStage === 3) get("choice-wizard-stage3-template-name").textContent = "｜" + this.value;
     });
@@ -1247,35 +1458,33 @@
       if (!selectTemplate(definition, null, false)) return;
       createMode = false; get("choice-wizard-builder").hidden = true;
       updateSourceButtons();
-      setStatus("choice-wizard-source-status", "已選取「" + definition.name + "」；載入樣本後繼續。", false);
+      renderStage(4);
     });
     get("choice-wizard-start-create").addEventListener("click", beginCreate);
-    get("choice-wizard-direct-use").addEventListener("click", function () {
-      var definition = templateFromSelect();
-      if (!definition) { setStatus("choice-wizard-source-status", "請選擇一個範本。", true); return; }
-      if (!selectTemplate(definition, null, false)) return;
-      showLegacy("choice", definition);
-    });
     get("choice-wizard-template").addEventListener("change", function () {
-      updateTemplateOrderWarning(templateFromSelect());
+      selectedTemplate = templateFromSelect();
+      renderTemplateCards();
+      updateTemplateOrderWarning(selectedTemplate);
+      updateSourceButtons();
     });
     get("choice-wizard-order-repair").addEventListener("click", function () {
       var result = options.createReorderedTemplateCopy(pendingOrderTemplate);
-      if (!result.ok) { setStatus("choice-wizard-source-status", result.message, true); return; }
+      if (!result.ok) { setStatus("choice-wizard-template-status", result.message, true); return; }
       var hadReadResults = typeof options.hasChoiceReadings === "function" && options.hasChoiceReadings();
       if (!selectTemplate(result.template, { preserveAnswers: true }, false)) {
-        setStatus("choice-wizard-source-status", "已建立修正版副本，但本次沒有更換目前範本；仍使用原範本。", false);
+        setStatus("choice-wizard-template-status", "已建立修正版副本，但本次沒有更換目前範本；仍使用原範本。", false);
         return;
       }
       get("choice-wizard-template").value = result.template.id;
       updateTemplateOrderWarning(result.template);
       updateSourceButtons();
-      if (currentStage === 4) { renderAnswerPage(); updateAnswerStatus(); }
+      if (currentStage === 4) { renderAnswerPage(); renderSimpleAnswerGrid(); updateAnswerStatus(); }
       var message = "已改用『" + result.template.name + "』；原範本保留在範本清單。";
       if (hadReadResults) message += " 範本已更換，請重新讀圈。";
-      setStatus("choice-wizard-source-status", message, false);
+      setStatus("choice-wizard-template-status", message, false);
     });
     get("choice-wizard-pdf-file").addEventListener("change", function () { loadSample(this.files[0]); });
+    get("choice-wizard-answer-sample-file").addEventListener("change", function () { loadSample(this.files[0]); });
     get("choice-wizard-template-file").addEventListener("change", function () {
       if (this.files[0]) options.importTemplate(this.files[0], this);
     });
@@ -1417,7 +1626,12 @@
         setStatus("choice-wizard-position-status", "題號排列已套用；請重新測試讀圈並儲存範本。", false);
       } else setStatus("choice-wizard-position-status", "目前範本沒有可調整的選擇題區。", true);
     });
-    ["mc-count", "tf-count"].forEach(function (id) { get(id).addEventListener("input", updateCountStatus); });
+    ["mc-count", "tf-count"].forEach(function (id) {
+      get(id).addEventListener("input", function () {
+        if (currentStage === 4) updateAnswerCounts();
+        else updateCountStatus();
+      });
+    });
     ["mc", "tf"].forEach(function (type) {
       get(type === "mc" ? "mc-key" : "tf-key").addEventListener("input", function () { syncAnswerInput(type); });
     });
@@ -1432,28 +1646,37 @@
       if (options.hasLoadedPdf() && !root.confirm("返回第一步會保留範本及答案，但離開目前批改畫面。要繼續嗎？")) return;
       renderStage(1);
     });
+    get("choice-wizard-back-to-review").addEventListener("click", function () { renderStage(5); });
     get("choice-wizard-stepper").querySelectorAll("[data-wizard-step]").forEach(function (pill) {
       pill.addEventListener("click", function () {
         var target = Number(pill.dataset.wizardStep);
         if (target === 1) renderStage(1);
-        else if (target === 2) returnToSampleBuilder();
-        else if (target === 3 && selectedTemplate && sampleFile) renderStage(3);
-        else if (target === 4 && selectedTemplate && sampleFile && !get("choice-wizard-next-to-answers").disabled && options.isTemplateSaved(selectedTemplate.id)) renderStage(4);
-        else if (target === 5 && selectedTemplate && sampleFile) {
+        else if (target === 2 && selectedTemplate && selectedTemplate.kind === "choice") {
+          if (selectTemplate(selectedTemplate, null, false)) renderStage(4);
+        }
+        else if (target === 3 && selectedTemplate && selectedTemplate.kind === "choice") {
           updateAnswerStatus();
           if (!get("choice-wizard-next-to-grade").disabled) renderStage(5);
-        }
+        } else if (target === 4 && selectedTemplate && selectedTemplate.kind === "choice") renderStage(6);
       });
     });
     document.querySelectorAll("[data-wizard-back]").forEach(function (button) {
       button.addEventListener("click", function () {
         var target = Number(button.dataset.wizardBack);
         if (target === 2 && currentStage === 3) returnToSampleBuilder();
+        else if (target === 1) renderStage(1);
         else renderStage(target);
       });
     });
     return {
-      start: function () { populateTemplates(); updateTemplateOrderWarning(options.getSelectedTemplate()); renderStage(1); },
+      start: function () { populateTemplates(); renderHome(); },
+      openSelectedTemplateEditor: function () {
+        var definition = selectedTemplate || templateFromSelect();
+        if (!definition || definition.kind !== "choice") return;
+        if (!selectTemplate(definition, null, false)) return;
+        openEditorForSelected(false, definition);
+        renderStage(3);
+      },
       onTemplateSaved: function (definition) { selectedTemplate = definition; populateTemplates(); updateTemplateOrderWarning(definition); },
       onTemplateImported: function (definition) {
         if (!definition || definition.kind !== "choice") return;
@@ -1461,8 +1684,8 @@
         createMode = false; populateTemplates();
         get("choice-wizard-template").value = definition.id;
         updateTemplateOrderWarning(definition);
-        setStatus("choice-wizard-source-status", "範本已匯入。已直接前往第四步；載入樣本頁後可點選圈格，也可用整批輸入。", false);
         renderStage(4);
+        setStatus("choice-wizard-answer-status", "範本已匯入；可在此設定答案。", false);
       },
       onEditorClosed: function () { if (editorPanel.parentNode !== editorHome) editorHome.insertBefore(editorPanel, editorNext); },
       refreshAiSettings: updateAiButton,

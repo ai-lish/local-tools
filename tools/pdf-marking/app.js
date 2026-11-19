@@ -16,6 +16,7 @@
   var DEFAULT_TEMPLATE = templates.BUILTIN_TEMPLATES[0];
   var storedTemplateState = templateStore.load(window, templates);
   var customTemplates = storedTemplateState.templates;
+  var preferredTemplateId = storedTemplateState.selectedTemplateId;
   var pendingColumnOrderTemplate = null;
   function findTemplateById(id) {
     return templates.BUILTIN_TEMPLATES.concat(customTemplates).find(function (definition) { return definition.id === id; }) || null;
@@ -687,7 +688,7 @@
     els.step1State.textContent = selected.name;
     els.step2State.textContent = state.pdfDoc ? "已載入 " + state.pageCount + " 頁" : "選擇本機 PDF";
     if (selected.kind === "choice") {
-      var settings = choiceSettings();
+      var settings = choiceSettings(selected);
       var summary = model.choiceReviewSummary(state.choicePages, state.pageCount, settings.mcCount, settings.tfCount);
       var hasReadPages = Object.keys(state.choicePages).length > 0;
       els.step3State.textContent = hasReadPages ? choiceReviewStatusText(summary) : "開始讀圈後可覆核及匯出";
@@ -707,7 +708,7 @@
 
   function setStep(step) {
     var next = Math.max(1, Math.min(3, Number(step) || 1));
-    if (state.choiceWizardActive && state.choiceWizardStage !== 5) {
+    if (state.choiceWizardActive && state.choiceWizardStage !== 5 && state.choiceWizardStage !== 6) {
       state.step = 1;
       [els.step1, els.step2, els.step3].forEach(function (section) { section.hidden = true; });
       els.stepper.hidden = true;
@@ -732,6 +733,12 @@
         if (state.step === 3 && !els.focusConfirm.disabled) els.focusConfirm.focus({ preventScroll: true });
       });
     }
+  }
+
+  function keepChoiceWizardReviewSurfaceVisible() {
+    if (!state.choiceWizardActive || state.choiceWizardStage !== 5) return;
+    els.step2.hidden = false;
+    els.step3.hidden = false;
   }
 
   function configureTemplateMode(templateOverride) {
@@ -776,15 +783,20 @@
     return Math.max(min, Math.min(max, value));
   }
 
-  function choiceSettings() {
-    var mcBlock = questionBlock("mc"); var tfBlock = questionBlock("tf");
-    var mcChoices = mcBlock ? templates.choiceOptionsFor(state.template, "mc", mcBlock.options) : ["A", "B", "C", "D"];
-    var tfChoices = tfBlock ? templates.choiceOptionsFor(state.template, "tf", tfBlock.options) : ["T", "F"];
+  function answerKeyForCount(value, count) {
+    return Array.from(String(value || "").toUpperCase().replace(/\s/g, "")).slice(0, count).join("");
+  }
+
+  function choiceSettings(templateDefinition) {
+    var definition = templateDefinition || state.template;
+    var mcBlock = questionBlock("mc", definition); var tfBlock = questionBlock("tf", definition);
+    var mcChoices = mcBlock ? templates.choiceOptionsFor(definition, "mc", mcBlock.options) : ["A", "B", "C", "D"];
+    var tfChoices = tfBlock ? templates.choiceOptionsFor(definition, "tf", tfBlock.options) : ["T", "F"];
     var mcCount = mcBlock ? numberInput(els.mcCount, mcBlock.maxCount, 0, mcBlock.maxCount) : 0;
     var tfCount = tfBlock ? numberInput(els.tfCount, tfBlock.maxCount, 0, tfBlock.maxCount) : 0;
-    var mc = model.parseKey(els.mcKey.value, mcCount, mcChoices);
-    var tf = model.parseKey(els.tfKey.value, tfCount, tfChoices);
-    var expanded = templates.expandChoiceTemplate(state.template, { mcCount: mcCount, tfCount: tfCount });
+    var mc = model.parseKey(answerKeyForCount(els.mcKey.value, mcCount), mcCount, mcChoices);
+    var tf = model.parseKey(answerKeyForCount(els.tfKey.value, tfCount), tfCount, tfChoices);
+    var expanded = templates.expandChoiceTemplate(definition, { mcCount: mcCount, tfCount: tfCount });
     var mcItems = expanded.items.filter(function (item) { return item.type === "mc"; });
     var tfItems = expanded.items.filter(function (item) { return item.type === "tf"; });
     var mcQuestionOptionsValid = mc.values.every(function (answer, index) {
@@ -2336,7 +2348,7 @@
       els.pageCount.textContent = "共 " + state.pageCount + " 頁";
       els.fileDot.classList.add("ready");
       els.omrStatus.textContent = "已載入。輸入答案後按「自動讀圈／重新讀取」。";
-      updatePageSelectors(); renderCurrentMode(); setStep(2);
+      updatePageSelectors(); renderCurrentMode(); setStep(2); keepChoiceWizardReviewSurfaceVisible();
       setStatus("");
     } catch (error) {
       state.pdfBytes = null; state.pdfDoc = null; state.pdfFingerprint = ""; state.pageCount = 0;
@@ -2405,7 +2417,7 @@
     excludedPageNumbers.forEach(ensureAnswerKeyExcludedPage);
     syncAnswerKeyExcludedPage();
     els.readOmr.disabled = false;
-    setStep(3); updateControls(); renderCurrentMode();
+    setStep(3); keepChoiceWizardReviewSurfaceVisible(); updateControls(); renderCurrentMode();
   }
 
   function confirmFocusedQuestion() {
@@ -2881,7 +2893,9 @@
       if (choiceWizardUI) choiceWizardUI.refreshAnswerSourceAvailability();
       setStatus("已載入進度 JSON（不包含 PDF）。", els.exportStatus);
       renderCurrentMode(); updateControls();
-      if (state.choiceWizardActive && state.choiceWizardStage === 5 && Object.keys(state.choicePages).length) setStep(3);
+      if (state.choiceWizardActive && state.choiceWizardStage === 5 && Object.keys(state.choicePages).length) {
+        setStep(3); keepChoiceWizardReviewSurfaceVisible();
+      }
       return;
     }
 
@@ -3010,6 +3024,7 @@
     }
     state.template = nextTemplate; state.mode = nextTemplate.kind;
     templateStore.savePreference(window, nextTemplate.id);
+    preferredTemplateId = nextTemplate.id;
     configureTemplateMode();
     setStep(state.pdfDoc ? 2 : 2);
     renderCurrentMode();
@@ -3038,6 +3053,9 @@
   }
   var legacyStepHome = els.step2.parentNode;
   var legacyStep3Next = els.step3.nextSibling;
+  var exportPanel = document.querySelector(".export-panel");
+  var exportPanelHome = exportPanel.parentNode;
+  var exportPanelNext = exportPanel.nextSibling;
   function moveLegacyStepsToWizard() {
     var slot = byId("choice-wizard-grade-slot");
     slot.append(els.step2, els.step3);
@@ -3045,6 +3063,12 @@
   function restoreLegacySteps() {
     legacyStepHome.insertBefore(els.step3, legacyStep3Next);
     legacyStepHome.insertBefore(els.step2, els.step3);
+  }
+  function moveExportPanelToWizard() {
+    byId("choice-wizard-export-slot").append(exportPanel);
+  }
+  function restoreExportPanel() {
+    exportPanelHome.insertBefore(exportPanel, exportPanelNext);
   }
 
   var templateEditorUI = window.PdfMarkingTemplateEditorUI.create({
@@ -3063,6 +3087,7 @@
       state.template = definition;
       state.mode = "choice";
       templateStore.savePreference(window, definition.id);
+      preferredTemplateId = definition.id;
       configureTemplateMode(definition);
       if (choiceWizardUI) choiceWizardUI.onTemplateSaved(definition);
       return { ok: true, template: definition, message: saved.message };
@@ -3084,6 +3109,7 @@
     omr: omr,
     getTemplates: function () { return templates.BUILTIN_TEMPLATES.concat(customTemplates); },
     getSelectedTemplate: function () { return state.template || templateById(state.templateId); },
+    getPreferredTemplateId: function () { return preferredTemplateId; },
     getEditorDraft: function () { return templateEditorUI.getDraft(); },
     getEditorContext: function () { return templateEditorUI.getContext(); },
     hasEditorUnsavedChanges: function () { return templateEditorUI.hasUnsavedChanges(); },
@@ -3180,6 +3206,8 @@
         if (preserveAnswers) els.omrStatus.textContent = "範本已更換，請重新讀圈。";
       }
       state.templateId = definition.id; state.template = definition; state.mode = "choice";
+      templateStore.savePreference(window, definition.id);
+      preferredTemplateId = definition.id;
       configureTemplateMode(definition);
       var mc = definition.blocks.find(function (block) { return block.type === "mc"; });
       var tf = definition.blocks.find(function (block) { return block.type === "tf"; });
@@ -3188,23 +3216,36 @@
         els.tfCount.value = String(tf ? tf.maxCount : 0);
         els.mcKey.value = ""; els.tfKey.value = "";
       }
-      renderCurrentMode(); updateStepper();
+      renderTemplateList(); renderCurrentMode(); updateStepper();
       return true;
     },
     onWizardStage: function (stage) {
       placeAiSettingsForWizard(stage);
       state.choiceWizardActive = true;
       state.choiceWizardStage = stage;
-      if (stage === 5) {
+      if (stage >= 5) {
         moveLegacyStepsToWizard();
-        setStep(2);
+        moveExportPanelToWizard();
+        setStep(state.pdfDoc ? 3 : 2);
+        if (stage === 6) els.step3.hidden = true;
+        else keepChoiceWizardReviewSurfaceVisible();
       } else {
+        restoreExportPanel();
         restoreLegacySteps();
         setStep(1);
       }
     },
+    onWizardHome: function () {
+      placeAiSettingsForWizard(0);
+      restoreExportPanel();
+      restoreLegacySteps();
+      state.choiceWizardActive = true;
+      state.choiceWizardStage = 0;
+      setStep(1);
+    },
     onShowLegacy: function (mode, definition) {
       placeAiSettingsForWizard(0);
+      restoreExportPanel();
       restoreLegacySteps();
       state.choiceWizardActive = false; state.choiceWizardStage = 0;
       if (mode === "choice" && definition) {
@@ -3356,7 +3397,10 @@
   els.appealQuestionFilter.addEventListener("change", function () { renderAppealQuestionBrowser(); });
   els.startDictation.addEventListener("click", function () { if (state.pdfDoc) { setStep(3); renderCurrentMode(); } });
   els.useTemplate.addEventListener("click", useSelectedTemplate);
-  els.editTemplateLayout.addEventListener("click", function () { templateEditorUI.open(templateById(state.templateId)); });
+  els.editTemplateLayout.addEventListener("click", function () {
+    if (choiceWizardUI && state.choiceWizardActive) choiceWizardUI.openSelectedTemplateEditor();
+    else templateEditorUI.open(templateById(state.templateId));
+  });
   els.exportTemplate.addEventListener("click", exportSelectedTemplate);
   els.deleteTemplate.addEventListener("click", deleteSelectedTemplate);
   els.templateFile.addEventListener("change", function () { importTemplateFile(els.templateFile.files[0]); });
@@ -3378,7 +3422,10 @@
     els.templateStatus.textContent = message;
     showTemplateOrderWarning(result.template);
   });
-  els.demoStart.addEventListener("click", startDemo);
+  els.demoStart.addEventListener("click", function () {
+    if (choiceWizardUI && state.choiceWizardActive) choiceWizardUI.showLegacy("choice");
+    startDemo();
+  });
   els.endDemo.addEventListener("click", endDemo);
   els.aiEnabled.addEventListener("change", function () {
     aiMemory.enabled = Boolean(els.aiEnabled.checked);
