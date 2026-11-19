@@ -5,6 +5,7 @@
 
   function create(options) {
     var api = root.PdfMarkingChoiceWizard;
+    var answerHighlight = root.PdfMarkingAnswerHighlight;
     var templates = options.templates;
     var geometry = options.geometry;
     var omr = options.omr;
@@ -1117,7 +1118,7 @@
       var canvas = document.createElement("canvas");
       canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
       await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
-      return { page: page, canvas: canvas };
+      return { page: page, canvas: canvas, viewport: viewport };
     }
     function currentAnswerBlocks() {
       var definition = selectedDefinition();
@@ -1129,6 +1130,30 @@
       var matches = (expanded.items || []).filter(function (item) { return item.number === questionNumber &&
         item.choices.some(function (choice) { return choice.option === answer; }); });
       return matches.length === 1 ? matches[0].type : "";
+    }
+    function viewportTextItems(items, viewport) {
+      return (items || []).map(function (item) {
+        var transform = item && item.transform;
+        var text = String(item && item.str || "");
+        if (!text.trim() || !transform || !Number.isFinite(Number(transform[4])) || !Number.isFinite(Number(transform[5]))) return null;
+        var x = Number(transform[4]); var y = Number(transform[5]);
+        var width = Math.max(0, Number(item.width) || 0); var height = Math.max(1, Number(item.height) || 1);
+        var corners = [
+          viewport.convertToViewportPoint(x, y),
+          viewport.convertToViewportPoint(x + width, y),
+          viewport.convertToViewportPoint(x, y + height),
+          viewport.convertToViewportPoint(x + width, y + height)
+        ];
+        var xs = corners.map(function (point) { return point[0]; });
+        var ys = corners.map(function (point) { return point[1]; });
+        return { text: text, x: Math.min.apply(Math, xs), y: Math.min.apply(Math, ys),
+          width: Math.max(1, Math.max.apply(Math, xs) - Math.min.apply(Math, xs)),
+          height: Math.max(1, Math.max.apply(Math, ys) - Math.min.apply(Math, ys)) };
+      }).filter(Boolean);
+    }
+    function showReferenceAiOption(show) {
+      get("choice-reference-ai-controls").hidden = !show;
+      get("choice-reference-ai-preview").disabled = !referenceDocument || !show;
     }
     function renderImportedAnswers(records, message) {
       var context = currentAnswerBlocks();
@@ -1201,30 +1226,81 @@
       destroyDocument(referenceDocument); referenceDocument = null; referenceFile = null;
       referenceMaskRects = []; referenceImage = null;
       get("choice-reference-ai-confirmation").hidden = true;
-      get("choice-reference-extract").disabled = true; get("choice-reference-ai-preview").disabled = true;
+      get("choice-reference-extract").disabled = true; showReferenceAiOption(false);
+      get("choice-answer-import-results").hidden = true;
+      importedAnswers = [];
       if (!file) return;
       try {
         referenceFile = file; referenceDocument = await pageDocument(file);
         get("choice-reference-page").max = String(referenceDocument.numPages);
         get("choice-reference-page").value = "1";
         get("choice-reference-extract").disabled = false;
-        get("choice-reference-ai-preview").disabled = false;
-        setStatus("choice-answer-import-status", "參考 PDF 已在本機開啟，共 " + referenceDocument.numPages + " 頁。", false);
+        setStatus("choice-answer-import-status", "PDF 已在本機開啟，共 " + referenceDocument.numPages + " 頁；正在讀取全文。", false);
+        await extractReferenceAnswers();
       } catch (error) {
         referenceFile = null; referenceDocument = null;
         setStatus("choice-answer-import-status", "參考 PDF 無法開啟；請確認檔案完整且未加密。", true);
       }
     }
+    async function readReferenceText() {
+      var pages = [];
+      var unreadablePages = [];
+      for (var pageNumber = 1; pageNumber <= referenceDocument.numPages; pageNumber += 1) {
+        try {
+          var page = await referenceDocument.getPage(pageNumber);
+          var content = await page.getTextContent();
+          pages.push(api.pdfTextLines(content.items).join("\n"));
+        } catch (error) {
+          pages.push("");
+          unreadablePages.push(pageNumber);
+        }
+      }
+      return Object.assign(api.parseAnswerKeyText(pages.join("\n"), 250, ["A", "B", "C", "D", "E", "F", "T"]),
+        { unreadablePages: unreadablePages });
+    }
+    async function readReferenceHighlights() {
+      if (!answerHighlight || !referenceDocument) throw new Error("本機螢光標示讀取程式未載入。");
+      var combined = { answers: Object.create(null), questionNumbers: [], duplicateNumbers: [] };
+      var previousQuestionNumber = null;
+      var sequenceQuestionNumbers = [];
+      for (var pageNumber = 1; pageNumber <= referenceDocument.numPages; pageNumber += 1) {
+        var page = await referenceDocument.getPage(pageNumber);
+        var base = page.getViewport({ scale: 1 });
+        var viewport = page.getViewport({ scale: Math.min(2.2, 1800 / Math.max(base.width, base.height)) });
+        var canvas = document.createElement("canvas");
+        canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+        try {
+          await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
+          var imageData = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
+          var content = await page.getTextContent();
+          var items = viewportTextItems(content.items, viewport);
+          var detected = answerHighlight.analyzePage(items, canvas.width, canvas.height, imageData,
+            canvas.width, canvas.height, previousQuestionNumber, sequenceQuestionNumbers);
+          previousQuestionNumber = detected.lastQuestionNumber;
+          sequenceQuestionNumbers = detected.seenQuestionNumbers || [];
+          if (detected.sequenceReset) {
+            combined.answers = Object.create(null);
+            combined.questionNumbers = [];
+            combined.duplicateNumbers = [];
+          }
+          combined.questionNumbers = combined.questionNumbers.concat(detected.questionNumbers);
+          combined.duplicateNumbers = combined.duplicateNumbers.concat(detected.duplicateNumbers || []);
+          Object.keys(detected.answers).forEach(function (key) {
+            combined.answers[key] = detected.answers[key] || "";
+          });
+        } finally {
+          canvas.width = 1; canvas.height = 1;
+        }
+      }
+      return combined;
+    }
     async function extractReferenceAnswers() {
       if (!referenceDocument || !selectedDefinition()) return;
       try {
-        setStatus("choice-answer-import-status", "正在本機讀取參考答案文字…", false);
-        var pageNumber = Math.floor(Number(get("choice-reference-page").value) || 1);
-        var page = await referenceDocument.getPage(pageNumber);
-        var content = await page.getTextContent();
-        var text = api.pdfTextLines(content.items).join("\n");
+        showReferenceAiOption(false);
+        setStatus("choice-answer-import-status", "正在本機讀取 PDF 文字層…", false);
         var context = currentAnswerBlocks();
-        var parsed = api.parseAnswerKeyText(text, 250, ["A", "B", "C", "D", "E", "F", "T"]);
+        var parsed = await readReferenceText();
         var records = parsed.matchedCount ? Object.keys(parsed.answers).map(function (key) {
           var number = Number(key); var answer = parsed.answers[key];
           var type = answerTypeFor(number, answer, context.expanded);
@@ -1235,19 +1311,65 @@
             records.push({ type: item.type, number: number, answer: "", status: "答案衝突，待老師設定" });
           });
         });
+        var textAnswers = Object.create(null);
+        records.forEach(function (record) {
+          if (record && record.answer) textAnswers[String(record.number)] = record.answer;
+        });
+        var textSource = { matchedCount: parsed.matchedCount, answers: textAnswers };
+        var textAnswerCount = answerHighlight.countAnswers(textSource);
+        var expectedCount = context.expanded.items.length;
         var warnings = [];
         if (parsed.unmatchedCount) warnings.push(parsed.unmatchedCount + " 項題號／答案數量不符或未能配對，請核對。");
         if (parsed.conflictingQuestions.length) warnings.push("第 " + parsed.conflictingQuestions.join("、") + " 題有不同答案，已留空待老師設定。");
         if (parsed.rejectedCount > parsed.unmatchedCount + parsed.conflictingQuestions.length) {
           warnings.push("另有 " + (parsed.rejectedCount - parsed.unmatchedCount - parsed.conflictingQuestions.length) + " 項無效或重複內容已忽略。");
         }
-        if (!records.length) {
-          renderImportedAnswers([], "本機文字層未辨認有效答案；如屬掃描頁，可檢視後選用 AI 讀取。" + (warnings.length ? " " + warnings.join(" ") : ""));
-        } else {
-          renderImportedAnswers(records, "本機文字層辨認 " + parsed.matchedCount + " 項。" +
+        if (parsed.unreadablePages.length) warnings.push("第 " + parsed.unreadablePages.join("、") + " 頁文字層無法讀取。");
+        if (expectedCount > 0 && parsed.matchedCount >= expectedCount) {
+          renderImportedAnswers(records, "採用文字答案表：讀取 " + parsed.matchedCount + " 題。" +
             (warnings.length ? " " + warnings.join(" ") : "") + " 請核對及補齊表格。");
+          return;
         }
+
+        setStatus("choice-answer-import-status", "沒有找到文字答案表；正在本機檢查螢光標示…", false);
+        var detected = await readReferenceHighlights();
+        var highlightedRecords = context.expanded.items.map(function (item) {
+            var answer = detected.answers[String(item.number)] || "";
+            var valid = item.choices.some(function (choice) { return choice.option === answer; });
+            return { type: item.type, number: item.number, answer: valid ? answer : "",
+              status: valid ? "螢光標示" : "待老師設定" };
+        });
+        var highlightedAnswers = Object.create(null);
+        highlightedRecords.forEach(function (record) {
+          if (record.answer) highlightedAnswers[String(record.number)] = record.answer;
+        });
+        var highlightSource = { answers: highlightedAnswers };
+        var highlightAnswerCount = answerHighlight.countAnswers(highlightSource);
+        var source = answerHighlight.chooseAnswerSource(textSource, highlightSource, expectedCount);
+        if (source === "text") {
+          var textMismatch = parsed.matchedCount !== expectedCount;
+          renderImportedAnswers(records, "文字答案表配對 " + parsed.matchedCount + " 題；螢光標示讀取 " +
+            highlightAnswerCount + " 題；採用文字答案表（有效 " + textAnswerCount + " 題）。" +
+            (textMismatch ? "與第 2 步設定的 " + expectedCount + " 題數量不符；請核對，答案不會自動套用。" : "") +
+            (warnings.length ? " " + warnings.join(" ") : "") + " 請核對及補齊表格。");
+          return;
+        }
+        if (source === "highlight") {
+          var pending = highlightedRecords.filter(function (record) { return !record.answer; }).length;
+          var countMismatch = detected.questionNumbers.length !== context.expanded.items.length;
+          var duplicateNotice = detected.duplicateNumbers.length
+            ? "題號重複（" + Array.from(new Set(detected.duplicateNumbers)).join("、") + "）已留空。" : "";
+          renderImportedAnswers(highlightedRecords, "文字答案表配對 " + parsed.matchedCount + " 題；採用螢光標示，讀取 " +
+            (highlightedRecords.length - pending) + " 題；" + pending + " 題待老師設定。" +
+            (countMismatch ? "偵測到 " + detected.questionNumbers.length +
+              " 個題號，與第 2 步設定的 " + expectedCount + " 題數量不符；請核對，答案不會自動套用。" : "") +
+            duplicateNotice + " 請核對及按「套用答案」。");
+          return;
+        }
+        showReferenceAiOption(true);
+        renderImportedAnswers([], "文字答案表配對 " + parsed.matchedCount + " 題；螢光標示沒有有效答案。可檢視後選用 AI 讀取；答案不會自動套用。");
       } catch (error) {
+        showReferenceAiOption(true);
         setStatus("choice-answer-import-status", error && error.message || "參考答案文字未能讀取。", true);
       }
     }

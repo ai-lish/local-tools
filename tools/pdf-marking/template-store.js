@@ -137,6 +137,23 @@
     }
   }
 
+  function clearOwnedData(host) {
+    var keys = [TEMPLATE_STORAGE_KEY, PREFERENCE_STORAGE_KEY, DRIVE_SYNC_STORAGE_KEY];
+    var storage = storageFrom(host);
+    var clearedKeys = [];
+    var failedKeys = [];
+    if (!storage || typeof storage.removeItem !== "function") {
+      return { ok: false, clearedKeys: clearedKeys, failedKeys: keys.slice() };
+    }
+    try { storage.removeItem(TEMPLATE_STORAGE_KEY); clearedKeys.push(TEMPLATE_STORAGE_KEY); }
+    catch (error) { failedKeys.push(TEMPLATE_STORAGE_KEY); }
+    try { storage.removeItem(PREFERENCE_STORAGE_KEY); clearedKeys.push(PREFERENCE_STORAGE_KEY); }
+    catch (error) { failedKeys.push(PREFERENCE_STORAGE_KEY); }
+    try { storage.removeItem(DRIVE_SYNC_STORAGE_KEY); clearedKeys.push(DRIVE_SYNC_STORAGE_KEY); }
+    catch (error) { failedKeys.push(DRIVE_SYNC_STORAGE_KEY); }
+    return { ok: failedKeys.length === 0, clearedKeys: clearedKeys, failedKeys: failedKeys };
+  }
+
   root.PdfMarkingTemplateStore = {
     TEMPLATE_STORAGE_KEY: TEMPLATE_STORAGE_KEY,
     PREFERENCE_STORAGE_KEY: PREFERENCE_STORAGE_KEY,
@@ -145,7 +162,8 @@
     saveTemplates: saveTemplates,
     savePreference: savePreference,
     loadDriveSync: loadDriveSync,
-    saveDriveSync: saveDriveSync
+    saveDriveSync: saveDriveSync,
+    clearOwnedData: clearOwnedData
   };
   if (typeof module !== "undefined" && module.exports) module.exports = root.PdfMarkingTemplateStore;
 })(typeof window !== "undefined" ? window : globalThis);

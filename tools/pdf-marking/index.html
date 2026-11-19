@@ -20,9 +20,11 @@
   <script defer src="ai-review.js"></script>
   <script defer src="demo.js"></script>
   <script defer src="template-store.js"></script>
+  <script defer src="clear-local-data.js"></script>
   <script defer src="template-editor.js"></script>
   <script defer src="template-editor-ui.js"></script>
   <script defer src="choice-wizard.js"></script>
+  <script defer src="answer-highlight.js"></script>
   <script defer src="choice-wizard-ui.js"></script>
   <script defer src="app.js"></script>
   <script defer src="drive-config.js"></script>
@@ -48,7 +50,15 @@
         <button class="button" id="choice-home-change-template" type="button">換範本或匯入範本</button>
         <button class="button" id="choice-home-lookup" type="button">成績查詢</button>
         <button class="button" id="choice-home-create-template" type="button">建立範本</button>
+        <button class="button" id="clear-local-data-open" type="button">清除本機資料</button>
       </nav>
+      <section id="clear-local-data-confirmation" class="clear-local-data-confirmation" role="alertdialog" aria-labelledby="clear-local-data-title" aria-describedby="clear-local-data-description" hidden>
+        <h2 id="clear-local-data-title">清除本工具的本機資料？</h2>
+        <p id="clear-local-data-description">將刪除這部瀏覽器儲存的自訂範本、上次使用的範本、Google Drive 用戶端 ID 及同步紀錄。</p>
+        <p>PDF、答案及成績本來就不會儲存；已下載的檔案不受影響</p>
+        <div class="toolbar-row"><button class="button danger-button" id="clear-local-data-confirm" type="button">確定清除</button><button class="button" id="clear-local-data-cancel" type="button">取消</button></div>
+      </section>
+      <p id="clear-local-data-status" class="status-message" role="status" aria-live="polite" hidden></p>
       <details class="marking-home-more">
         <summary>更多</summary>
         <div id="choice-home-more-slot"><button class="button" id="demo-start" type="button">試玩示範（不需要檔案）</button></div>
@@ -231,12 +241,15 @@
               </div>
             </details>
             <details id="choice-reference-details" class="choice-answer-source-disclosure">
-              <summary class="button">由評卷參考讀取</summary>
+              <summary class="button">由考卷或評卷參考讀取</summary>
               <div class="choice-answer-source-content">
-                <label class="field"><span>參考答案 PDF</span><input id="choice-reference-file" type="file" accept="application/pdf,.pdf"></label>
-                <label class="field"><span>參考答案頁碼</span><input id="choice-reference-page" type="number" min="1" step="1" value="1"></label>
-                <div class="toolbar-row"><button class="button" id="choice-reference-extract" type="button" disabled>本機讀取文字</button><button class="button" id="choice-reference-ai-preview" type="button" disabled>預覽 AI 讀取頁面</button></div>
-                <p class="muted small">掃描頁可選用 AI。先檢視並遮蓋不需送出的部分，再確認送出；不會自動傳送。</p>
+                <label class="field"><span>考卷或評卷參考 PDF</span><input id="choice-reference-file" type="file" accept="application/pdf,.pdf"></label>
+                <button class="button" id="choice-reference-extract" type="button" disabled>重新讀取答案</button>
+                <div id="choice-reference-ai-controls" hidden>
+                  <label class="field"><span>AI 預覽頁碼</span><input id="choice-reference-page" type="number" min="1" step="1" value="1"></label>
+                  <button class="button" id="choice-reference-ai-preview" type="button" disabled>預覽 AI 讀取頁面</button>
+                  <p id="choice-reference-ai-note" class="muted small">本機文字及螢光標示均未讀取到答案。掃描頁可選用 AI；先檢視並遮蓋不需送出的部分，再確認送出；不會自動傳送。</p>
+                </div>
               </div>
             </details>
           </div>

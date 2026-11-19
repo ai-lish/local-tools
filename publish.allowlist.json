@@ -85,6 +85,18 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/pdf-marking/clear-local-data.js",
+      "destination": "tools/pdf-marking/clear-local-data.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
+      "source": "tools/pdf-marking/answer-highlight.js",
+      "destination": "tools/pdf-marking/answer-highlight.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/pdf-marking/drive-config.js",
       "destination": "tools/pdf-marking/drive-config.js",
       "publicMode": "cli-source",
@@ -1547,7 +1559,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.19.12",
+      "version": "2026.11.19.14",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1566,6 +1578,8 @@
         "tools/pdf-marking/app.js",
         "tools/pdf-marking/templates.js",
         "tools/pdf-marking/template-store.js",
+        "tools/pdf-marking/clear-local-data.js",
+        "tools/pdf-marking/answer-highlight.js",
         "tools/pdf-marking/template-editor.js",
         "tools/pdf-marking/template-editor-ui.js",
         "tools/pdf-marking/choice-wizard.js",
@@ -1780,7 +1794,7 @@
     {
       "id": "pdf-marking",
       "title": "PDF 閱卷及批改工具",
-      "version": "2026.11.19.12",
+      "version": "2026.11.19.14",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -1791,6 +1805,8 @@
         "tools/pdf-marking/app.js",
         "tools/pdf-marking/templates.js",
         "tools/pdf-marking/template-store.js",
+        "tools/pdf-marking/clear-local-data.js",
+        "tools/pdf-marking/answer-highlight.js",
         "tools/pdf-marking/template-editor.js",
         "tools/pdf-marking/template-editor-ui.js",
         "tools/pdf-marking/choice-wizard.js",
@@ -1995,7 +2011,7 @@
     {
       "id": "pdf-marking-choice",
       "title": "批改 PDF（選擇題）",
-      "version": "2026.11.19.12",
+      "version": "2026.11.19.14",
       "entry": "tools/pdf-marking/index.html",
       "entries": [
         "tools/pdf-marking/index.html"
@@ -2006,6 +2022,8 @@
         "tools/pdf-marking/app.js",
         "tools/pdf-marking/templates.js",
         "tools/pdf-marking/template-store.js",
+        "tools/pdf-marking/clear-local-data.js",
+        "tools/pdf-marking/answer-highlight.js",
         "tools/pdf-marking/template-editor.js",
         "tools/pdf-marking/template-editor-ui.js",
         "tools/pdf-marking/choice-wizard.js",
