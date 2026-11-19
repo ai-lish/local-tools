@@ -475,6 +475,13 @@
             <section class="focus-card" aria-label="專注覆核">
               <div class="focus-heading"><div><p class="eyebrow">目前覆核</p><h3 id="focus-title">尚未選取題目</h3></div><span id="focus-progress" class="hint-pill">0 題</span></div>
               <p id="focus-reason" class="muted">先自動讀圈，待覆核題目會在這裏放大顯示。</p>
+              <div id="focus-page-navigation" class="focus-page-navigation" aria-label="本頁題目瀏覽">
+                <button class="button compact" id="focus-browse-start" type="button" disabled>瀏覽同一學生所有題目</button>
+                <button class="button compact" id="focus-browse-prev" type="button" disabled>同一學生：上一題</button>
+                <button class="button compact" id="focus-browse-next" type="button" disabled>同一學生：下一題</button>
+                <button class="button compact" id="focus-browse-return" type="button" hidden>返回待覆核題目</button>
+              </div>
+              <p id="focus-ink-stats" class="focus-ink-stats muted small" aria-live="polite"></p>
               <div id="focus-preview" class="focus-preview"><p class="empty-state">放大題目圈格會顯示在這裏。</p></div>
               <div class="toolbar-row ai-review-actions">
                 <button class="button" id="ai-review-choice-current" type="button" disabled>AI 覆核此題</button>
@@ -508,7 +515,15 @@
           <p id="appeal-status" class="status-message" role="status" aria-live="polite">完成讀圈或載入進度及同一 PDF 後即可查詢。</p>
           <div id="appeal-page-results" class="appeal-page-results" aria-live="polite"></div>
           <div class="appeal-question-layout">
-            <div id="appeal-question-list" class="appeal-question-list" aria-label="該頁題目"></div>
+            <div class="appeal-question-sidebar">
+              <div id="appeal-group-summary" class="appeal-group-summary" aria-label="題組分數"></div>
+              <label class="field appeal-question-filter"><span>題目狀態</span><select id="appeal-question-filter">
+                <option value="all">全部題目</option><option value="correct">答對</option><option value="wrong">答錯</option>
+                <option value="blank">未作答</option><option value="pending">待覆核</option><option value="teacher-modified">老師曾修改</option>
+              </select></label>
+              <p id="appeal-question-position" class="muted small" aria-live="polite">第 0 / 0 題</p>
+              <div id="appeal-question-list" class="appeal-question-list" aria-label="該頁題目"></div>
+            </div>
             <section id="appeal-question-detail" class="appeal-question-detail" aria-label="題目原圖及讀圈資料" hidden>
               <div class="appeal-detail-heading">
                 <h4 id="appeal-detail-title"></h4>

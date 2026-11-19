@@ -114,6 +114,12 @@ h3 { font-size: 14px; }
 .appeal-page-results { display: flex; flex-wrap: wrap; gap: 7px; min-width: 0; }
 .appeal-page-results:empty { display: none; }
 .appeal-question-layout { display: grid; grid-template-columns: minmax(170px, .7fr) minmax(0, 1.4fr); gap: 12px; min-width: 0; margin-top: 10px; }
+.appeal-question-sidebar { display: grid; align-content: start; gap: 8px; min-width: 0; }
+.appeal-group-summary { display: grid; gap: 5px; min-width: 0; }
+.appeal-group-button { width: 100%; min-width: 0; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--navy); background: #fff; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.appeal-group-button[aria-pressed="true"] { border-color: var(--blue); color: #fff; background: var(--blue); }
+.appeal-question-filter { min-width: 0; margin: 0; }
+.appeal-question-position { margin: 0; }
 .appeal-question-list { display: grid; align-content: start; gap: 6px; min-width: 0; max-height: 430px; overflow: auto; }
 .appeal-question-button { display: grid; gap: 3px; width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--navy); background: #fff; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
 .appeal-question-button[aria-current="true"] { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(39, 106, 160, .12); }
@@ -324,6 +330,8 @@ footer { padding: 12px 0; color: var(--muted); font-size: 11px; text-align: cent
 .focus-preview { display: grid; min-height: 170px; margin: 10px 0; place-items: center; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: #eef2f5; }
 .focus-preview canvas { display: block; max-width: 100%; height: auto; }
 .focus-preview .empty-state { padding: 38px 15px; }
+.focus-page-navigation { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; margin: 8px 0; }
+.focus-ink-stats { min-height: 1em; margin: 6px 0; overflow-wrap: anywhere; }
 .focus-answer-keys { display: flex; flex-wrap: wrap; gap: 7px; margin: 11px 0; }
 .answer-choice { min-width: 48px; min-height: 44px; border: 1px solid #bdcbd6; border-radius: 9px; color: var(--navy); background: #fff; font-size: 16px; font-weight: 900; }
 .answer-choice.selected { border-color: var(--blue); color: #fff; background: var(--blue); }

@@ -112,6 +112,81 @@
     return candidate < 0 || candidate >= queue.length ? -1 : candidate;
   }
 
+  function pageQuestions(pageNumber, page, items) {
+    if (!page || Array.isArray(page.pageFlags) && page.pageFlags.indexOf("答案卷頁：不計分、不匯出") >= 0) return [];
+    var responses = new Map();
+    (Array.isArray(page.questions) ? page.questions : []).forEach(function (question) {
+      if (question) responses.set(String(question.type) + ":" + String(question.number), question);
+    });
+    return (Array.isArray(items) ? items : []).map(function (item, index) {
+      var response = responses.get(String(item.type) + ":" + String(item.number)) || null;
+      return { pageNumber: pageNumber, type: item.type, number: item.number, item: item,
+        question: response, response: response, order: index };
+    }).sort(function (left, right) {
+      var typeOrder = { mc: 0, tf: 1 };
+      return (typeOrder[left.type] == null ? 2 : typeOrder[left.type]) -
+        (typeOrder[right.type] == null ? 2 : typeOrder[right.type]) || left.number - right.number || left.order - right.order;
+    });
+  }
+
+  function questionInkStats(entries, currentKey) {
+    var maxima = [];
+    var selectedValues = [];
+    (Array.isArray(entries) ? entries : []).forEach(function (entry) {
+      var question = entry && entry.question;
+      var values = question && Array.isArray(question.values) ? question.values.map(Number).filter(Number.isFinite) : [];
+      if (entry && entry.key === currentKey) selectedValues = values.slice();
+      if (values.length) maxima.push(Math.max.apply(Math, values));
+    });
+    maxima.sort(function (left, right) { return left - right; });
+    var median = null;
+    if (maxima.length) {
+      var middle = Math.floor(maxima.length / 2);
+      median = maxima.length % 2 ? maxima[middle] : (maxima[middle - 1] + maxima[middle]) / 2;
+    }
+    selectedValues.sort(function (left, right) { return right - left; });
+    return {
+      count: maxima.length,
+      median: median,
+      minimum: maxima.length ? maxima[0] : null,
+      maximum: maxima.length ? maxima[maxima.length - 1] : null,
+      darkest: selectedValues.length ? selectedValues[0] : null,
+      secondDarkest: selectedValues.length > 1 ? selectedValues[1] : null
+    };
+  }
+
+  function filterAppealQuestions(entries, statusFilter, groupKey) {
+    var filter = statusFilter || "all";
+    return (Array.isArray(entries) ? entries : []).filter(function (entry) {
+      if (groupKey && entry.groupKey !== groupKey) return false;
+      if (filter === "all") return true;
+      if (filter === "correct") return entry.status === "對";
+      if (filter === "wrong") return entry.status === "錯" || entry.status === "多選";
+      if (filter === "blank") return entry.status === "未作答";
+      if (filter === "pending") return entry.status === "待覆核";
+      if (filter === "teacher-modified") return Boolean(entry.manual);
+      return false;
+    });
+  }
+
+  function summarizeAppealGroups(entries, groups, scoreAvailable) {
+    return (Array.isArray(groups) ? groups : []).map(function (group) {
+      var questions = (Array.isArray(entries) ? entries : []).filter(function (entry) { return entry.groupKey === group.key; });
+      var counts = questions.reduce(function (result, entry) {
+        if (entry.status === "對") result.correct += 1;
+        else if (entry.status === "錯" || entry.status === "多選") result.wrong += 1;
+        else if (entry.status === "未作答") result.blank += 1;
+        else if (entry.status === "待覆核") result.pending += 1;
+        return result;
+      }, { correct: 0, wrong: 0, blank: 0, pending: 0 });
+      return {
+        key: group.key, label: group.label, count: questions.length, counts: counts,
+        earned: scoreAvailable ? questions.reduce(function (sum, entry) { return sum + (entry.correct ? entry.points : 0); }, 0) : null,
+        maximum: scoreAvailable ? questions.reduce(function (sum, entry) { return sum + entry.points; }, 0) : null
+      };
+    });
+  }
+
   function findIndex(queue, pageNumber, type, number) {
     if (!Array.isArray(queue)) return -1;
     return queue.findIndex(function (entry) {
@@ -167,6 +242,10 @@
     findPagesByIdentity: findPagesByIdentity,
     questionCropBounds: questionCropBounds,
     nextIndex: nextIndex,
+    pageQuestions: pageQuestions,
+    questionInkStats: questionInkStats,
+    filterAppealQuestions: filterAppealQuestions,
+    summarizeAppealGroups: summarizeAppealGroups,
     findIndex: findIndex,
     focusCropBounds: focusCropBounds,
     hasManualEdits: hasManualEdits,

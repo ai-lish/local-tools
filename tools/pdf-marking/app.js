@@ -33,7 +33,9 @@
     dictationStyle: "sentence", dictationBaseEnabled: false, dictationUndo: [],
     exportSort: "class-student", choiceClassSizeTouched: false
   };
-  var appealState = { pageNumber: 0, questionKey: "", questions: [], renderToken: 0, crop: null };
+  var appealState = { pageNumber: 0, questionKey: "", questions: [], filteredQuestions: [], groups: [],
+    filter: "all", groupKey: "", renderToken: 0, crop: null };
+  var focusBrowseState = { active: false, pageNumber: 0, questionKey: "", returnPage: 0 };
   var appealClassOptionsKey = "";
   // API credentials and AI suggestions intentionally live outside serializable grading state.
   var aiMemory = { enabled: false, provider: "gemini", model: "gemini-3.8-flash", credential: "", busy: false };
@@ -62,7 +64,9 @@
     demoBanner: byId("demo-banner"), endDemo: byId("end-demo"), reviewStepStatus: byId("review-step-status"),
     focusTitle: byId("focus-title"), focusReason: byId("focus-reason"), focusPreview: byId("focus-preview"),
     focusAnswerKeys: byId("focus-answer-keys"), focusConfirm: byId("focus-confirm"), focusProgress: byId("focus-progress"),
-    focusPageReread: byId("focus-page-reread"),
+    focusPageReread: byId("focus-page-reread"), focusBrowseStart: byId("focus-browse-start"),
+    focusBrowsePrev: byId("focus-browse-prev"), focusBrowseNext: byId("focus-browse-next"),
+    focusBrowseReturn: byId("focus-browse-return"), focusInkStats: byId("focus-ink-stats"),
     mcCount: byId("mc-count"), tfCount: byId("tf-count"),
     mcKey: byId("mc-key"), tfKey: byId("tf-key"), mcPoints: byId("mc-points"), tfPoints: byId("tf-points"),
     readOmr: byId("read-omr"), omrStatus: byId("omr-status"), choicePage: byId("choice-page"),
@@ -84,6 +88,8 @@
     appealCropCanvas: byId("appeal-crop-canvas"), appealCropOverlay: byId("appeal-crop-overlay"),
     appealReadouts: byId("appeal-readouts"), appealReviewRecord: byId("appeal-review-record"),
     appealPrevQuestion: byId("appeal-prev-question"), appealNextQuestion: byId("appeal-next-question"),
+    appealGroupSummary: byId("appeal-group-summary"), appealQuestionFilter: byId("appeal-question-filter"),
+    appealQuestionPosition: byId("appeal-question-position"),
     dictationSegment: byId("dictation-segment"), dictationStyle: byId("dictation-style"),
     dictationAnswer: byId("dictation-answer"), firstRow: byId("dictation-first-row"),
     dictationBaseEnabled: byId("dictation-base-enabled"), dictationCalibration: byId("dictation-calibration"),
@@ -1022,10 +1028,14 @@
   }
 
   function resetAppealLookup(message) {
-    appealState.pageNumber = 0; appealState.questionKey = ""; appealState.questions = [];
+    appealState.pageNumber = 0; appealState.questionKey = ""; appealState.questions = []; appealState.filteredQuestions = [];
+    appealState.groups = []; appealState.filter = "all"; appealState.groupKey = "";
     appealState.crop = null; appealState.renderToken += 1;
     if (els.appealPageResults) els.appealPageResults.replaceChildren();
     if (els.appealQuestionList) els.appealQuestionList.replaceChildren();
+    if (els.appealGroupSummary) els.appealGroupSummary.replaceChildren();
+    if (els.appealQuestionPosition) els.appealQuestionPosition.textContent = "第 0 / 0 題";
+    if (els.appealQuestionFilter) els.appealQuestionFilter.value = "all";
     if (els.appealQuestionDetail) els.appealQuestionDetail.hidden = true;
     if (els.appealCropCanvas) { els.appealCropCanvas.width = 0; els.appealCropCanvas.height = 0; }
     if (els.appealCropOverlay) { els.appealCropOverlay.replaceChildren(); els.appealCropOverlay.hidden = true; }
@@ -1045,9 +1055,103 @@
       var answer = response && response.answer || "";
       var pending = Boolean(response && response.status === "review" && !response.reviewed);
       var status = pending ? "待覆核" : model.choiceAnswerStatus(answer, key, item.type, response && response.status || "blank");
+      var groupKey = [item.type, item.columnIndex == null ? 0 : item.columnIndex,
+        item.rowGroupIndex == null ? 0 : item.rowGroupIndex].join(":");
+      var points = Number(item.type === "mc" ? settings.mcPoints[item.number - 1] : settings.tfPoints[item.number - 1]) || 0;
+      var normalizedAnswer = item.type === "tf" ? String(answer).toUpperCase() : model.normalizeChoice(answer);
+      var normalizedKey = item.type === "tf" ? String(key || "").toUpperCase() : model.normalizeChoice(key);
       return { item: item, response: response || null, answer: answer, key: key || "", status: status,
+        groupKey: groupKey, points: points, correct: Boolean(normalizedKey && normalizedAnswer === normalizedKey),
         manual: Boolean(response && (response.status === "manual" || response.focusDraftEdited)) };
     });
+  }
+
+  function renderAppealGroupSummary() {
+    var page = state.choicePages[appealState.pageNumber] || {};
+    var available = Boolean(page && !page.pageFailure && !review.hasForcedReadPending(page) && choiceSettings().valid);
+    var summaries = review.summarizeAppealGroups(appealState.questions, appealState.groups, available);
+    els.appealGroupSummary.replaceChildren();
+    var allButton = document.createElement("button"); allButton.type = "button";
+    allButton.className = "appeal-group-button"; allButton.setAttribute("aria-pressed", appealState.groupKey ? "false" : "true");
+    var totalEarned = summaries.reduce(function (sum, group) { return sum + (Number(group.earned) || 0); }, 0);
+    var totalMaximum = summaries.reduce(function (sum, group) { return sum + (Number(group.maximum) || 0); }, 0);
+    var allCounts = summaries.reduce(function (result, group) {
+      result.correct += group.counts.correct; result.wrong += group.counts.wrong;
+      result.blank += group.counts.blank; result.pending += group.counts.pending;
+      return result;
+    }, { correct: 0, wrong: 0, blank: 0, pending: 0 });
+    function countLabel(counts) {
+      return "答對 " + counts.correct + " · 答錯 " + counts.wrong + " · 未作答 " + counts.blank + " · 待覆核 " + counts.pending;
+    }
+    allButton.textContent = "全部題組 · " + (available ? formatNumber(totalEarned) + " / " + formatNumber(totalMaximum) : "暫不計分") +
+      " · " + countLabel(allCounts);
+    allButton.dataset.earned = available ? String(totalEarned) : "";
+    allButton.dataset.maximum = available ? String(totalMaximum) : "";
+    allButton.addEventListener("click", function () {
+      appealState.groupKey = "";
+      renderAppealQuestionBrowser(appealState.questionKey);
+    });
+    els.appealGroupSummary.append(allButton);
+    summaries.forEach(function (group) {
+      var button = document.createElement("button"); button.type = "button"; button.className = "appeal-group-button";
+      button.dataset.groupKey = group.key;
+      button.setAttribute("aria-pressed", appealState.groupKey === group.key ? "true" : "false");
+      button.dataset.earned = available ? String(group.earned) : "";
+      button.dataset.maximum = available ? String(group.maximum) : "";
+      button.textContent = group.label + " · " + (available ? formatNumber(group.earned) + " / " + formatNumber(group.maximum) : "暫不計分") +
+        " · " + countLabel(group.counts);
+      button.addEventListener("click", function () {
+        appealState.groupKey = group.key;
+        renderAppealQuestionBrowser("");
+      });
+      els.appealGroupSummary.append(button);
+    });
+  }
+
+  function renderAppealQuestionBrowser(preferredKey) {
+    appealState.filter = els.appealQuestionFilter.value || "all";
+    appealState.filteredQuestions = review.filterAppealQuestions(appealState.questions, appealState.filter, appealState.groupKey);
+    renderAppealGroupSummary();
+    els.appealQuestionList.replaceChildren();
+    if (!appealState.filteredQuestions.length) {
+      appealState.renderToken += 1;
+      els.appealQuestionPosition.textContent = "第 0 / 0 題";
+      els.appealQuestionDetail.hidden = true;
+      if (els.appealCropCanvas) { els.appealCropCanvas.width = 0; els.appealCropCanvas.height = 0; }
+      if (els.appealCropOverlay) { els.appealCropOverlay.replaceChildren(); els.appealCropOverlay.hidden = true; }
+      var empty = document.createElement("p"); empty.className = "muted small";
+      empty.textContent = "此篩選條件沒有題目。"; els.appealQuestionList.append(empty);
+      appealState.questionKey = "";
+      els.appealPrevQuestion.disabled = true; els.appealNextQuestion.disabled = true;
+      return;
+    }
+    appealState.filteredQuestions.forEach(function (entry) {
+      var button = document.createElement("button"); button.type = "button"; button.className = "appeal-question-button";
+      if (entry.status === "錯" || entry.status === "多選") button.classList.add("is-wrong");
+      if (entry.status === "待覆核") button.classList.add("is-pending");
+      button.dataset.questionKey = entry.item.type + ":" + entry.item.number;
+      button.setAttribute("aria-current", "false");
+      var line = (entry.item.type === "mc" ? "選擇題" : "是非題") + "第 " + String(entry.item.number).padStart(2, "0") +
+        " 題 · 讀到「" + (entry.answer || "未作答") + "」· 標準答案「" + (entry.key || "未設定") + "」· " + entry.status;
+      if (entry.manual) line += " · 老師曾修改";
+      button.textContent = line;
+      button.addEventListener("click", function () { renderAppealSelectedQuestion(entry.item.type + ":" + entry.item.number); });
+      els.appealQuestionList.append(button);
+    });
+    var requestedKey = preferredKey === undefined ? appealState.questionKey : preferredKey;
+    var selected = appealState.filteredQuestions.find(function (entry) {
+      return entry.item.type + ":" + entry.item.number === requestedKey;
+    }) || null;
+    if (selected) renderAppealSelectedQuestion(selected.item.type + ":" + selected.item.number);
+    else {
+      appealState.renderToken += 1;
+      appealState.questionKey = "";
+      els.appealQuestionDetail.hidden = true;
+      if (els.appealCropCanvas) { els.appealCropCanvas.width = 0; els.appealCropCanvas.height = 0; }
+      if (els.appealCropOverlay) { els.appealCropOverlay.replaceChildren(); els.appealCropOverlay.hidden = true; }
+      els.appealQuestionPosition.textContent = "第 0 / " + appealState.filteredQuestions.length + " 題";
+      els.appealPrevQuestion.disabled = true; els.appealNextQuestion.disabled = true;
+    }
   }
 
   function renderAppealPage(pageNumber, resultLabel) {
@@ -1055,9 +1159,22 @@
     if (!Number.isInteger(page) || page < 1 || page > state.pageCount || isAnswerKeyExcludedPage(page)) return;
     appealState.pageNumber = page;
     appealState.questionKey = "";
+    appealState.groupKey = "";
+    appealState.filter = "all";
+    els.appealQuestionFilter.value = "all";
     var pageRecord = state.choicePages[page];
     appealState.questions = pageRecord && Array.isArray(pageRecord.questions) && pageRecord.questions.length
       ? appealQuestionRows(page) : [];
+    var seenGroups = new Set();
+    appealState.groups = appealState.questions.reduce(function (groups, entry) {
+      if (!seenGroups.has(entry.groupKey)) {
+        seenGroups.add(entry.groupKey);
+        var numbers = appealState.questions.filter(function (candidate) { return candidate.groupKey === entry.groupKey; })
+          .map(function (candidate) { return candidate.item.number; });
+        groups.push({ key: entry.groupKey, label: omr.answerGroupLabel(entry.item.type, numbers) });
+      }
+      return groups;
+    }, []);
     els.appealPage.value = String(page);
     els.appealStatus.textContent = resultLabel || "已選第 " + page + " 頁；請選擇題號查看原 PDF 截圖及讀圈資料。";
     els.appealQuestionList.replaceChildren();
@@ -1068,20 +1185,11 @@
       var noQuestions = document.createElement("p"); noQuestions.className = "muted small";
       noQuestions.textContent = "此頁尚無讀圈結果，請選擇已完成讀圈的頁面。";
       els.appealQuestionList.append(noQuestions);
+      els.appealGroupSummary.replaceChildren();
+      els.appealQuestionPosition.textContent = "第 0 / 0 題";
       return;
     }
-    appealState.questions.forEach(function (entry) {
-      var button = document.createElement("button"); button.type = "button"; button.className = "appeal-question-button";
-      if (entry.status === "錯") button.classList.add("is-wrong");
-      if (entry.status === "待覆核") button.classList.add("is-pending");
-      button.dataset.questionKey = entry.item.type + ":" + entry.item.number;
-      button.setAttribute("aria-current", "false");
-      var line = "第 " + String(entry.item.number).padStart(2, "0") + " 題 · 讀到「" + (entry.answer || "未作答") + "」· 標準答案「" + (entry.key || "未設定") + "」· " + entry.status;
-      if (entry.manual) line += " · 老師已修改";
-      button.textContent = line;
-      button.addEventListener("click", function () { renderAppealSelectedQuestion(entry.item.type + ":" + entry.item.number); });
-      els.appealQuestionList.append(button);
-    });
+    renderAppealQuestionBrowser("");
   }
 
   function appealMappedCenters(questionEntry, viewport) {
@@ -1118,9 +1226,14 @@
       row.textContent = bubble.option + "：填色 " + amount + (entry.answer.indexOf(bubble.option) >= 0 ? " · 程式選取" : "");
       els.appealReadouts.append(row);
     });
-    var selectedIndex = appealState.questions.indexOf(entry);
+    var selectedIndex = appealState.filteredQuestions.indexOf(entry);
+    els.appealQuestionPosition.textContent = "第 " + (selectedIndex + 1) + " / " + appealState.filteredQuestions.length + " 題";
     els.appealPrevQuestion.disabled = selectedIndex <= 0;
-    els.appealNextQuestion.disabled = selectedIndex >= appealState.questions.length - 1;
+    els.appealNextQuestion.disabled = selectedIndex < 0 || selectedIndex >= appealState.filteredQuestions.length - 1;
+    var scoreText = entry.correct ? entry.points : 0;
+    els.appealDetailStatus.textContent = "讀到作答：「" + (entry.answer || "未作答") + "」；標準答案：「" + (entry.key || "未設定") + "」；結果：「" + entry.status + "」；得分 " +
+      formatNumber(scoreText) + " / " + formatNumber(entry.points) + "。" +
+      (entry.response && entry.response.reason ? "讀圈提示：「" + entry.response.reason + "」。" : "");
     try {
       var pdfPage = await state.pdfDoc.getPage(appealState.pageNumber);
       var viewport = pdfPage.getViewport({ scale: 2 });
@@ -1180,7 +1293,9 @@
     }
     var matches = review.findPagesByIdentity(state.choicePages, state.pageCount, classValue, studentId, answerKeyExcludedPages());
     if (!matches.length) {
-      appealState.pageNumber = 0; appealState.questionKey = ""; appealState.questions = [];
+      appealState.pageNumber = 0; appealState.questionKey = ""; appealState.questions = []; appealState.filteredQuestions = [];
+      appealState.groups = [];
+      els.appealGroupSummary.replaceChildren(); els.appealQuestionPosition.textContent = "第 0 / 0 題";
       els.appealStatus.textContent = "找不到符合此班別及學號的已讀頁面。請核對輸入或直接選頁碼。";
       return;
     }
@@ -1199,35 +1314,117 @@
   }
 
   function moveAppealQuestion(direction) {
-    var index = appealState.questions.findIndex(function (entry) {
+    var index = appealState.filteredQuestions.findIndex(function (entry) {
       return entry.item.type + ":" + entry.item.number === appealState.questionKey;
     });
     var next = index + direction;
-    if (next < 0 || next >= appealState.questions.length) return;
-    var entry = appealState.questions[next];
+    if (next < 0 || next >= appealState.filteredQuestions.length) return;
+    var entry = appealState.filteredQuestions[next];
     renderAppealSelectedQuestion(entry.item.type + ":" + entry.item.number);
+  }
+
+  function focusPageEntries(pageNumber) {
+    var page = state.choicePages[pageNumber];
+    if (!page || page.pageFailure || isAnswerKeyExcludedPage(pageNumber)) return [];
+    var items = geometry.expandChoiceTemplate(state.template, choiceSettings()).items;
+    return review.pageQuestions(pageNumber, page, items).map(function (entry) {
+      entry.key = entry.type + ":" + entry.number;
+      entry.question = entry.response || { type: entry.type, number: entry.number, answer: "", values: [], status: "blank", reviewed: true };
+      return entry;
+    });
+  }
+
+  function focusBrowseEntry() {
+    if (!focusBrowseState.active || focusBrowseState.pageNumber !== state.currentPage) return null;
+    return focusPageEntries(focusBrowseState.pageNumber).find(function (entry) { return entry.key === focusBrowseState.questionKey; }) || null;
+  }
+
+  function startFocusBrowse() {
+    var entries = focusPageEntries(state.currentPage);
+    if (!entries.length) return;
+    var queue = review.buildReviewQueue(state.choicePages, state.pageCount);
+    var pending = queue.find(function (entry) { return entry.key === state.focusKey; });
+    focusBrowseState = {
+      active: true, pageNumber: state.currentPage, questionKey: entries[0].key,
+      returnPage: pending && pending.kind !== "page" ? pending.pageNumber : state.currentPage
+    };
+    renderCurrentMode();
+  }
+
+  function moveFocusBrowse(direction) {
+    var entries = focusPageEntries(state.currentPage);
+    if (!entries.length) return;
+    var active = focusBrowseEntry();
+    var queue = review.buildReviewQueue(state.choicePages, state.pageCount);
+    var pending = queue.find(function (entry) { return entry.key === state.focusKey; });
+    var index = active ? entries.findIndex(function (entry) { return entry.key === active.key; }) : pending && pending.kind !== "page" && pending.pageNumber === state.currentPage
+      ? entries.findIndex(function (entry) { return entry.type === pending.type && entry.number === pending.number; }) : -1;
+    if (index < 0) {
+      index = direction < 0 ? entries.length - 1 : 0;
+      focusBrowseState.returnPage = pending && pending.kind !== "page" ? pending.pageNumber : state.currentPage;
+    } else {
+      index = review.nextIndex(entries, index, direction);
+      if (index < 0) return;
+      if (!focusBrowseState.active) focusBrowseState.returnPage = pending && pending.kind !== "page" ? pending.pageNumber : state.currentPage;
+    }
+    focusBrowseState.active = true;
+    focusBrowseState.pageNumber = state.currentPage;
+    focusBrowseState.questionKey = entries[index].key;
+    renderCurrentMode();
+  }
+
+  function returnToPendingFocus() {
+    var queue = review.buildReviewQueue(state.choicePages, state.pageCount);
+    var pending = queue.find(function (entry) { return entry.key === state.focusKey; });
+    focusBrowseState.active = false;
+    if (pending) state.currentPage = pending.pageNumber;
+    else if (focusBrowseState.returnPage) state.currentPage = focusBrowseState.returnPage;
+    renderCurrentMode();
+  }
+
+  function renderFocusInkStats(entry, entries) {
+    var currentKey = entry ? entry.key : "";
+    var stats = review.questionInkStats(entries, currentKey);
+    if (!stats.count) { els.focusInkStats.textContent = "本頁讀圈深淺：沒有可用讀數。"; return; }
+    function percent(value) { return value == null ? "未記錄" : Math.round(value * 100) + "%"; }
+    els.focusInkStats.textContent = "本頁每題最深選項：中位數 " + percent(stats.median) + "；範圍 " +
+      percent(stats.minimum) + "–" + percent(stats.maximum) + (entry ? "。本題最深／第二深：" +
+        percent(stats.darkest) + "／" + percent(stats.secondDarkest) : "。");
   }
 
   function renderFocusControls(queue) {
     var current = queue.find(function (entry) { return entry.key === state.focusKey; });
+    if (current && current.kind !== "page") {
+      current = Object.assign({}, current, { item: geometry.expandChoiceTemplate(state.template, choiceSettings()).items.find(function (item) {
+        return item.type === current.type && item.number === current.number;
+      }) || null });
+    }
+    if (focusBrowseState.active && focusBrowseState.pageNumber !== state.currentPage) focusBrowseState.active = false;
+    var browsing = focusBrowseEntry();
+    var shown = browsing || current;
     els.focusAnswerKeys.replaceChildren();
-    els.focusProgress.textContent = queue.length ? (Math.max(1, queue.findIndex(function (entry) { return entry.key === state.focusKey; }) + 1) + " / " + queue.length + " 題") : "0 題";
-    var pageFailureItem = Boolean(current && current.kind === "page");
+    var queueIndex = queue.findIndex(function (entry) { return entry.key === state.focusKey; });
+    els.focusProgress.textContent = queue.length ? (Math.max(1, queueIndex + 1) + " / " + queue.length + " 題") : "0 題";
+    var pageFailureItem = Boolean(current && current.kind === "page" && !browsing);
+    var pageEntries = focusPageEntries(state.currentPage);
+    var statsEntries = browsing ? pageEntries : current && current.kind !== "page" ? focusPageEntries(current.pageNumber) : pageEntries;
+    var browseIndex = browsing ? pageEntries.findIndex(function (entry) { return entry.key === browsing.key; }) :
+      current && current.kind !== "page" && current.pageNumber === state.currentPage
+        ? pageEntries.findIndex(function (entry) { return entry.key === current.key; }) : -1;
+    var hasBrowseAnchor = Boolean(browsing || browseIndex >= 0);
+    els.focusBrowseStart.disabled = !pageEntries.length;
+    els.focusBrowsePrev.disabled = !pageEntries.length || !hasBrowseAnchor || browseIndex <= 0;
+    els.focusBrowseNext.disabled = !pageEntries.length || !hasBrowseAnchor || browseIndex >= pageEntries.length - 1;
+    els.focusBrowseReturn.hidden = !browsing;
     els.focusPageReread.hidden = !pageFailureItem;
     els.focusConfirm.hidden = pageFailureItem;
     els.focusConfirm.disabled = !current || pageFailureItem;
     els.focusConfirm.classList.toggle("primary", Boolean(current));
     els.exportPdf.classList.toggle("primary", !current);
-    if (!current) {
-      els.focusTitle.textContent = "沒有待覆核題目";
-      els.focusReason.textContent = state.pdfDoc ? "所有已讀題目都已確認；整頁警告仍請檢查。" : "載入 PDF 後，待覆核題目會在這裏放大顯示。";
-      els.focusPreview.replaceChildren(Object.assign(document.createElement("p"), { className: "empty-state", textContent: "目前沒有需要覆核的題目。" }));
-      renderChoiceAiSuggestion(null);
-      return;
-    }
-    if (pageFailureItem) {
-      els.focusTitle.textContent = "第 " + current.pageNumber + " 頁 · 整頁定位失敗";
-      var diagnostics = current.diagnostic || {};
+    renderFocusInkStats(browsing || current && current.kind !== "page" ? shown : null, statsEntries);
+    if (shown && shown.kind === "page") {
+      els.focusTitle.textContent = "第 " + shown.pageNumber + " 頁 · 整頁定位失敗";
+      var diagnostics = shown.diagnostic || {};
       var diagnosticReasons = diagnostics.reasons || [];
       var groupLines = (diagnostics.groups || []).map(function (group) {
         return group.label + "平均偏移 " + Number(group.meanMm).toFixed(1) + " mm";
@@ -1235,7 +1432,7 @@
       var worstLines = (diagnostics.worstGroups || []).map(function (group) {
         return group.label + " " + Number(group.meanMm).toFixed(1) + " mm";
       });
-      var readout = diagnosticReasons.length ? diagnosticReasons.slice() : [current.reason];
+      var readout = diagnosticReasons.length ? diagnosticReasons.slice() : [shown.reason];
       readout.push("各組平均偏移：" + (groupLines.join("；") || "沒有題組"));
       readout.push("偏移最大的三組：" + (worstLines.join("；") || "沒有題組"));
       els.focusReason.textContent = readout.join("\n");
@@ -1244,21 +1441,37 @@
       renderChoiceAiSuggestion(null);
       return;
     }
-    var question = current.question;
+    if (!shown) {
+      els.focusTitle.textContent = "沒有待覆核題目";
+      els.focusReason.textContent = state.pdfDoc ? "所有已讀題目都已確認；可瀏覽本頁題目，整頁警告仍請檢查。" : "載入 PDF 後，待覆核題目會在這裏放大顯示。";
+      els.focusPreview.replaceChildren(Object.assign(document.createElement("p"), { className: "empty-state", textContent: "目前沒有需要覆核的題目。" }));
+      renderChoiceAiSuggestion(null);
+      return;
+    }
+    var question = shown.question;
     var selected = question.answer || "";
-    els.focusTitle.textContent = "第 " + current.pageNumber + " 頁 · " + (current.type === "mc" ? "選擇題" : "是非題") +
-      "第 " + String(current.number).padStart(2, "0") + " 題";
-    els.focusReason.textContent = "讀圈結果：「" + (selected || "空白") + "」；" + (question.reason || "請對照整頁確認答案。");
-    var item = geometry.expandChoiceTemplate(state.template, choiceSettings()).items.find(function (entry) {
-      return entry.type === current.type && entry.number === current.number;
-    });
-    var answerOptions = item ? item.choices.map(function (bubble) { return bubble.option; }) : [];
+    var pendingNow = question.status === "review" && !question.reviewed;
+    var browsingNonPending = Boolean(browsing && !pendingNow);
+    var titlePrefix = browsing ? (browsingNonPending ? "瀏覽中：非待覆核題目 · " : "瀏覽中：待覆核題目 · ") : "";
+    els.focusTitle.textContent = titlePrefix + "第 " + shown.pageNumber + " 頁 · " + (shown.type === "mc" ? "選擇題" : "是非題") +
+      "第 " + String(shown.number).padStart(2, "0") + " 題";
+    var readings = (shown.item ? shown.item.choices : []).map(function (choice, index) {
+      var value = Array.isArray(question.values) ? Number(question.values[index]) : NaN;
+      return choice.option + " " + (Number.isFinite(value) ? Math.round(value * 100) + "%" : "未記錄");
+    }).join("、");
+    var browseNote = browsing ? "瀏覽不會更改覆核狀態；Alt+↑／↓ 可移至本頁上一題／下一題，Enter 仍確認待覆核清單中的題目。" : "";
+    els.focusReason.textContent = "讀圈結果：「" + (selected || "空白") + "」；選項填色：" + (readings || "未記錄") + "；" +
+      (question.reason || "請對照整頁確認答案。") + (browseNote ? "\n" + browseNote : "");
+    var answerOptions = shown.item ? shown.item.choices.map(function (bubble) { return bubble.option; }) : [];
     answerOptions.concat(["空白"]).forEach(function (option) {
       var button = document.createElement("button"); button.type = "button"; button.className = "answer-choice";
       var isSelected = option === "空白" ? !selected : selected.indexOf(option) >= 0;
       button.textContent = option; button.setAttribute("aria-pressed", isSelected ? "true" : "false");
       if (isSelected) button.classList.add("selected");
       button.addEventListener("click", function () {
+        var page = state.choicePages[shown.pageNumber];
+        if (!question || !Array.isArray(page.questions)) return;
+        if (!page.questions.includes(question)) page.questions.push(question);
         var next = option === "空白" ? "" : (selected.indexOf(option) >= 0 ? selected.replace(option, "") : Array.from(new Set((selected + option).split(""))).sort().join(""));
         question.answer = next;
         question.status = "review";
@@ -1268,7 +1481,7 @@
       });
       els.focusAnswerKeys.append(button);
     });
-    renderChoiceAiSuggestion(current);
+    renderChoiceAiSuggestion(browsing ? null : current);
   }
 
   function renderReviewList(page) {
@@ -1290,6 +1503,7 @@
       detail.textContent = entry.kind === "page" ? "定位檢查失敗 · 按此查看診斷" : (entry.answer || "空白") + " · " + entry.reason;
       button.append(label, detail);
       button.addEventListener("click", function () {
+        focusBrowseState.active = false;
         state.focusKey = entry.key; state.currentPage = entry.pageNumber;
         renderCurrentMode();
       });
@@ -1626,13 +1840,13 @@
 
   function renderFocusPreview(sourceCanvas, viewport) {
     var queue = review.buildReviewQueue(state.choicePages, state.pageCount);
-    var current = queue.find(function (entry) { return entry.key === state.focusKey; });
-    if (!sourceCanvas || !current || current.pageNumber !== state.currentPage) return;
+    var current = focusBrowseEntry() || queue.find(function (entry) { return entry.key === state.focusKey; });
+    if (!sourceCanvas || !current || current.kind === "page" || current.pageNumber !== state.currentPage) return;
     var settings = choiceSettings();
     var template = geometry.expandChoiceTemplate(state.template, settings);
-    var item = template.items.find(function (entry) { return entry.type === current.type && entry.number === current.number; });
+    var item = current.item || template.items.find(function (entry) { return entry.type === current.type && entry.number === current.number; });
     if (!item) return;
-    var question = current.question;
+    var question = current.question || { values: [] };
     var centers = item.choices.map(function (bubble, index) {
       return geometry.mapBubble(bubble, viewport.width, viewport.height, state.choicePages[current.pageNumber].calibration,
         question.localOffsets && question.localOffsets[index]);
@@ -1653,7 +1867,8 @@
     context.strokeRect((focus.left - left) * factor, (focus.top - top) * factor,
       (focus.right - focus.left) * factor, (focus.bottom - focus.top) * factor);
     zoom.setAttribute("role", "img");
-    zoom.setAttribute("aria-label", "第 " + current.pageNumber + " 頁，第 " + current.number + " 題，目前覆核，橙框標示該題圈格");
+    zoom.setAttribute("aria-label", "第 " + current.pageNumber + " 頁，" + (current.type === "mc" ? "選擇題" : "是非題") +
+      "第 " + current.number + " 題，橙框標示該題圈格");
     els.focusPreview.replaceChildren(zoom);
   }
 
@@ -2198,6 +2413,8 @@
     var index = queue.findIndex(function (entry) { return entry.key === state.focusKey; });
     if (index < 0) return;
     var current = queue[index];
+    focusBrowseState.active = false;
+    state.currentPage = current.pageNumber;
     review.confirmQuestion(current.question);
     var page = state.choicePages[current.pageNumber];
     if (page && Array.isArray(page.pageFlags) && page.pageFlags.indexOf(omr.FORCED_READ_REVIEW_FLAG) >= 0 &&
@@ -3136,6 +3353,7 @@
   });
   els.appealPrevQuestion.addEventListener("click", function () { moveAppealQuestion(-1); });
   els.appealNextQuestion.addEventListener("click", function () { moveAppealQuestion(1); });
+  els.appealQuestionFilter.addEventListener("change", function () { renderAppealQuestionBrowser(); });
   els.startDictation.addEventListener("click", function () { if (state.pdfDoc) { setStep(3); renderCurrentMode(); } });
   els.useTemplate.addEventListener("click", useSelectedTemplate);
   els.editTemplateLayout.addEventListener("click", function () { templateEditorUI.open(templateById(state.templateId)); });
@@ -3199,9 +3417,18 @@
   els.stepPills.forEach(function (pill) { pill.addEventListener("click", function () { setStep(Number(pill.dataset.step)); renderCurrentMode(); }); });
   els.focusConfirm.addEventListener("click", confirmFocusedQuestion);
   els.focusPageReread.addEventListener("click", rereadFailedPageForReview);
+  els.focusBrowseStart.addEventListener("click", startFocusBrowse);
+  els.focusBrowsePrev.addEventListener("click", function () { moveFocusBrowse(-1); });
+  els.focusBrowseNext.addEventListener("click", function () { moveFocusBrowse(1); });
+  els.focusBrowseReturn.addEventListener("click", returnToPendingFocus);
   window.addEventListener("keydown", function (event) {
-    if (event.key !== "Enter" || state.step !== 3 || state.mode !== "choice") return;
     var target = event.target;
+    var isTextControl = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
+    if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && state.step === 3 && state.mode === "choice" && !isTextControl &&
+        (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+      event.preventDefault(); moveFocusBrowse(event.key === "ArrowUp" ? -1 : 1); return;
+    }
+    if (event.key !== "Enter" || state.step !== 3 || state.mode !== "choice") return;
     if (target && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName) && target !== els.focusConfirm) return;
     event.preventDefault(); confirmFocusedQuestion();
   });
