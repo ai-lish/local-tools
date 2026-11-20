@@ -639,6 +639,54 @@
     };
   }
 
+  function preparePaleMultiplePageForReview(result, template, params, options) {
+    if (!result || !result.pageFailure || options && options.forceRead) return result;
+    var calibration = result.calibration || {};
+    var gridScore = Number(calibration.gridScore);
+    var groupGapInk = Number(calibration.groupGapInk);
+    if (calibration.alignmentBoundary !== false || !Number.isFinite(gridScore) || gridScore < params.minGridScore ||
+        !Number.isFinite(groupGapInk) || groupGapInk >= params.maxGroupGapInk) return result;
+
+    var checks = result.alignmentDiagnostics && Array.isArray(result.alignmentDiagnostics.checks)
+      ? result.alignmentDiagnostics.checks : [];
+    var multiDeepCheck = checks.find(function (check) { return check && check.id === "multi-deep"; });
+    if (!multiDeepCheck || multiDeepCheck.passed !== false || Number(multiDeepCheck.value) < 0.6 ||
+        checks.some(function (check) { return check && check.id !== "multi-deep" && check.passed !== true; })) return result;
+    if (!Array.isArray(result.questions) || result.questions.length !== template.items.length ||
+        result.questions.some(function (question, index) {
+          var item = template.items[index];
+          return !item || question.type !== item.type || question.number !== item.number ||
+            !Array.isArray(question.values) || question.values.length !== item.choices.length;
+        })) return result;
+
+    var thresholds = result.thresholds || {};
+    var gapLimit = Math.max(0.08, Number(thresholds.spread || 0) * 0.18);
+    result.questions.forEach(function (question, index) {
+      var item = template.items[index];
+      var choices = item.choices.map(function (choice) { return choice.option; });
+      var classified = classifyItem(choices, question.values, thresholds);
+      var ranked = item.choices.map(function (choice, choiceIndex) {
+        return { choice: choice.option, value: Number(question.values[choiceIndex]) };
+      }).sort(function (left, right) { return right.value - left.value; });
+      var top = ranked[0];
+      var second = ranked[1] || { value: 0 };
+      var tied = top && top.value === second.value;
+      var gap = top ? top.value - second.value : 0;
+      question.answer = classified.status === "blank" || tied ? "" : top.choice;
+      question.status = "review";
+      question.reviewed = false;
+      question.reason = gap < gapLimit
+        ? "填色太淺，最深與次深差距細，需確認"
+        : "填色太淺，已按最深圈預填，需確認";
+    });
+    result.pageFlags = (Array.isArray(result.pageFlags) ? result.pageFlags : [])
+      .filter(function (flag) { return String(flag || "").indexOf("整頁定位失敗：") !== 0; });
+    if (result.pageFlags.indexOf(FORCED_READ_REVIEW_FLAG) < 0) result.pageFlags.push(FORCED_READ_REVIEW_FLAG);
+    result.pageFailure = false;
+    result.reviewCount = result.questions.filter(function (question) { return question.status === "review"; }).length + result.pageFlags.length;
+    return result;
+  }
+
   function detectPage(data, width, height, mcCount, tfCount, calibration, metadataCalibration, expandedTemplate, options) {
     var template = expandedTemplate || geometry.omrTemplate(mcCount, tfCount);
     var params = template.params || BUILTIN_PARAMS;
@@ -649,9 +697,9 @@
     var metadataApplied = metadataCalibration || baseCalibration;
     var gridResult = analysePage(data, width, height, template, baseCalibration, metadataApplied, params, baseCalibration, options);
     if (options && options.forceRead) return gridResult;
-    if (baseCalibration.affine || gridResult.pageFailure) return gridResult;
+    if (baseCalibration.affine || gridResult.pageFailure) return preparePaleMultiplePageForReview(gridResult, template, params, options);
     var fit = fitAffineCorrection(data, width, height, template, baseCalibration, params);
-    if (!fit) return gridResult;
+    if (!fit) return preparePaleMultiplePageForReview(gridResult, template, params, options);
     var affineCalibration = Object.assign({}, baseCalibration, { affine: fit.affine });
     var affineResult = analysePage(data, width, height, template, affineCalibration, metadataApplied, params, baseCalibration, options);
     affineResult.affineDiagnostics = Object.assign({}, affineResult.affineDiagnostics, {
@@ -663,9 +711,9 @@
         anchorCount: fit.anchorCount, inlierCount: fit.inlierCount, fitResidualMedian: fit.fitResidualMedian,
         maximumShift: fit.maximumShift, fallback: true
       });
-      return gridResult;
+      return preparePaleMultiplePageForReview(gridResult, template, params, options);
     }
-    return affineResult;
+    return preparePaleMultiplePageForReview(affineResult, template, params, options);
   }
 
   root.PdfMarkingOmr = {

@@ -1485,6 +1485,12 @@
     return "整頁定位失敗";
   }
 
+  function isPaleMultiplePagePending(page) {
+    return Boolean(page && !page.pageFailure && Array.isArray(page.pageFlags) &&
+      page.pageFlags.indexOf(omr.FORCED_READ_REVIEW_FLAG) >= 0 && Array.isArray(page.questions) &&
+      page.questions.some(function (question) { return String(question && question.reason || "").indexOf("填色太淺，") === 0; }));
+  }
+
   function renderFocusControls(queue) {
     var current = queue.find(function (entry) { return entry.key === state.focusKey; });
     if (current && current.kind !== "page") {
@@ -1499,6 +1505,8 @@
     var queueIndex = queue.findIndex(function (entry) { return entry.key === state.focusKey; });
     els.focusProgress.textContent = queue.length ? (Math.max(1, queueIndex + 1) + " / " + queue.length + " 題") : "0 題";
     var pageFailureItem = Boolean(current && current.kind === "page" && !browsing);
+    var paleMultiplePagePending = Boolean(shown && shown.kind !== "page" &&
+      isPaleMultiplePagePending(state.choicePages[shown.pageNumber]));
     var pageEntries = focusPageEntries(state.currentPage);
     var statsEntries = browsing ? pageEntries : current && current.kind !== "page" ? focusPageEntries(current.pageNumber) : pageEntries;
     var browseIndex = browsing ? pageEntries.findIndex(function (entry) { return entry.key === browsing.key; }) :
@@ -1517,7 +1525,8 @@
     els.focusFixTemplate.hidden = !(state.choiceWizardActive && state.choiceWizardStage === 5 &&
       (pageFailureItem || pendingQuestionCount >= 5));
     els.focusFixTemplate.textContent = "用此頁修正範本";
-    els.focusFailureReason.hidden = !pageFailureItem;
+    els.focusFailureReason.hidden = !pageFailureItem && !paleMultiplePagePending;
+    if (paleMultiplePagePending) els.focusFailureReason.textContent = "填色太淺：已預填，需逐題確認";
     els.focusConfirm.hidden = pageFailureItem;
     els.focusConfirm.disabled = !current || pageFailureItem;
     els.focusConfirm.classList.toggle("primary", Boolean(current));
