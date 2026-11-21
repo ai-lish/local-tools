@@ -235,7 +235,18 @@ function assertStorageAllowed(relative, content) {
       approvedPdfMarkingStorageCalls.filter((match) => match[1] === 'setItem').length === 3 &&
       approvedPdfMarkingStorageCalls.filter((match) => match[1] === 'removeItem').length === 3 &&
       !/\b(?:sessionStorage|indexedDB)\b/i.test(content);
-    if (!namespacedCalculatorStorage && !namespacedThankTeacherStorage && !namespacedPdfMarkingStorage) {
+    const hkdseTemplateStorageCalls = [...content.matchAll(
+      /\bstorage\.(getItem|setItem)\s*\(\s*STORAGE_KEY\s*(?=[,)])/g
+    )];
+    const namespacedHkdseTemplateStorage = relative === 'tools/hkdse-question-split/split-template.js' &&
+      content.includes('var STORAGE_KEY = "hkdse-question-split.templates.v1";') &&
+      content.includes('var storage = host && host.localStorage;') &&
+      (content.match(/\blocalStorage\b/gi) || []).length === 1 &&
+      hkdseTemplateStorageCalls.length === 2 &&
+      hkdseTemplateStorageCalls.filter((match) => match[1] === 'getItem').length === 1 &&
+      hkdseTemplateStorageCalls.filter((match) => match[1] === 'setItem').length === 1 &&
+      !/\b(?:sessionStorage|indexedDB)\b/i.test(content);
+    if (!namespacedCalculatorStorage && !namespacedThankTeacherStorage && !namespacedPdfMarkingStorage && !namespacedHkdseTemplateStorage) {
       throw new Error('unapproved browser storage in public file: ' + relative);
     }
   }

@@ -211,6 +211,12 @@
       "managedBy": "math-lish/local-tools"
     },
     {
+      "source": "tools/hkdse-question-split/split-template.js",
+      "destination": "tools/hkdse-question-split/split-template.js",
+      "publicMode": "cli-source",
+      "managedBy": "math-lish/local-tools"
+    },
+    {
       "source": "tools/hkdse-question-split/tool.yaml",
       "destination": "tools/hkdse-question-split/tool.yaml",
       "publicMode": "cli-source",
@@ -1565,7 +1571,7 @@
     {
       "id": "core-all",
       "title": "核心工具全套",
-      "version": "2026.11.20.3",
+      "version": "2026.11.20.4",
       "entry": "START-HERE.html",
       "entries": [
         "tools/image-upscaler/index.html",
@@ -1609,6 +1615,7 @@
         "tools/_vendor/jszip-3.10.1/jszip.min.js",
         "tools/_vendor/jszip-3.10.1/LICENSE.markdown",
         "tools/hkdse-question-split/index.html",
+        "tools/hkdse-question-split/split-template.js",
         "tools/conduct-grade-average/index.html",
         "tools/zip-batch-extract/index.html",
         "tools/zip-batch-extract/app.js",
@@ -2400,13 +2407,14 @@
     {
       "id": "hkdse-question-split",
       "title": "HKDSE 試卷逐題切圖工具",
-      "version": "2026.11.13.2",
+      "version": "2026.11.20.3",
       "entry": "tools/hkdse-question-split/index.html",
       "entries": [
         "tools/hkdse-question-split/index.html"
       ],
       "files": [
         "tools/hkdse-question-split/index.html",
+        "tools/hkdse-question-split/split-template.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.min.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.worker.min.js",
         "tools/_vendor/pdfjs-3.11.174/pdf.worker.embedded.js",

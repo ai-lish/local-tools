@@ -213,6 +213,37 @@
       margin-top: 14px;
     }
 
+    .template-panel { margin: 18px 0; padding: 16px; }
+    .template-panel h2 { margin: 0 0 5px; font-size: 15px; }
+    .template-panel > p { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+    .template-controls, .template-offsets, .template-actions, .saved-template-actions {
+      display: flex; flex-wrap: wrap; align-items: end; gap: 8px;
+    }
+    .template-controls .field { flex: 1 1 220px; }
+    .template-controls input, .template-offsets input, .saved-template input {
+      width: 100%; min-height: 38px; padding: 7px 9px; border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); background: rgba(13, 17, 23, .7);
+    }
+    .template-status, .template-summary, .template-warning, .template-errors, .template-confirm {
+      margin-top: 10px; white-space: pre-line; font-size: 12px;
+    }
+    .template-status { color: var(--muted); }
+    .template-status.bad, .template-errors { color: var(--bad); }
+    .template-status.good { color: var(--good); }
+    .template-status.warn { color: var(--warn); }
+    .template-warning { color: var(--warn); }
+    .template-preview { margin-top: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2); }
+    .template-offsets { margin-top: 10px; }
+    .template-offsets .field { flex: 1 1 180px; }
+    .template-offsets label, .template-controls label { display: block; margin-bottom: 5px; color: var(--muted); font-size: 11px; }
+    .saved-templates { display: grid; gap: 8px; margin-top: 14px; }
+    .saved-template { min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 9px; background: rgba(13, 17, 23, .45); }
+    .saved-template-name { font-weight: 700; overflow-wrap: anywhere; }
+    .saved-template-meta { margin: 3px 0 8px; color: var(--muted); font-size: 11px; }
+    .saved-template-actions .btn { min-height: 32px; padding: 5px 8px; font-size: 11px; }
+    .template-confirm { padding: 9px; border: 1px solid rgba(241, 189, 85, .45); border-radius: 8px; color: var(--warn); }
+    .template-confirm .btn { margin: 6px 6px 0 0; }
+
     .btn {
       min-height: 38px;
       padding: 8px 13px;
@@ -424,6 +455,8 @@
       .thumbs { grid-template-columns: repeat(4, 1fr); }
       .output-panel { grid-template-columns: 1fr; }
       .output-actions { justify-content: start; }
+      .template-panel { padding: 12px; }
+      .template-controls .btn, .template-actions .btn { flex: 1 1 auto; }
     }
   </style>
 </head>
@@ -533,6 +566,56 @@
       </div>
     </section>
 
+    <section class="panel template-panel" aria-labelledby="templateTitle">
+      <h2 id="templateTitle">界線範本</h2>
+      <p>可把目前題目界線及輸出設定匯出為 JSON，或儲存在此瀏覽器；範本不會包含 PDF 內容、檔案名稱或路徑。</p>
+      <div class="template-controls">
+        <div class="field">
+          <label for="templateName">範本名稱</label>
+          <input id="templateName" type="text" maxlength="100" placeholder="例如：M2 2026 中文題目">
+        </div>
+        <button class="btn" id="saveTemplateBtn" type="button">儲存到此瀏覽器</button>
+        <button class="btn primary" id="exportTemplateBtn" type="button">匯出範本 JSON</button>
+        <button class="btn" id="importTemplateBtn" type="button">匯入範本 JSON</button>
+        <input id="templateFileInput" type="file" accept="application/json,.json" hidden>
+      </div>
+      <div class="template-status" id="templateStatus" role="status" aria-live="polite"></div>
+      <div class="template-confirm" id="saveTemplateChoice" role="group" aria-live="polite" aria-labelledby="saveTemplateChoiceTitle" hidden>
+        <strong id="saveTemplateChoiceTitle">此範本 ID 已在瀏覽器清單中。請選擇儲存方式：</strong>
+        <button class="btn primary" id="overwriteTemplateBtn" type="button">覆蓋原範本</button>
+        <button class="btn" id="saveAsNewTemplateBtn" type="button">另存為新範本</button>
+        <button class="btn" id="cancelTemplateSaveBtn" type="button">取消</button>
+      </div>
+      <div class="template-preview" id="templatePreview" hidden>
+        <strong>範本預覽</strong>
+        <div class="template-summary" id="templateSummary"></div>
+        <div class="template-warning" id="templateWarning"></div>
+        <div class="template-offsets">
+          <div class="field">
+            <label for="pageOffsetInput">整體頁碼位移（整數）</label>
+            <input id="pageOffsetInput" type="number" step="1" value="0">
+          </div>
+          <div class="field">
+            <label for="verticalOffsetInput">整體上下位移（百分點）</label>
+            <input id="verticalOffsetInput" type="number" min="-100" max="100" step="0.1" value="0">
+          </div>
+        </div>
+        <div class="template-summary">頁碼位移會加到每個已設定的起點及終點頁；上下位移是加減百分點。超出目標範圍的界線會保留並列出錯誤，讓你修正。</div>
+        <div class="template-summary" id="templateOffsetPreview"></div>
+        <ul class="template-errors" id="templateApplyErrors" hidden></ul>
+        <div class="template-actions">
+          <button class="btn primary" id="applyTemplateBtn" type="button">套用到目前題目表</button>
+          <button class="btn" id="cancelTemplateBtn" type="button">取消預覽</button>
+        </div>
+      </div>
+      <div class="template-confirm" id="replaceConfirm" hidden>
+        目前題目表有尚未匯出或儲存的界線。確認後會以範本覆蓋。
+        <button class="btn primary" id="confirmReplaceBtn" type="button">確認覆蓋</button>
+        <button class="btn" id="cancelReplaceBtn" type="button">取消</button>
+      </div>
+      <div class="saved-templates" id="savedTemplates" aria-label="已儲存的範本"></div>
+    </section>
+
     <div class="workspace">
       <aside class="panel preview">
         <div class="panel-head">
@@ -604,6 +687,7 @@
   <script src="../_vendor/pdfjs-3.11.174/pdf.min.js"></script>
   <script src="../_vendor/pdfjs-3.11.174/pdf.worker.embedded.js"></script>
   <script src="../_vendor/jszip-3.10.1/jszip.min.js"></script>
+  <script src="./split-template.js"></script>
   <script>
     (function () {
       "use strict";
@@ -616,7 +700,12 @@
         selected: -1,
         boundaryMode: "",
         rows: [],
-        loadingToken: 0
+        loadingToken: 0,
+        templateDirty: false,
+        templateMeta: null,
+        pendingTemplate: null,
+        pendingTemplateSave: false,
+        savedTemplates: []
       };
 
       var $ = function (id) { return document.getElementById(id); };
@@ -711,6 +800,387 @@
         setValidation(text, "");
       }
 
+      function markTemplateDirty() {
+        if (state.rows.length) state.templateDirty = true;
+      }
+
+      function hasCoordinateValue(value) {
+        return value !== undefined && value !== null && String(value) !== "";
+      }
+
+      function templateNameFallback() {
+        return paper() + " " + numberValue("year") + " " +
+          (value("language") === "en" ? "英文" : "中文") + " " +
+          (value("kind") === "a" ? "評卷參考" : "題目");
+      }
+
+      function currentTemplate() {
+        if (!state.pdf || !state.rows.length) return { ok: false, errors: ["請先載入 PDF 並建立題目表。"] };
+        var template = window.HkdseSplitTemplate.createTemplate({
+          metadata: state.templateMeta || {},
+          name: value("templateName").trim() || templateNameFallback(),
+          paper: paper(),
+          year: numberValue("year"),
+          language: value("language"),
+          kind: value("kind"),
+          outputFormat: value("format"),
+          dpi: numberValue("dpi"),
+          sectionEnd: numberValue("sectionEnd"),
+          leftPercent: Number(value("leftPercent")),
+          rightPercent: Number(value("rightPercent")),
+          sourcePageCount: state.pageCount,
+          rows: state.rows
+        });
+        var result = window.HkdseSplitTemplate.validateTemplate(template);
+        return { ok: result.ok, template: template, errors: result.errors };
+      }
+
+      function setTemplateStatus(message, kind) {
+        var element = $("templateStatus");
+        element.textContent = message;
+        element.className = "template-status" + (kind ? " " + kind : "");
+      }
+
+      function templateSummary(template) {
+        return template.boundarySets.questions.length + " 題・" + template.paper + "・" + template.year + "・" +
+          (template.language === "en" ? "英文" : "中文") + "・" +
+          (template.kind === "a" ? "評卷參考" : "題目") + "・來源 PDF " + template.sourcePageCount + " 頁";
+      }
+
+      function templateFilename(template) {
+        return template.paper + "_" + template.year + "_" +
+          (template.language === "en" ? "英文" : "中文") + "_" +
+          (template.kind === "a" ? "評卷參考" : "題目") + "_template.json";
+      }
+
+      function currentOffsetResult() {
+        if (!state.pendingTemplate) return null;
+        return window.HkdseSplitTemplate.applyOffsets(state.pendingTemplate, {
+          pageOffset: $("pageOffsetInput").value === "" ? NaN : Number($("pageOffsetInput").value),
+          verticalOffset: $("verticalOffsetInput").value === "" ? NaN : Number($("verticalOffsetInput").value),
+          pageCount: state.pdf ? state.pageCount : null
+        });
+      }
+
+      function updateTemplateOffsetPreview() {
+        var result = currentOffsetResult();
+        var preview = $("templateOffsetPreview");
+        var warning = $("templateWarning");
+        var errorList = $("templateApplyErrors");
+        if (!result || !state.pendingTemplate) return;
+        preview.textContent = "此位移會改動 " + result.affectedCount + " 題的界線。";
+        warning.textContent = result.warnings.join("\n");
+        if (!state.pdf) warning.textContent = "請先載入要套用範本的 PDF。";
+        errorList.replaceChildren();
+        result.errors.forEach(function (message) {
+          var item = document.createElement("li");
+          item.textContent = message;
+          errorList.appendChild(item);
+        });
+        if (result.errors.length && result.canApply) {
+          var note = document.createElement("li");
+          note.textContent = "界線仍可套用；超出頁數、百分比或與其他題目衝突的列會保留在題目表供你修正。";
+          errorList.appendChild(note);
+        }
+        errorList.hidden = errorList.children.length === 0;
+        $("applyTemplateBtn").disabled = !state.pdf || !result.canApply;
+      }
+
+      function showTemplatePreview(input) {
+        var result = window.HkdseSplitTemplate.deserializeTemplate(input);
+        if (!result.ok) {
+          setTemplateStatus(result.errors.join("\n"), "bad");
+          return;
+        }
+        state.pendingTemplate = result.template;
+        $("templateName").value = result.template.name;
+        $("templateSummary").textContent = templateSummary(result.template);
+        $("templatePreview").hidden = false;
+        $("replaceConfirm").hidden = true;
+        $("pageOffsetInput").value = "0";
+        $("verticalOffsetInput").value = "0";
+        if (!state.pdf) {
+          $("templateWarning").textContent = "請先載入要套用範本的 PDF。";
+        } else if (state.pageCount !== result.template.sourcePageCount) {
+          $("templateWarning").textContent = "目前 PDF 共 " + state.pageCount + " 頁；範本來源 PDF 共 " +
+            result.template.sourcePageCount + " 頁。套用後請核對所有界線。";
+        } else {
+          $("templateWarning").textContent = "";
+        }
+        updateTemplateOffsetPreview();
+        setTemplateStatus("範本已驗證。請預覽位移，再按「套用到目前題目表」。", "good");
+      }
+
+      function reloadStoredTemplates() {
+        if (!window.HkdseSplitTemplate) {
+          ["saveTemplateBtn", "exportTemplateBtn", "importTemplateBtn"].forEach(function (id) {
+            $(id).disabled = true;
+          });
+          setTemplateStatus("範本模組未能載入；現有手動切圖仍可使用。請重新整理本頁。", "bad");
+          renderSavedTemplates();
+          return;
+        }
+        var result = window.HkdseSplitTemplate.loadStored(window);
+        state.savedTemplates = result.templates;
+        if (!result.ok) setTemplateStatus(result.message, "bad");
+        else if (result.invalidCount) setTemplateStatus("本機清單有 " + result.invalidCount + " 個無效範本，已略過；其餘仍可使用。", "warn");
+        renderSavedTemplates();
+      }
+
+      function persistStoredTemplates(message, nextTemplates) {
+        var list = nextTemplates || state.savedTemplates;
+        var result = window.HkdseSplitTemplate.saveStored(window, list);
+        if (result.ok) state.savedTemplates = list;
+        setTemplateStatus(result.ok ? (message || result.message) : result.message, result.ok ? "good" : "bad");
+        return result.ok;
+      }
+
+      function renderSavedTemplates() {
+        var container = $("savedTemplates");
+        container.replaceChildren();
+        if (!state.savedTemplates.length) {
+          var empty = document.createElement("div");
+          empty.className = "saved-template-meta";
+          empty.textContent = "此瀏覽器尚未儲存範本。";
+          container.appendChild(empty);
+          return;
+        }
+        state.savedTemplates.forEach(function (template, index) {
+          var card = document.createElement("div");
+          card.className = "saved-template";
+          var title = document.createElement("div");
+          title.className = "saved-template-name";
+          title.textContent = template.name;
+          var meta = document.createElement("div");
+          meta.className = "saved-template-meta";
+          meta.textContent = templateSummary(template);
+          var actions = document.createElement("div");
+          actions.className = "saved-template-actions";
+          var apply = document.createElement("button");
+          apply.className = "btn";
+          apply.type = "button";
+          apply.textContent = "預覽／套用";
+          apply.addEventListener("click", function () { showTemplatePreview(template); });
+          var renameInput = document.createElement("input");
+          renameInput.type = "text";
+          renameInput.maxLength = 100;
+          renameInput.value = template.name;
+          renameInput.setAttribute("aria-label", "範本新名稱");
+          var rename = document.createElement("button");
+          rename.className = "btn";
+          rename.type = "button";
+          rename.textContent = "改名";
+          rename.addEventListener("click", function () {
+            var nextName = renameInput.value.trim();
+            if (!nextName || nextName.length > 100) {
+              setTemplateStatus("範本名稱須為 1 至 100 個字元。", "bad");
+              return;
+            }
+            var nextTemplates = state.savedTemplates.slice();
+            nextTemplates[index] = Object.assign({}, template, { name: nextName, updatedAt: new Date().toISOString() });
+            if (persistStoredTemplates("範本已改名。", nextTemplates)) renderSavedTemplates();
+          });
+          var remove = document.createElement("button");
+          remove.className = "btn danger";
+          remove.type = "button";
+          remove.textContent = "刪除";
+          var confirm = document.createElement("div");
+          confirm.className = "template-confirm";
+          confirm.hidden = true;
+          var confirmText = document.createElement("span");
+          confirmText.textContent = "確認刪除此範本？";
+          var yes = document.createElement("button");
+          yes.className = "btn danger";
+          yes.type = "button";
+          yes.textContent = "確認刪除";
+          var no = document.createElement("button");
+          no.className = "btn";
+          no.type = "button";
+          no.textContent = "取消";
+          remove.addEventListener("click", function () { confirm.hidden = false; });
+          no.addEventListener("click", function () { confirm.hidden = true; });
+          yes.addEventListener("click", function () {
+            var nextTemplates = state.savedTemplates.slice();
+            nextTemplates.splice(index, 1);
+            if (persistStoredTemplates("已刪除範本。", nextTemplates)) renderSavedTemplates();
+          });
+          confirm.appendChild(confirmText);
+          confirm.appendChild(yes);
+          confirm.appendChild(no);
+          actions.appendChild(apply);
+          actions.appendChild(renameInput);
+          actions.appendChild(rename);
+          actions.appendChild(remove);
+          card.appendChild(title);
+          card.appendChild(meta);
+          card.appendChild(actions);
+          card.appendChild(confirm);
+          container.appendChild(card);
+        });
+      }
+
+      function captureTemplate() {
+        var result = currentTemplate();
+        if (!result.ok) {
+          setTemplateStatus(result.errors.join("\n"), "bad");
+          return null;
+        }
+        state.templateMeta = { id: result.template.id, createdAt: result.template.createdAt };
+        $("templateName").value = result.template.name;
+        return result.template;
+      }
+
+      function saveCurrentTemplate() {
+        var template = captureTemplate();
+        if (!template) return;
+        var existing = state.savedTemplates.find(function (item) { return item.id === template.id; });
+        if (existing) {
+          state.pendingTemplateSave = true;
+          $("saveTemplateChoiceTitle").textContent = "清單已存在「" + existing.name + "」。請選擇儲存方式：";
+          $("saveTemplateChoice").hidden = false;
+          setTemplateStatus("這次儲存會影響同 ID 範本；請選擇覆蓋或另存。", "warn");
+          return;
+        }
+        persistCurrentTemplate(template, "範本已儲存到此瀏覽器。");
+      }
+
+      function persistCurrentTemplate(template, message) {
+        var nextTemplates = state.savedTemplates.slice();
+        var existing = nextTemplates.findIndex(function (item) { return item.id === template.id; });
+        if (existing >= 0) nextTemplates[existing] = template;
+        else nextTemplates.push(template);
+        if (persistStoredTemplates(message, nextTemplates)) {
+          state.templateMeta = { id: template.id, createdAt: template.createdAt };
+          state.templateDirty = false;
+          state.pendingTemplateSave = false;
+          $("saveTemplateChoice").hidden = true;
+          renderSavedTemplates();
+        }
+      }
+
+      function createSavedCopy(source) {
+        return window.HkdseSplitTemplate.createTemplate({
+          name: value("templateName").trim() || templateNameFallback(),
+          paper: source.paper,
+          year: source.year,
+          language: source.language,
+          kind: source.kind,
+          outputFormat: source.outputFormat,
+          dpi: source.dpi,
+          sectionEnd: source.sectionEnd,
+          leftPercent: source.leftPercent,
+          rightPercent: source.rightPercent,
+          sourcePageCount: source.sourcePageCount,
+          rows: source.boundarySets.questions
+        });
+      }
+
+      function resolveTemplateSave(mode) {
+        if (!state.pendingTemplateSave) return;
+        var captured = captureTemplate();
+        if (!captured) return;
+        var existing = state.savedTemplates.find(function (item) { return item.id === captured.id; });
+        if (!existing) {
+          state.pendingTemplateSave = false;
+          $("saveTemplateChoice").hidden = true;
+          persistCurrentTemplate(captured, "範本已儲存到此瀏覽器。");
+          return;
+        }
+        if (mode === "copy") {
+          var copy = createSavedCopy(captured);
+          var attempts = 0;
+          while (state.savedTemplates.some(function (item) { return item.id === copy.id; }) && attempts < 3) {
+            copy = createSavedCopy(captured);
+            attempts += 1;
+          }
+          if (state.savedTemplates.some(function (item) { return item.id === copy.id; })) {
+            setTemplateStatus("未能建立新的範本 ID，原有範本未有更改。請再試一次。", "bad");
+            return;
+          }
+          var validation = window.HkdseSplitTemplate.validateTemplate(copy);
+          if (!validation.ok) {
+            setTemplateStatus(validation.errors.join("\n"), "bad");
+            return;
+          }
+          persistCurrentTemplate(copy, "已另存為新範本；原有範本保留不變。");
+          return;
+        }
+        var replacement = Object.assign({}, captured, {
+          id: existing.id,
+          createdAt: existing.createdAt,
+          updatedAt: new Date().toISOString()
+        });
+        persistCurrentTemplate(replacement, "已覆蓋原範本。");
+      }
+
+      function cancelTemplateSave() {
+        state.pendingTemplateSave = false;
+        $("saveTemplateChoice").hidden = true;
+      }
+
+      function exportCurrentTemplate() {
+        var template = captureTemplate();
+        if (!template) return;
+        var result = window.HkdseSplitTemplate.serializeTemplate(template);
+        if (!result.ok) {
+          setTemplateStatus(result.errors.join("\n"), "bad");
+          return;
+        }
+        downloadBlob(new Blob([result.text], { type: "application/json;charset=utf-8" }), templateFilename(template));
+        state.templateDirty = false;
+        setTemplateStatus("已匯出範本 JSON；檔案只包含界線及設定，不含 PDF 或本機路徑。", "good");
+      }
+
+      function beginTemplateApply() {
+        if (!state.pendingTemplate) return;
+        if (!state.pdf) {
+          setTemplateStatus("請先載入目標 PDF，再套用範本。", "bad");
+          return;
+        }
+        var hasBoundaries = state.rows.some(function (row) {
+          return ["start", "end"].some(function (side) {
+            var coord = row[side] || {};
+            return hasCoordinateValue(coord.page) || hasCoordinateValue(coord.percent);
+          });
+        });
+        if (hasBoundaries && state.templateDirty) {
+          $("replaceConfirm").hidden = false;
+          return;
+        }
+        performTemplateApply();
+      }
+
+      function performTemplateApply() {
+        var result = currentOffsetResult();
+        if (!result || !result.canApply || !state.pdf) return;
+        var template = state.pendingTemplate;
+        $("paper").value = template.paper;
+        $("year").value = String(template.year);
+        $("language").value = template.language;
+        $("kind").value = template.kind;
+        $("format").value = template.outputFormat;
+        $("dpi").value = String(template.dpi);
+        $("sectionEnd").value = String(template.sectionEnd);
+        $("leftPercent").value = String(template.leftPercent);
+        $("rightPercent").value = String(template.rightPercent);
+        $("count").value = String(result.rows.length);
+        $("sectionField").style.display = usesSection() ? "" : "none";
+        state.rows = result.rows;
+        state.selected = -1;
+        state.boundaryMode = "";
+        state.templateMeta = { id: template.id, createdAt: template.createdAt };
+        $("templateName").value = template.name;
+        state.templateDirty = false;
+        $("replaceConfirm").hidden = true;
+        renderTable();
+        updateSelection();
+        validate(true);
+        $("templatePreview").hidden = true;
+        setTemplateStatus(result.errors.length
+          ? "範本已套用；有 " + result.errors.length + " 項界線需在題目表修正。題目列已保留，未有自動刪除或截斷。"
+          : "範本已套用，可以逐題微調界線。", result.errors.length ? "warn" : "good");
+      }
+
       function renderThumbs() {
         if (!state.pdf) {
           thumbs.innerHTML = '<div class="empty">載入 PDF 後會顯示頁面縮圖</div>';
@@ -791,6 +1261,7 @@
           fileMeta.textContent = pdf.numPages + " 頁・" + Math.round(file.size / 1024) + " KB";
           renderThumbs();
           await showPage(1);
+          if (state.pendingTemplate && !$('templatePreview').hidden) updateTemplateOffsetPreview();
           setStatus("PDF 已載入。請輸入題數，建立題目表。", "good");
         } catch (error) {
           state.file = null;
@@ -812,6 +1283,8 @@
           return;
         }
         state.rows = [];
+        state.templateDirty = true;
+        state.templateMeta = null;
         state.selected = -1;
         state.boundaryMode = "";
         for (var i = 1; i <= count; i += 1) {
@@ -996,6 +1469,7 @@
         var percent = ((event.clientY - rect.top) / rect.height) * 100;
         percent = Math.max(0, Math.min(100, Math.round(percent * 10) / 10));
         row[state.boundaryMode] = { page: state.currentPage, percent: percent };
+        markTemplateDirty();
         var side = state.boundaryMode;
         state.boundaryMode = "";
         renderTable();
@@ -1015,6 +1489,7 @@
         if (!tr) return;
         var index = Number(tr.dataset.index);
         var row = state.rows[index];
+        markTemplateDirty();
         var field = event.target.dataset.field;
         if (field === "name") {
           row.name = event.target.value;
@@ -1042,6 +1517,7 @@
         var row = state.rows[Number(tr.dataset.index)];
         row.section = event.target.value;
         row.customSection = true;
+        markTemplateDirty();
         renderTable();
         updateSelection();
         validate(false);
@@ -1054,6 +1530,7 @@
         if (!row) return;
         row.start = { page: "", percent: "" };
         row.end = { page: "", percent: "" };
+        markTemplateDirty();
         renderTable();
         updateSelection();
         validate(false);
@@ -1063,6 +1540,7 @@
 
       ["paper", "year", "language", "kind", "format", "sectionEnd", "leftPercent", "rightPercent"].forEach(function (id) {
         $(id).addEventListener("change", function () {
+          markTemplateDirty();
           state.rows.forEach(function (row) {
             if (!row.customName) row.name = outputName(row.number);
             if (!usesSection()) {
@@ -1087,6 +1565,8 @@
         state.selected = -1;
         state.boundaryMode = "";
         state.rows = [];
+        state.templateDirty = false;
+        state.templateMeta = null;
         $("leftPercent").value = "0";
         $("rightPercent").value = "100";
         fileInput.value = "";
@@ -1279,6 +1759,40 @@
       $("downloadOneBtn").addEventListener("click", downloadOne);
       $("downloadZipBtn").addEventListener("click", downloadZip);
 
+      $("saveTemplateBtn").addEventListener("click", saveCurrentTemplate);
+      $("overwriteTemplateBtn").addEventListener("click", function () { resolveTemplateSave("overwrite"); });
+      $("saveAsNewTemplateBtn").addEventListener("click", function () { resolveTemplateSave("copy"); });
+      $("cancelTemplateSaveBtn").addEventListener("click", cancelTemplateSave);
+      $("exportTemplateBtn").addEventListener("click", exportCurrentTemplate);
+      $("importTemplateBtn").addEventListener("click", function () { $("templateFileInput").click(); });
+      $("templateFileInput").addEventListener("change", async function () {
+        var file = this.files && this.files[0];
+        this.value = "";
+        if (!file) return;
+        try {
+          var result = window.HkdseSplitTemplate.deserializeTemplate(await file.text());
+          if (!result.ok) {
+            setTemplateStatus(result.errors.join("\n"), "bad");
+            return;
+          }
+          showTemplatePreview(result.template);
+        } catch (error) {
+          setTemplateStatus("範本 JSON 讀取失敗：" + (error && error.message ? error.message : error), "bad");
+        }
+      });
+      ["pageOffsetInput", "verticalOffsetInput"].forEach(function (id) {
+        $(id).addEventListener("input", updateTemplateOffsetPreview);
+      });
+      $("applyTemplateBtn").addEventListener("click", beginTemplateApply);
+      $("confirmReplaceBtn").addEventListener("click", performTemplateApply);
+      $("cancelReplaceBtn").addEventListener("click", function () { $("replaceConfirm").hidden = true; });
+      $("cancelTemplateBtn").addEventListener("click", function () {
+        state.pendingTemplate = null;
+        $("templatePreview").hidden = true;
+        $("replaceConfirm").hidden = true;
+      });
+      reloadStoredTemplates();
+
       $("sectionField").style.display = usesSection() ? "" : "none";
       updateSelection();
       validate(false);
@@ -1286,12 +1800,14 @@
   </script>
   <script>
       window.addEventListener("load", function () {
-        if (window.pdfjsLib && window.JSZip && window.LT_PDF_WORKER_SRC) return;
+        if (window.pdfjsLib && window.JSZip && window.LT_PDF_WORKER_SRC && window.HkdseSplitTemplate) return;
         var warning = document.createElement("p");
         warning.setAttribute("role", "alert");
         warning.textContent = window.LT_OFFLINE
           ? "套件不完整：請先把 zip 完整解壓，再開啟 START-HERE.html"
-          : "PDF.js 未能載入；請檢查網絡連線後重新整理。";
+          : window.pdfjsLib && window.JSZip && window.LT_PDF_WORKER_SRC
+            ? "範本模組未能載入；現有手動切圖仍可使用，請重新整理本頁。"
+            : "PDF.js 未能載入；請檢查網絡連線後重新整理。";
         document.body.insertBefore(warning, document.body.firstChild);
       });
   </script>

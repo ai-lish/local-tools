@@ -14,10 +14,10 @@
       "byteLength": 24162
     },
     "core-all": {
-      "version": "2026.11.20.3",
-      "contentHash": "faba7442ca6a",
-      "fileCount": 36,
-      "byteLength": 4756009
+      "version": "2026.11.20.4",
+      "contentHash": "013d79e5fde6",
+      "fileCount": 37,
+      "byteLength": 4800461
     },
     "pdf-marking": {
       "version": "2026.11.20.3",
@@ -38,10 +38,10 @@
       "byteLength": 3572053
     },
     "hkdse-question-split": {
-      "version": "2026.11.13.2",
-      "contentHash": "5ff6bb1b350c",
-      "fileCount": 7,
-      "byteLength": 3047402
+      "version": "2026.11.20.3",
+      "contentHash": "fccad11ec724",
+      "fileCount": 8,
+      "byteLength": 3091854
     },
     "conduct-grade-average": {
       "version": "2026.11.16.4",
